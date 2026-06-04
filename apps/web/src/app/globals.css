@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', sans-serif;
+  }
+  [lang='ar'] {
+    font-family: 'Noto Naskh Arabic', serif;
+    direction: rtl;
+  }
+}

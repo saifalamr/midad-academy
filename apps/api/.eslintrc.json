@@ -1,0 +1,5 @@
+{
+  "root": true,
+  "extends": ["../../.eslintrc.js"],
+  "env": { "node": true }
+}

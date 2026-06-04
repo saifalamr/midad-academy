@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+.next/
+out/
+
+# Build outputs
+dist/
+build/
+
+# Turbo cache
+.turbo/
+
+# Environment files — never commit secrets
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Prisma generated client (regenerated via prisma generate)
+packages/database/src/generated/
+
+# IDE
+.vscode/settings.json
+.idea/

@@ -1,0 +1,205 @@
+// Prisma schema for Arabic Learning Platform
+// Run `npm run db:generate` after changes
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  TEACHER
+  STUDENT
+  PARENT
+}
+
+enum LessonStatus {
+  SCHEDULED
+  LIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+// ─── Users & Profiles ─────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         UserRole
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  teacherProfile TeacherProfile?
+  studentProfile StudentProfile?
+  parentProfile  ParentProfile?
+  payments       Payment[]
+
+  @@index([email])
+}
+
+model TeacherProfile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  bio            String
+  qualifications String[]
+  hourlyRate     Float
+  currency       String   @default("USD")
+  rating         Float    @default(0)
+  totalReviews   Int      @default(0)
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courses Course[]
+}
+
+model StudentProfile {
+  id          String  @id @default(cuid())
+  userId      String  @unique
+  age         Int
+  level       String  @default("beginner")
+  totalPoints Int     @default(0)
+  parentId    String?
+
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent       ParentProfile?    @relation(fields: [parentId], references: [id])
+  enrollments  Enrollment[]
+  achievements Achievement[]
+  pointEvents  PointTransaction[]
+}
+
+model ParentProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  children StudentProfile[]
+}
+
+// ─── Courses & Lessons ────────────────────────────────────────────────────────
+
+model Course {
+  id            String   @id @default(cuid())
+  title         String
+  description   String
+  teacherId     String
+  level         String
+  ageGroup      String
+  price         Float
+  currency      String   @default("USD")
+  maxStudents   Int      @default(10)
+  coverImageUrl String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  teacher     TeacherProfile @relation(fields: [teacherId], references: [id])
+  lessons     Lesson[]
+  enrollments Enrollment[]
+  payments    Payment[]
+}
+
+model Lesson {
+  id              String       @id @default(cuid())
+  courseId        String
+  title           String
+  description     String
+  scheduledAt     DateTime
+  durationMinutes Int
+  videoRoomId     String?
+  whiteboardId    String?
+  status          LessonStatus @default(SCHEDULED)
+  recordingUrl    String?
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId, scheduledAt])
+}
+
+model Enrollment {
+  id         String           @id @default(cuid())
+  courseId   String
+  studentId  String
+  enrolledAt DateTime         @default(now())
+  status     EnrollmentStatus @default(ACTIVE)
+
+  course  Course         @relation(fields: [courseId], references: [id])
+  student StudentProfile @relation(fields: [studentId], references: [id])
+
+  @@unique([courseId, studentId])
+  @@index([studentId])
+}
+
+// ─── Payments ─────────────────────────────────────────────────────────────────
+
+model Payment {
+  id                String        @id @default(cuid())
+  userId            String
+  courseId          String
+  amount            Float
+  currency          String        @default("USD")
+  status            PaymentStatus @default(PENDING)
+  provider          String
+  providerPaymentId String?
+  createdAt         DateTime      @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@index([userId, createdAt])
+}
+
+// ─── Gamification ─────────────────────────────────────────────────────────────
+
+model Badge {
+  id          String @id @default(cuid())
+  name        String @unique
+  description String
+  iconUrl     String
+
+  achievements Achievement[]
+}
+
+model Achievement {
+  id        String   @id @default(cuid())
+  studentId String
+  badgeId   String
+  earnedAt  DateTime @default(now())
+
+  student StudentProfile @relation(fields: [studentId], references: [id])
+  badge   Badge          @relation(fields: [badgeId], references: [id])
+
+  @@unique([studentId, badgeId])
+  @@index([studentId])
+}
+
+model PointTransaction {
+  id        String   @id @default(cuid())
+  studentId String
+  points    Int
+  event     String
+  createdAt DateTime @default(now())
+
+  student StudentProfile @relation(fields: [studentId], references: [id])
+
+  @@index([studentId, createdAt])
+}
