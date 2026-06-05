@@ -161,11 +161,19 @@ export default function TeacherDashboard() {
                       </p>
                     </div>
                   </div>
-                  <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
-                    <span>👥 {course._count.enrollments} student{course._count.enrollments !== 1 ? 's' : ''}</span>
-                    {course.lessons.length > 0 && (
-                      <span>📅 {course.lessons.length} upcoming session{course.lessons.length !== 1 ? 's' : ''}</span>
-                    )}
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                      <span>👥 {course._count.enrollments} student{course._count.enrollments !== 1 ? 's' : ''}</span>
+                      {course.lessons.length > 0 && (
+                        <span>📅 {course.lessons.length} upcoming session{course.lessons.length !== 1 ? 's' : ''}</span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => router.push(`/classroom/${course.id}`)}
+                      className="text-xs font-semibold bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      ▶ Start Class
+                    </button>
                   </div>
                 </div>
               ))}

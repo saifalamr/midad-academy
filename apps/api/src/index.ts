@@ -9,6 +9,7 @@ import { healthRoutes } from './routes/health';
 import { authRoutes } from './routes/auth';
 import { courseRoutes } from './routes/courses';
 import { parentRoutes } from './routes/parent';
+import { sessionRoutes } from './routes/sessions';
 
 const app = Fastify({ logger: config.NODE_ENV !== 'test' });
 
@@ -58,6 +59,7 @@ async function bootstrap() {
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(courseRoutes, { prefix: '/api/courses' });
   await app.register(parentRoutes, { prefix: '/api/parent' });
+  await app.register(sessionRoutes, { prefix: '/api/sessions' });
 
   await app.listen({ port: config.PORT, host: '0.0.0.0' });
   app.log.info(`API running on http://localhost:${config.PORT}`);

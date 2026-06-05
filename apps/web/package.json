@@ -13,6 +13,9 @@
   "dependencies": {
     "@arabic-platform/shared-types": "*",
     "@arabic-platform/ui": "*",
+    "@livekit/components-react": "^2.9.21",
+    "@livekit/components-styles": "^1.2.0",
+    "livekit-client": "^2.19.1",
     "next": "14.2.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
