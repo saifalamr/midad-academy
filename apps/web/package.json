@@ -15,10 +15,13 @@
     "@arabic-platform/ui": "*",
     "@livekit/components-react": "^2.9.21",
     "@livekit/components-styles": "^1.2.0",
+    "fabric": "^7.4.0",
     "livekit-client": "^2.19.1",
     "next": "14.2.4",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "y-websocket": "^3.0.0",
+    "yjs": "^13.6.31"
   },
   "devDependencies": {
     "@types/node": "^20",

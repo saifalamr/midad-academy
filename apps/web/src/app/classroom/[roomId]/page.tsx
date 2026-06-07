@@ -13,6 +13,7 @@ import {
 import '@livekit/components-styles';
 import type { TrackReferenceOrPlaceholder } from '@livekit/components-react';
 import { Track } from 'livekit-client';
+import Whiteboard from '@/components/Whiteboard';
 
 const LIVEKIT_URL = process.env.NEXT_PUBLIC_LIVEKIT_URL!;
 
@@ -38,7 +39,7 @@ function getRole(trackRef: TrackReferenceOrPlaceholder): string {
 
 // ── Inner classroom UI (rendered inside LiveKitRoom context) ─────────────────
 
-function ClassroomContent({ onLeave }: { onLeave: () => void }) {
+function ClassroomContent({ roomId, isTeacher, onLeave }: { roomId: string; isTeacher: boolean; onLeave: () => void }) {
   const cameraTracks = useTracks(
     [{ source: Track.Source.Camera, withPlaceholder: true }],
     { onlySubscribed: false },
@@ -65,11 +66,11 @@ function ClassroomContent({ onLeave }: { onLeave: () => void }) {
         <span className="text-xs text-gray-500">{cameraTracks.length} participant{cameraTracks.length !== 1 ? 's' : ''}</span>
       </div>
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col gap-3 p-4 overflow-hidden min-h-0">
+      {/* Main content — scrolls so the whiteboard can sit below the video feeds */}
+      <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
 
         {/* Teacher feed — large */}
-        <div className="flex-1 relative rounded-2xl overflow-hidden bg-gray-800 min-h-0">
+        <div className="relative rounded-2xl overflow-hidden bg-gray-800 aspect-video">
           {teacherTrack ? (
             <ParticipantTile
               trackRef={teacherTrack}
@@ -85,7 +86,7 @@ function ClassroomContent({ onLeave }: { onLeave: () => void }) {
 
         {/* Student feeds — small strip */}
         {studentTracks.length > 0 && (
-          <div className={`grid ${studentGridCols} gap-2 h-36 shrink-0`}>
+          <div className={`grid ${studentGridCols} gap-2 h-36`}>
             {studentTracks.map((track) => (
               <div
                 key={track.participant.identity}
@@ -99,6 +100,12 @@ function ClassroomContent({ onLeave }: { onLeave: () => void }) {
             ))}
           </div>
         )}
+
+        {/* Shared whiteboard — synced live across the room via Yjs */}
+        <div>
+          <h2 className="text-sm font-semibold text-gray-300 mb-2">📝 Whiteboard</h2>
+          <Whiteboard roomId={roomId} canDraw={isTeacher} />
+        </div>
       </div>
 
       {/* Control bar */}
@@ -144,6 +151,7 @@ export default function ClassroomPage() {
   const roomId = params.roomId as string;
 
   const [token, setToken] = useState<string | null>(null);
+  const [role, setRole] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -156,6 +164,16 @@ export default function ClassroomPage() {
       console.log('[Classroom] No token — redirecting to /login');
       router.push('/login');
       return;
+    }
+
+    // Decode the role straight from our own JWT — relying on the LiveKit
+    // participant's `metadata` here would race against the room connection
+    // (it's not guaranteed to be populated on first render).
+    try {
+      const payload = JSON.parse(atob(appToken.split('.')[1]));
+      setRole(payload.role?.toLowerCase() ?? null);
+    } catch {
+      setRole(null);
     }
 
     console.log('[Classroom] Sending POST /api/sessions/create');
@@ -229,7 +247,7 @@ export default function ClassroomPage() {
       onDisconnected={handleLeave}
       style={{ height: '100vh' }}
     >
-      <ClassroomContent onLeave={handleLeave} />
+      <ClassroomContent roomId={roomId} isTeacher={role === 'teacher'} onLeave={handleLeave} />
     </LiveKitRoom>
   );
 }
