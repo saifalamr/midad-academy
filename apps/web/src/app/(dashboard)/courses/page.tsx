@@ -64,22 +64,31 @@ export default function BrowseCoursesPage() {
     setMessage('');
     setEnrollingId(courseId);
     try {
-      const res = await authFetch('/api/enrollments', {
+      const res = await authFetch('/api/payments/create-checkout', {
         method: 'POST',
         body: JSON.stringify({ courseId }),
       });
       const json = await res.json();
 
       if (!res.ok) {
-        setMessage(json.error || 'Failed to enroll');
+        setMessage(json.error || 'Failed to start enrollment');
+        setEnrollingId(null);
         return;
       }
 
+      if (json.data.type === 'checkout') {
+        // Paid course — hand off to Stripe's hosted checkout page. Keep the
+        // button in its "Enrolling…" state through the redirect.
+        window.location.href = json.data.url;
+        return;
+      }
+
+      // Free course — the API enrolled the student directly, no payment needed.
       setEnrolledIds((prev) => new Set(prev).add(courseId));
       setMessage('Enrolled! Find your class on the dashboard.');
+      setEnrollingId(null);
     } catch {
       setMessage('Could not connect to server');
-    } finally {
       setEnrollingId(null);
     }
   }

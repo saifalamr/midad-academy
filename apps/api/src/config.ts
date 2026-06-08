@@ -10,4 +10,6 @@ export const config = {
   LIVEKIT_API_KEY: process.env.LIVEKIT_API_KEY || '',
   LIVEKIT_API_SECRET: process.env.LIVEKIT_API_SECRET || '',
   WHITEBOARD_WS_PORT: Number(process.env.WHITEBOARD_WS_PORT) || 1234,
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
+  WEB_URL: process.env.WEB_URL || 'http://localhost:3000',
 } as const;

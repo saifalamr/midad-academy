@@ -10,6 +10,7 @@ import { authRoutes } from './routes/auth';
 import { courseRoutes } from './routes/courses';
 import { enrollmentRoutes } from './routes/enrollments';
 import { parentRoutes } from './routes/parent';
+import { paymentRoutes } from './routes/payments';
 import { sessionRoutes } from './routes/sessions';
 import { startWhiteboardWebSocketServer } from './ws-server';
 
@@ -63,6 +64,7 @@ async function bootstrap() {
   await app.register(enrollmentRoutes, { prefix: '/api/enrollments' });
   await app.register(parentRoutes, { prefix: '/api/parent' });
   await app.register(sessionRoutes, { prefix: '/api/sessions' });
+  await app.register(paymentRoutes, { prefix: '/api/payments' });
 
   await app.listen({ port: config.PORT, host: '0.0.0.0' });
   app.log.info(`API running on http://localhost:${config.PORT}`);
