@@ -8,6 +8,7 @@ import { config } from './config';
 import { healthRoutes } from './routes/health';
 import { authRoutes } from './routes/auth';
 import { courseRoutes } from './routes/courses';
+import { enrollmentRoutes } from './routes/enrollments';
 import { parentRoutes } from './routes/parent';
 import { sessionRoutes } from './routes/sessions';
 import { startWhiteboardWebSocketServer } from './ws-server';
@@ -59,6 +60,7 @@ async function bootstrap() {
   await app.register(healthRoutes, { prefix: '/api' });
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(courseRoutes, { prefix: '/api/courses' });
+  await app.register(enrollmentRoutes, { prefix: '/api/enrollments' });
   await app.register(parentRoutes, { prefix: '/api/parent' });
   await app.register(sessionRoutes, { prefix: '/api/sessions' });
 

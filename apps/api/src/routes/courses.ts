@@ -10,6 +10,32 @@ const createCourseSchema = z.object({
 });
 
 export async function courseRoutes(app: FastifyInstance) {
+  // ── GET /api/courses/browse ───────────────────────────────────────────────
+  // Lists every course on the platform with its teacher's name — used by the
+  // student-facing "Browse Courses" page. Any authenticated user can call it.
+  app.get('/browse', { preHandler: [app.authenticate] }, async (_request, reply) => {
+    const courses = await prisma.course.findMany({
+      include: {
+        teacher: { include: { user: { select: { name: true } } } },
+        _count: { select: { enrollments: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return reply.send({
+      data: courses.map((c) => ({
+        id: c.id,
+        title: c.title,
+        description: c.description,
+        ageGroup: c.ageGroup,
+        price: c.price,
+        currency: c.currency,
+        teacherName: c.teacher.user.name,
+        studentCount: c._count.enrollments,
+      })),
+    });
+  });
+
   // ── GET /api/courses ──────────────────────────────────────────────────────
   // Returns the authenticated teacher's courses with enrollment counts and
   // the next 3 upcoming scheduled lessons per course.
