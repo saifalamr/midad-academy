@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function RegisterPage() {
@@ -40,96 +41,121 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
-        <p className="text-3xl mb-2">📚</p>
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Create an account</h1>
-        <p className="text-gray-500 mb-8 text-sm">Join the Arabic learning platform</p>
+    <div className="midad auth">
+      {/* ── Left side ───────────────────────────────────────── */}
+      <aside className="auth-side geo-navy">
+        <Link className="brand brand-light" href="/">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/midad-mark.png" alt="Midad Academy" />
+          <span className="bn"><b style={{ color: '#fff', fontSize: 20 }}>Midad</b><span style={{ color: 'var(--gold-200)' }}>ACADEMY</span></span>
+        </Link>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700" htmlFor="name">
-              Full name
-            </label>
-            <input
-              id="name"
-              type="text"
-              required
-              placeholder="Ahmed Al-Rashid"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400"
-            />
+        <div className="auth-side-body">
+          <h2 className="auth-head">Begin the journey today.</h2>
+          <p className="ar auth-head-ar">ابدأ رحلة التعلّم اليوم</p>
+          <ul className="auth-perks">
+            <li>First week completely free</li>
+            <li>Certified native-speaking teachers</li>
+            <li>Cancel anytime — no contracts</li>
+            <li>Parent dashboard included on every plan</li>
+          </ul>
+        </div>
+
+        <div className="auth-side-foot">© 2026 Midad Academy</div>
+      </aside>
+
+      {/* ── Right side ──────────────────────────────────────── */}
+      <div className="auth-main">
+        <div className="auth-card">
+          <div className="auth-top-link">
+            Already a member? <Link href="/login">Log in</Link>
           </div>
 
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700" htmlFor="email">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400"
-            />
-          </div>
+          <h1 className="auth-title">Create your account</h1>
+          <p className="auth-sub">A few details and you&apos;re in. <span className="ar">إنشاء حساب جديد</span></p>
 
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700" htmlFor="password">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              minLength={8}
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400"
-            />
-          </div>
+          {error && <div className="auth-error">{error}</div>}
 
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700" htmlFor="role">
-              I am a…
+          <form onSubmit={handleSubmit}>
+            <div className="field">
+              <label htmlFor="name">
+                Full name <span className="ar muted">الاسم الكامل</span>
+              </label>
+              <input
+                id="name"
+                className="input"
+                type="text"
+                required
+                placeholder="e.g. Sara Al-Amin"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+
+            <div className="field">
+              <label htmlFor="email">
+                Email address <span className="ar muted">البريد الإلكتروني</span>
+              </label>
+              <input
+                id="email"
+                className="input"
+                type="email"
+                required
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+
+            <div className="grid-2">
+              <div className="field">
+                <label htmlFor="password">
+                  Password <span className="ar muted">كلمة المرور</span>
+                </label>
+                <input
+                  id="password"
+                  className="input"
+                  type="password"
+                  required
+                  minLength={8}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+
+              <div className="field">
+                <label htmlFor="role">
+                  I am a… <span className="ar muted">الدور</span>
+                </label>
+                <select
+                  id="role"
+                  className="input"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                >
+                  <option value="parent">Parent — وليّ أمر</option>
+                  <option value="student">Student — طالب</option>
+                  <option value="teacher">Teacher — معلّم</option>
+                </select>
+              </div>
+            </div>
+
+            <label className="check check-block">
+              <input type="checkbox" required />
+              I agree to the <a href="#" className="link-gold">Terms</a> &amp; <a href="#" className="link-gold">Privacy Policy</a>
             </label>
-            <select
-              id="role"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400 bg-white"
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn btn-gold btn-block btn-lg"
+              style={{ opacity: loading ? 0.65 : 1 }}
             >
-              <option value="teacher">Teacher</option>
-              <option value="student">Student</option>
-              <option value="parent">Parent</option>
-            </select>
-          </div>
-
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-              {error}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-primary-500 text-white py-2.5 rounded-lg font-semibold hover:bg-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Creating account…' : 'Create Account'}
-          </button>
-        </form>
-
-        <p className="text-center text-sm text-gray-500 mt-6">
-          Already have an account?{' '}
-          <a href="/login" className="text-primary-600 font-medium hover:underline">
-            Sign in
-          </a>
-        </p>
+              {loading ? 'Creating account…' : 'Create account'}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

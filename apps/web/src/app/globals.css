@@ -139,9 +139,6 @@
 .midad .nav-inner{max-width:var(--maxw);margin:0 auto;padding:0 28px;height:72px;display:flex;align-items:center;gap:28px}
 .midad .brand{display:flex;align-items:center;gap:11px;font-weight:800}
 .midad .brand img{height:46px;width:auto}
-.midad .brand-mark{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;flex:none;
-  background:linear-gradient(160deg,var(--navy),var(--navy-900));color:var(--gold-200);
-  font-family:var(--font-ar);font-weight:700;font-size:20px;box-shadow:var(--sh-sm)}
 .midad .brand .bn{display:flex;flex-direction:column;line-height:1}
 .midad .brand .bn b{color:var(--navy);font-size:18px;letter-spacing:-.01em}
 .midad .brand .bn span{color:var(--gold-600);font-size:11px;font-weight:700;letter-spacing:.18em}
@@ -305,6 +302,61 @@
   .midad .price-best{transform:none}
   .midad .sec-h2{font-size:32px}
   .midad .cta-band{padding:36px 28px}
+}
+
+/* ============================================================
+   AUTH PAGES (login / register)
+   ============================================================ */
+.midad .auth{display:grid;grid-template-columns:.92fr 1.08fr;min-height:100vh}
+.midad .auth-side{padding:40px 48px;display:flex;flex-direction:column;color:#fff;position:relative}
+.midad .brand-light .bn{gap:2px}
+.midad .brand-light .bn span{font-size:11px;letter-spacing:.18em}
+.midad .auth-side-body{margin:auto 0;max-width:420px}
+.midad .auth-head{color:#fff;font-size:38px;font-weight:900;line-height:1.1}
+.midad .auth-head-ar{font-size:22px;color:var(--gold-200);font-weight:600;margin:10px 0 18px}
+.midad .auth-side-p{color:#c5d2e6;font-size:16px;line-height:1.6;max-width:380px}
+.midad .card-glass{margin-top:30px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);
+  border-radius:var(--r);padding:20px 22px;backdrop-filter:blur(4px)}
+.midad .auth-quote p{color:#eef3fb;font-size:15.5px;font-style:italic;line-height:1.55}
+.midad .aq-by{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:13.5px;color:#bccbe2;font-weight:600}
+.midad .auth-side-foot{font-size:12.5px;color:#8ea0bb;margin-top:auto}
+.midad .auth-perks{list-style:none;margin-top:24px;display:flex;flex-direction:column;gap:14px}
+.midad .auth-perks li{color:#dbe4f1;font-size:16px;display:flex;align-items:center;gap:12px;font-weight:500}
+.midad .auth-perks li::before{content:"";width:24px;height:24px;border-radius:50%;flex:none;background:var(--gold);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='white' stroke-width='2.6'%3E%3Cpath d='M2 7l3.5 3.5L12 3'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:center}
+
+.midad .auth-main{background:var(--paper);display:grid;place-items:center;padding:40px 28px}
+.midad .auth-card{width:min(440px,100%)}
+.midad .auth-top-link{text-align:right;font-size:14px;color:var(--ink-3);margin-bottom:26px}
+.midad .auth-top-link a{color:var(--gold-600);font-weight:700}
+.midad .auth-title{font-size:34px;font-weight:900;margin-bottom:6px;color:var(--navy)}
+.midad .auth-sub{color:var(--ink-2);font-size:15px;margin-bottom:28px}
+.midad .auth-sub .ar{color:var(--ink-3)}
+.midad .field label .ar{font-weight:500;font-size:12px;margin-left:6px}
+.midad .input-wrap{position:relative}
+.midad .eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--ink-3);padding:6px;
+  background:none;border:none;cursor:pointer}
+.midad .eye svg{width:20px;height:20px}
+.midad .auth-row{display:flex;justify-content:space-between;align-items:center;margin:6px 0 22px}
+.midad .check{display:flex;align-items:center;gap:9px;font-size:14px;color:var(--ink-2);cursor:pointer}
+.midad .check input{width:17px;height:17px;accent-color:var(--gold)}
+.midad .check-block{margin:4px 0 22px}
+.midad .link-gold{color:var(--gold-600);font-weight:700;font-size:14px}
+.midad .auth-or{text-align:center;position:relative;margin:24px 0}
+.midad .auth-or::before{content:"";position:absolute;top:50%;left:0;right:0;height:1px;background:var(--line)}
+.midad .auth-or span{position:relative;background:var(--paper);padding:0 14px;font-size:13px;color:var(--ink-3)}
+.midad .auth-social{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.midad .social-btn{height:48px;border-radius:12px;border:1.5px solid var(--line);background:#fff;
+  font-weight:700;font-size:14.5px;color:var(--ink);transition:.15s;cursor:pointer;font-family:inherit}
+.midad .social-btn:hover{border-color:var(--navy)}
+.midad .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.midad .auth-error{background:#fde6df;border:1px solid #f5bdb6;border-radius:12px;
+  padding:12px 16px;font-size:14px;color:#c93b31;margin-bottom:18px}
+
+@media(max-width:880px){
+  .midad .auth{grid-template-columns:1fr}
+  .midad .auth-side{display:none}
 }
 
 /* ============================================================
