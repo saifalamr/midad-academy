@@ -76,8 +76,7 @@ export default function Navbar() {
       <div className="nav-inner">
         <Link className="brand" href="/">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/midad-mark.png" alt="Midad Academy" />
-          <span className="bn"><b>Midad</b><span>ACADEMY</span></span>
+          <img src="/midad-logo-transparent.png" alt="Midad Academy" className="logo-full" />
         </Link>
 
         <nav className="nav-links">

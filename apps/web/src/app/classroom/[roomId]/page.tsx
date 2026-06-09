@@ -37,7 +37,7 @@ function getRole(trackRef: TrackReferenceOrPlaceholder): string {
   }
 }
 
-// ── Inner classroom UI (rendered inside LiveKitRoom context) ─────────────────
+// ── Inner classroom UI (inside LiveKitRoom context) ──────────────────────────
 
 function ClassroomContent({ roomId, isTeacher, onLeave }: { roomId: string; isTeacher: boolean; onLeave: () => void }) {
   const cameraTracks = useTracks(
@@ -50,93 +50,113 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: { roomId: string; isTe
 
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
 
-  const studentGridCols =
-    studentTracks.length === 1 ? 'grid-cols-1' :
-    studentTracks.length === 2 ? 'grid-cols-2' :
-    studentTracks.length <= 4 ? 'grid-cols-2' :
-    'grid-cols-4';
+  const participantCount = cameraTracks.length;
 
   return (
-    <div className="flex flex-col h-screen bg-gray-950 text-white select-none">
+    <div className="midad room">
       <RoomAudioRenderer />
 
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-gray-800 bg-gray-900 shrink-0">
-        <span className="text-sm font-semibold text-gray-300">🌙 Arabic Live Class</span>
-        <span className="text-xs text-gray-500">{cameraTracks.length} participant{cameraTracks.length !== 1 ? 's' : ''}</span>
-      </div>
+      {/* ── Room top bar ── */}
+      <header className="room-top">
+        <div className="rt-left">
+          <button className="rt-back" onClick={onLeave} aria-label="Leave room">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <div>
+            <div className="rt-title ar">Arabic Live Class</div>
+            <div className="rt-sub">Interactive whiteboard session</div>
+          </div>
+        </div>
+        <div className="rt-center">
+          <span className="badge-live"><span className="dot"></span> Live</span>
+          <span className="rt-count">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M16 19v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="3"/><path d="M22 19v-2a4 4 0 0 0-3-3.9"/></svg>
+            {participantCount}
+          </span>
+        </div>
+        <div className="rt-right">
+          <button className="rt-leave btn btn-sm" onClick={onLeave}>Leave</button>
+        </div>
+      </header>
 
-      {/* Main content — scrolls so the whiteboard can sit below the video feeds */}
-      <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
-
-        {/* Teacher feed — large */}
-        <div className="relative rounded-2xl overflow-hidden bg-gray-800 aspect-video">
+      {/* ── Video strip ── */}
+      <div className="video-strip">
+        {/* Teacher tile — wider, gold border */}
+        <div className="vtile vteacher">
           {teacherTrack ? (
-            <ParticipantTile
-              trackRef={teacherTrack}
-              style={{ width: '100%', height: '100%' }}
-            />
+            <ParticipantTile trackRef={teacherTrack} style={{ width: '100%', height: '100%' }} />
           ) : (
-            <div className="h-full flex flex-col items-center justify-center gap-2 text-gray-500">
-              <span className="text-4xl">👨‍🏫</span>
-              <span className="text-sm">Waiting for teacher to join…</span>
+            <div className="vph">
+              <span>Waiting for teacher…</span>
             </div>
           )}
+          <div className="vlabel">
+            <span className="vmic on"></span>
+            Teacher
+            <span className="vhost">Host</span>
+          </div>
         </div>
 
-        {/* Student feeds — small strip */}
-        {studentTracks.length > 0 && (
-          <div className={`grid ${studentGridCols} gap-2 h-36`}>
-            {studentTracks.map((track) => (
-              <div
-                key={track.participant.identity}
-                className="relative rounded-xl overflow-hidden bg-gray-800"
-              >
-                <ParticipantTile
-                  trackRef={track}
-                  style={{ width: '100%', height: '100%' }}
-                />
-              </div>
-            ))}
+        {/* Student tiles */}
+        {studentTracks.slice(0, 4).map((track) => (
+          <div key={track.participant.identity} className="vtile">
+            <ParticipantTile trackRef={track} style={{ width: '100%', height: '100%' }} />
+            <div className="vlabel">
+              <span className="vmic on"></span>
+              {track.participant.name ?? track.participant.identity}
+            </div>
           </div>
-        )}
+        ))}
 
-        {/* Shared whiteboard — synced live across the room via Yjs */}
-        <div>
-          <h2 className="text-sm font-semibold text-gray-300 mb-2">📝 Whiteboard</h2>
-          <Whiteboard roomId={roomId} canDraw={isTeacher} />
+        {studentTracks.length > 4 && (
+          <div className="vtile vmore"><span>+{studentTracks.length - 4}</span></div>
+        )}
+      </div>
+
+      {/* ── Whiteboard area ── */}
+      <div className="board-wrap">
+        <div className="board-stage">
+          <div className="board-paper">
+            <Whiteboard roomId={roomId} canDraw={isTeacher} />
+            <div className="board-guide ar">اِكتُب الحروف هنا ✍️</div>
+          </div>
         </div>
       </div>
 
-      {/* Control bar */}
-      <div className="flex items-center justify-center gap-3 py-4 px-6 border-t border-gray-800 bg-gray-900 shrink-0">
+      {/* ── Room controls ── */}
+      <div className="room-controls">
         <button
+          className="rc-btn"
           onClick={() => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-            isMicrophoneEnabled
-              ? 'bg-gray-700 hover:bg-gray-600 text-white'
-              : 'bg-red-600 hover:bg-red-700 text-white'
-          }`}
         >
-          {isMicrophoneEnabled ? '🎤 Mute' : '🔇 Unmute'}
+          <span className="rci">{isMicrophoneEnabled ? '🎤' : '🔇'}</span>
+          <span>{isMicrophoneEnabled ? 'Mute' : 'Unmute'}</span>
         </button>
 
         <button
+          className="rc-btn"
           onClick={() => localParticipant.setCameraEnabled(!isCameraEnabled)}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-            isCameraEnabled
-              ? 'bg-gray-700 hover:bg-gray-600 text-white'
-              : 'bg-red-600 hover:bg-red-700 text-white'
-          }`}
         >
-          {isCameraEnabled ? '📷 Stop Video' : '📷 Start Video'}
+          <span className="rci">📷</span>
+          <span>{isCameraEnabled ? 'Stop Video' : 'Start Video'}</span>
+        </button>
+
+        <button className="rc-btn">
+          <span className="rci">✋</span>
+          <span>Raise hand</span>
+        </button>
+
+        <button className="rc-btn">
+          <span className="rci">😊</span>
+          <span>React</span>
         </button>
 
         <DisconnectButton
           onClick={onLeave}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-sm transition-colors"
+          className="rc-btn rc-leave"
         >
-          Leave Class
+          <span className="rci">📞</span>
+          <span>Leave</span>
         </DisconnectButton>
       </div>
     </div>
@@ -198,16 +218,15 @@ export default function ClassroomPage() {
       });
   }, [roomId, router]);
 
-  // Redirect back to the role dashboard after leaving
   function handleLeave() {
     const appToken = localStorage.getItem('token');
     if (appToken) {
       try {
         const payload = JSON.parse(atob(appToken.split('.')[1]));
-        const role = payload.role?.toLowerCase();
-        if (role === 'teacher') { router.push('/teacher'); return; }
-        if (role === 'parent')  { router.push('/parent');  return; }
-        if (role === 'student') { router.push('/student'); return; }
+        const r = payload.role?.toLowerCase();
+        if (r === 'teacher') { router.push('/teacher'); return; }
+        if (r === 'parent')  { router.push('/parent');  return; }
+        if (r === 'student') { router.push('/student'); return; }
       } catch { /* fall through */ }
     }
     router.push('/login');
@@ -215,12 +234,10 @@ export default function ClassroomPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">
-        <div className="text-center space-y-3">
-          <p className="text-red-400 font-medium">{error}</p>
-          <button onClick={handleLeave} className="text-sm text-gray-400 hover:text-white underline">
-            Go back
-          </button>
+      <div className="midad room" style={{ alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center', padding: 32 }}>
+          <p style={{ color: '#f87171', fontWeight: 600, marginBottom: 12 }}>{error}</p>
+          <button className="btn btn-ghost btn-sm" onClick={handleLeave}>Go back</button>
         </div>
       </div>
     );
@@ -228,10 +245,10 @@ export default function ClassroomPage() {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">
-        <div className="text-center space-y-2">
-          <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-sm text-gray-400">Joining classroom…</p>
+      <div className="midad room" style={{ alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center', padding: 32 }}>
+          <div className="animate-spin" style={{ width: 32, height: 32, border: '2px solid rgba(255,255,255,.3)', borderTopColor: '#fff', borderRadius: '50%', margin: '0 auto 12px' }} />
+          <p style={{ fontSize: 14, color: '#8ea0bb' }}>Joining classroom…</p>
         </div>
       </div>
     );

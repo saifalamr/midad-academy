@@ -44,10 +44,9 @@ export default function RegisterPage() {
     <div className="midad auth">
       {/* ── Left side ───────────────────────────────────────── */}
       <aside className="auth-side geo-navy">
-        <Link className="brand brand-light" href="/">
+        <Link className="brand" href="/">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/midad-mark.png" alt="Midad Academy" />
-          <span className="bn"><b style={{ color: '#fff', fontSize: 20 }}>Midad</b><span style={{ color: 'var(--gold-200)' }}>ACADEMY</span></span>
+          <img src="/midad-logo-transparent.png" alt="Midad Academy" className="logo-full logo-white" />
         </Link>
 
         <div className="auth-side-body">

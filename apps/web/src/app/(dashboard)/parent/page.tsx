@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 type Session = {
   id: string;
@@ -43,36 +44,33 @@ function authFetch(path: string) {
   });
 }
 
-const LEVEL_STYLES: Record<string, string> = {
-  beginner: 'bg-green-50 text-green-700 border-green-200',
-  intermediate: 'bg-blue-50 text-blue-700 border-blue-200',
-  advanced: 'bg-purple-50 text-purple-700 border-purple-200',
-};
-
-function ProgressBar({ completed, total }: { completed: number; total: number }) {
-  const pct = total === 0 ? 0 : Math.round((completed / total) * 100);
-  return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-xs text-gray-500">
-        <span>{completed} / {total} lessons</span>
-        <span>{pct}%</span>
-      </div>
-      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-        <div
-          className="h-full bg-primary-500 rounded-full transition-all duration-500"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-    </div>
-  );
+function getTokenPayload(): { name?: string } {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return {};
+    return JSON.parse(atob(token.split('.')[1]));
+  } catch {
+    return {};
+  }
 }
+
+const CHILD_COLORS = [
+  { bg: '#dce6f4', color: 'var(--navy)' },
+  { bg: '#e3efe6', color: '#2a6d49' },
+  { bg: '#f4dede', color: '#b3463b' },
+  { bg: '#f3e8d4', color: '#8a5a1a' },
+];
 
 export default function ParentDashboard() {
   const router = useRouter();
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState('Parent');
 
   useEffect(() => {
+    const payload = getTokenPayload();
+    setUserName(payload.name ?? 'Parent');
+
     authFetch('/api/parent/overview')
       .then(async (res) => {
         if (res.status === 401) { router.push('/login'); return; }
@@ -86,111 +84,136 @@ export default function ParentDashboard() {
   const children = overview?.children ?? [];
   const totalCompleted = children.reduce((s, c) => s + c.lessonsCompleted, 0);
   const totalEnrolled = children.reduce((s, c) => s + c.courseProgress.length, 0);
+  const familyXP = children.reduce((s, c) => s + c.totalPoints, 0);
 
   const allSessions = children
     .flatMap((c) => c.recentSessions.map((s) => ({ ...s, childName: c.name })))
     .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime())
-    .slice(0, 10);
+    .slice(0, 5);
 
-  const stats = [
-    { label: 'Children', value: String(children.length), color: 'text-primary-600' },
-    { label: 'Active Enrollments', value: String(totalEnrolled), color: 'text-secondary-600' },
-    { label: 'Lessons Completed', value: String(totalCompleted), color: 'text-green-600' },
-  ];
+  const initial = userName.charAt(0).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Parent Dashboard</h1>
-        <p className="text-gray-500 text-sm">Monitor your children's Arabic learning progress</p>
-      </div>
+    <div className="midad" style={{ minHeight: '100vh', background: 'var(--cream)' }}>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
-        {stats.map((s) => (
-          <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-            <p className="text-sm font-medium text-gray-500 mb-1">{s.label}</p>
-            <p className={`text-3xl font-bold ${s.color}`}>{loading ? '—' : s.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {loading ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-sm text-gray-400">
-          Loading dashboard…
-        </div>
-      ) : children.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <p className="text-gray-400 text-sm">No children linked to your account yet.</p>
-        </div>
-      ) : (
-        <div className="space-y-8">
-          {/* My Children */}
-          <section>
-            <h2 className="font-semibold text-gray-900 mb-4">My Children</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {children.map((child) => (
-                <div key={child.id} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <p className="font-semibold text-gray-900">{child.name}</p>
-                      <span
-                        className={`inline-block text-xs px-2 py-0.5 rounded-full border mt-1 capitalize ${
-                          LEVEL_STYLES[child.level] ?? 'bg-gray-50 text-gray-600 border-gray-200'
-                        }`}
-                      >
-                        {child.level}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-primary-600">{child.totalPoints}</p>
-                      <p className="text-xs text-gray-400">XP</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4 text-sm text-gray-500">
-                    <span title="Day streak">🔥 {child.streak} day{child.streak !== 1 ? 's' : ''}</span>
-                    <span title="Lessons completed">✅ {child.lessonsCompleted} lessons</span>
-                  </div>
-                </div>
-              ))}
+      {/* ── App bar ── */}
+      <header className="appbar">
+        <div className="ab-inner">
+          <Link className="brand" href="/">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/midad-logo-transparent.png" alt="Midad Academy" className="logo-full" />
+          </Link>
+          <nav className="ab-nav">
+            <a className="on">Overview</a>
+            <a>Children</a>
+            <a>Reports</a>
+          </nav>
+          <div className="ab-right">
+            <span className="role-tag">Parent · وليّ أمر</span>
+            <div className="ab-user">
+              <span className="avatar" style={{ width: 38, height: 38, background: '#f4dede', color: '#b3463b' }}>{initial}</span>
             </div>
-          </section>
+          </div>
+        </div>
+      </header>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Attendance */}
-            <section>
-              <h2 className="font-semibold text-gray-900 mb-4">Attendance</h2>
-              <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+      <main className="dash">
+
+        {/* ── Page head ── */}
+        <div className="page-head">
+          <div>
+            <p className="dh-hi">Good morning, <b>{userName}</b> <span className="ar dh-ar">صباح الخير</span></p>
+            <h1 className="dh-title">Your family&apos;s progress</h1>
+          </div>
+          <button className="btn btn-outline">Download weekly report</button>
+        </div>
+
+        {/* ── Stats row ── */}
+        <div className="stat-row">
+          <div className="stat card"><div className="st-ic st-navy">👨‍👩‍👧</div><div><b>{loading ? '—' : children.length}</b><span>Children enrolled</span></div></div>
+          <div className="stat card"><div className="st-ic st-fire">🗓️</div><div><b>{loading ? '—' : totalEnrolled}</b><span>Active classes</span></div></div>
+          <div className="stat card"><div className="st-ic st-gold">⭐</div><div><b>{loading ? '—' : familyXP}</b><span>Family XP</span></div></div>
+          <div className="stat card"><div className="st-ic st-green">✓</div><div><b>{loading ? '—' : totalCompleted}</b><span>Lessons done</span></div></div>
+        </div>
+
+        {loading ? (
+          <div className="card pad" style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14 }}>
+            Loading dashboard…
+          </div>
+        ) : children.length === 0 ? (
+          <div className="card pad" style={{ textAlign: 'center' }}>
+            <p style={{ color: 'var(--ink-3)', fontSize: 14, marginBottom: 14 }}>No children linked to your account yet.</p>
+            <Link href="/courses" className="btn btn-gold btn-sm">Browse courses</Link>
+          </div>
+        ) : (
+          <>
+            {/* ── Children grid ── */}
+            <div className="col-head" style={{ marginTop: 8 }}>
+              <h2>My Children <span className="ar muted">أبنائي</span></h2>
+            </div>
+            <div className="child-grid">
+              {children.map((child, idx) => {
+                const col = CHILD_COLORS[idx % CHILD_COLORS.length];
+                const pct = child.totalLessons > 0
+                  ? Math.round((child.lessonsCompleted / child.totalLessons) * 100)
+                  : 0;
+                return (
+                  <div key={child.id} className="child card">
+                    <div className="ch-head">
+                      <span className="avatar ch-av" style={{ background: col.bg, color: col.color }}>
+                        {child.name.charAt(0)}
+                      </span>
+                      <div>
+                        <div className="ch-name">{child.name}</div>
+                        <div className="ch-meta capitalize">{child.level}</div>
+                      </div>
+                      <span className="mini-chip"><span className="mc-ic">🔥</span> {child.streak}</span>
+                    </div>
+
+                    <div className="ch-xp">
+                      <div className="lvl-row"><span>{child.totalPoints} XP</span><span className="capitalize">{child.level}</span></div>
+                      <div className="bar"><i style={{ width: `${pct}%` }}></i></div>
+                    </div>
+
+                    <div className="ch-stats">
+                      <div><b>{child.courseProgress.length}</b><span>Courses</span></div>
+                      <div><b>{child.lessonsCompleted}</b><span>Lessons done</span></div>
+                      <div><b>{child.streak}</b><span>Day streak</span></div>
+                    </div>
+
+                    <div className="ch-next">
+                      <span className="nx-dot"></span>
+                      <b>Progress:</b> {child.lessonsCompleted} of {child.totalLessons} lessons
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* ── Bottom grid ── */}
+            <div className="dash-grid p-grid">
+              <div className="card pad">
+                <div className="col-head sm">
+                  <h3>Attendance timeline <span className="ar muted">سجلّ الحضور</span></h3>
+                </div>
                 {allSessions.length === 0 ? (
-                  <p className="text-sm text-gray-400">No sessions yet.</p>
+                  <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No sessions yet.</p>
                 ) : (
-                  <ul className="divide-y divide-gray-100">
+                  <ul className="timeline">
                     {allSessions.map((s) => {
                       const date = new Date(s.scheduledAt);
                       return (
-                        <li key={s.id} className="py-3 flex items-center justify-between gap-4">
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-gray-800 truncate">{s.lessonTitle}</p>
-                            <p className="text-xs text-gray-500 truncate">
-                              {s.courseTitle}
-                              {children.length > 1 && (
-                                <span className="text-gray-400"> · {s.childName}</span>
-                              )}
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-xs text-gray-400">
-                              {date.toLocaleDateString('en', { month: 'short', day: 'numeric' })}
-                            </p>
-                            <span
-                              className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium mt-0.5 ${
-                                s.attended
-                                  ? 'bg-green-50 text-green-700'
-                                  : 'bg-red-50 text-red-600'
-                              }`}
-                            >
-                              {s.attended ? 'Attended' : 'Missed'}
+                        <li key={s.id}>
+                          <span className={`tl-dot ${s.attended ? 'ok' : 'miss'}`}></span>
+                          <div className="tl-body">
+                            <div className="tl-row">
+                              <b>{s.lessonTitle}</b>
+                              <span className={`tl-tag ${s.attended ? 'ok' : 'miss'}`}>
+                                {s.attended ? 'Attended' : 'Missed'}
+                              </span>
+                            </div>
+                            <span className="tl-sub">
+                              {children.length > 1 ? `${s.childName} · ` : ''}{s.courseTitle} · {date.toLocaleDateString('en', { month: 'short', day: 'numeric' })}
                             </span>
                           </div>
                         </li>
@@ -199,34 +222,34 @@ export default function ParentDashboard() {
                   </ul>
                 )}
               </div>
-            </section>
 
-            {/* Progress */}
-            <section>
-              <h2 className="font-semibold text-gray-900 mb-4">Progress</h2>
-              <div className="space-y-4">
-                {children.map((child) => (
-                  <div key={child.id} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-                    <p className="font-medium text-gray-800 mb-4">{child.name}</p>
-                    {child.courseProgress.length === 0 ? (
-                      <p className="text-sm text-gray-400">Not enrolled in any courses.</p>
-                    ) : (
-                      <div className="space-y-4">
-                        {child.courseProgress.map((cp) => (
-                          <div key={cp.courseTitle}>
-                            <p className="text-sm text-gray-600 mb-1 truncate">{cp.courseTitle}</p>
-                            <ProgressBar completed={cp.completed} total={cp.total} />
-                          </div>
-                        ))}
-                      </div>
-                    )}
+              <div className="dash-col">
+                <div className="card pad report-card">
+                  <div className="col-head sm"><h3>This week</h3></div>
+                  <div className="rep-big">
+                    <b>{totalCompleted}</b>
+                    <span>lessons attended</span>
                   </div>
-                ))}
+                  <div className="rep-rows">
+                    <div className="rep-row"><span>Total XP earned</span><b>{familyXP}</b></div>
+                    <div className="rep-row"><span>Lessons done</span><b>{totalCompleted} / {children.reduce((s, c) => s + c.totalLessons, 0)}</b></div>
+                    <div className="rep-row"><span>Active children</span><b>{children.length}</b></div>
+                  </div>
+                  <p className="rep-note">Keep supporting your children&apos;s learning! 🌟</p>
+                </div>
+
+                <div className="card pad">
+                  <div className="col-head sm"><h3>Plan</h3></div>
+                  <div className="pay-row">
+                    <div><b>Scholar plan</b><span>Manage your subscription</span></div>
+                    <Link href="/courses" className="link-gold">Manage</Link>
+                  </div>
+                </div>
               </div>
-            </section>
-          </div>
-        </div>
-      )}
+            </div>
+          </>
+        )}
+      </main>
     </div>
   );
 }

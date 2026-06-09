@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Navbar from '@/components/Navbar';
 
 type Course = {
   id: string;
@@ -18,6 +19,9 @@ type Enrollment = {
   id: string;
   course: { id: string };
 };
+
+const THUMBS = ['th-1', 'th-2', 'th-3', 'th-4', 'th-5', 'th-6'];
+const AGE_FILTERS = ['All', '5–7', '8–11', '12–15'];
 
 function authFetch(path: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -38,6 +42,8 @@ export default function BrowseCoursesPage() {
   const [loading, setLoading] = useState(true);
   const [enrollingId, setEnrollingId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const [search, setSearch] = useState('');
+  const [ageFilter, setAgeFilter] = useState('All');
 
   useEffect(() => {
     Promise.all([
@@ -77,13 +83,11 @@ export default function BrowseCoursesPage() {
       }
 
       if (json.data.type === 'checkout') {
-        // Paid course — hand off to Stripe's hosted checkout page. Keep the
-        // button in its "Enrolling…" state through the redirect.
         window.location.href = json.data.url;
         return;
       }
 
-      // Free course — the API enrolled the student directly, no payment needed.
+      // Free course — enrolled directly
       setEnrolledIds((prev) => new Set(prev).add(courseId));
       setMessage('Enrolled! Find your class on the dashboard.');
       setEnrollingId(null);
@@ -93,63 +97,145 @@ export default function BrowseCoursesPage() {
     }
   }
 
+  const filtered = courses.filter((c) => {
+    const matchesSearch = c.title.toLowerCase().includes(search.toLowerCase()) ||
+      c.description.toLowerCase().includes(search.toLowerCase());
+    const matchesAge = ageFilter === 'All' || c.ageGroup.includes(ageFilter.replace('–', '–'));
+    return matchesSearch && matchesAge;
+  });
+
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Browse Courses</h1>
-        <p className="text-gray-500 text-sm">Find your next Arabic class and enroll in a couple of clicks</p>
+    <div className="midad" style={{ background: 'var(--paper)', minHeight: '100vh' }}>
+      <Navbar />
+
+      {/* ── Courses hero ── */}
+      <div className="courses-hero geo">
+        <div className="wrap center">
+          <span className="eyebrow">Our Courses · دوراتنا</span>
+          <h1 className="ch-h1">Find the perfect class for your child</h1>
+          <p className="ch-sub">Live, small-group courses for ages 5–15 — taught by certified native teachers.</p>
+          <div className="course-search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+            <input
+              placeholder="Search courses — ابحث عن دورة…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <button className="btn btn-gold btn-sm">Search</button>
+          </div>
+        </div>
       </div>
 
+      {/* ── Filter bar ── */}
+      <div className="wrap courses-bar">
+        <div className="filters">
+          <button className="filter on">All courses</button>
+          <button className="filter">Reading &amp; Writing</button>
+          <button className="filter">Conversation</button>
+          <button className="filter">Grammar — النحو</button>
+          <button className="filter">Qur&apos;an</button>
+        </div>
+        <div className="age-filter">
+          <span>Age:</span>
+          {AGE_FILTERS.map((a) => (
+            <button
+              key={a}
+              className={`chip-f${ageFilter === a ? ' on' : ''}`}
+              onClick={() => setAgeFilter(a)}
+            >
+              {a}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Message banner ── */}
       {message && (
-        <div className="mb-6 text-sm bg-primary-50 text-primary-700 border border-primary-200 rounded-lg px-4 py-2.5">
-          {message}
+        <div className="wrap">
+          <div className="auth-error" style={{ background: '#e1f0e7', borderColor: '#a3d4b3', color: 'var(--ok)', marginBottom: 0 }}>
+            {message}
+          </div>
         </div>
       )}
 
-      {loading ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-sm text-gray-400">
-          Loading courses…
-        </div>
-      ) : courses.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-sm text-gray-400">
-          No courses are available yet — check back soon!
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {courses.map((course) => {
-            const enrolled = enrolledIds.has(course.id);
-            return (
-              <div key={course.id} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm flex flex-col">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <h3 className="font-semibold text-gray-900">{course.title}</h3>
-                  <span className="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full border border-primary-200">
-                    Ages {course.ageGroup}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-500 line-clamp-3 mb-3 flex-1">{course.description}</p>
-                <p className="text-xs text-gray-500 mb-4">👨‍🏫 {course.teacherName}</p>
+      {/* ── Course grid ── */}
+      <div className="wrap">
+        {loading ? (
+          <div className="card pad" style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14, marginTop: 24 }}>
+            Loading courses…
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="card pad" style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14, marginTop: 24 }}>
+            {courses.length === 0 ? 'No courses are available yet — check back soon!' : 'No courses match your search.'}
+          </div>
+        ) : (
+          <div className="course-grid">
+            {filtered.map((course, idx) => {
+              const enrolled = enrolledIds.has(course.id);
+              return (
+                <article key={course.id} className="course card">
+                  <div className={`cv-thumb ${THUMBS[idx % THUMBS.length]}`}>
+                    <span className="ar">{course.title.slice(0, 5)}</span>
+                    <span className="cv-age">Ages {course.ageGroup}</span>
+                  </div>
+                  <div className="cv-body">
+                    <div className="cv-tags">
+                      <span className="pill pill-navy">Course</span>
+                      <span className="cv-rate">★ —</span>
+                    </div>
+                    <h3 className="cv-title">{course.title}</h3>
+                    <p className="cv-desc">{course.description}</p>
+                    <div className="cv-meta">
+                      <span className="avatar" style={{ width: 24, height: 24 }}>
+                        {course.teacherName.charAt(0)}
+                      </span>
+                      {course.teacherName} · {course.studentCount} student{course.studentCount !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                  <div className="cv-foot">
+                    <div className="cv-price">
+                      {course.price === 0 ? (
+                        <b>Free</b>
+                      ) : (
+                        <><b>${course.price}</b><span>/mo</span></>
+                      )}
+                    </div>
+                    <button
+                      className={`btn btn-sm${enrolled ? ' btn-outline' : ' btn-gold'}`}
+                      onClick={() => { if (!enrolled) handleEnroll(course.id); }}
+                      disabled={enrolled || enrollingId === course.id}
+                      style={{ opacity: enrollingId === course.id ? 0.65 : 1 }}
+                    >
+                      {enrolled ? '✓ Enrolled' : enrollingId === course.id ? 'Enrolling…' : 'Enroll'}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
 
-                <div className="flex items-center justify-between">
-                  <p className="font-semibold text-gray-900">
-                    {course.price === 0 ? 'Free' : `$${course.price}`}
-                  </p>
-                  <button
-                    onClick={() => handleEnroll(course.id)}
-                    disabled={enrolled || enrollingId === course.id}
-                    className={`text-xs font-semibold px-4 py-2 rounded-lg transition-colors ${
-                      enrolled
-                        ? 'bg-green-50 text-green-700 border border-green-200 cursor-default'
-                        : 'bg-primary-500 hover:bg-primary-600 text-white disabled:opacity-60 disabled:cursor-not-allowed'
-                    }`}
-                  >
-                    {enrolled ? '✓ Enrolled' : enrollingId === course.id ? 'Enrolling…' : 'Enroll'}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+        {/* ── CTA band ── */}
+        <div className="cta-band geo-navy courses-cta">
+          <div>
+            <h2 className="cta-h">Not sure which course fits?</h2>
+            <p>Book a free placement chat and we&apos;ll match your child to the right level.</p>
+          </div>
+          <button className="btn btn-lg btn-gold" onClick={() => router.push('/register')}>
+            Get a free placement
+          </button>
         </div>
-      )}
+      </div>
+
+      {/* ── Footer ── */}
+      <footer className="footer">
+        <div className="wrap">
+          <div className="foot-bottom" style={{ marginTop: 0, border: 'none' }}>
+            <span>© 2026 Midad Academy · مداد. All rights reserved.</span>
+            <span>Privacy · Terms · Cookies</span>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
