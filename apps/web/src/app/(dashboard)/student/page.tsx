@@ -18,6 +18,29 @@ type Enrollment = {
   };
 };
 
+type QuizResult = {
+  id: string;
+  quizId: string;
+  quizTitle: string;
+  courseTitle: string;
+  score: number;
+  passed: boolean;
+  passingScore: number;
+  status: 'COMPLETE' | 'PENDING_REVIEW';
+  completedAt: string;
+  answers: {
+    questionId: string;
+    text: string;
+    questionType: 'MCQ' | 'WRITTEN' | 'TRUE_FALSE';
+    answerText: string;
+    status: 'GRADED' | 'PENDING';
+    correct: boolean | null;
+    points: number;
+    pointsAwarded: number | null;
+    feedback: string | null;
+  }[];
+};
+
 function authFetch(path: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   return fetch(`http://localhost:4000${path}`, {
@@ -51,6 +74,7 @@ export default function StudentDashboard() {
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [userName, setUserName] = useState('Student');
+  const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
 
   useEffect(() => {
     const payload = getTokenPayload();
@@ -64,6 +88,14 @@ export default function StudentDashboard() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    authFetch('/api/students/results')
+      .then(async (res) => {
+        if (!res.ok) return;
+        const json = await res.json();
+        setQuizResults(json.data ?? []);
+      })
+      .catch(() => {});
   }, [router]);
 
   async function handleJoinClass(courseId: string) {
@@ -198,19 +230,24 @@ export default function StudentDashboard() {
                           {course.teacherName}
                         </div>
                       </div>
-                      {enrollment.isLive ? (
-                        <button
-                          className="btn btn-gold btn-sm"
-                          onClick={() => handleJoinClass(course.id)}
-                          disabled={joiningId === course.id}
-                          style={{ opacity: joiningId === course.id ? 0.65 : 1, flexShrink: 0 }}
-                        >
-                          {joiningId === course.id ? 'Joining…' : 'Join Class'}
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-                        </button>
-                      ) : (
-                        <span className="cc-soon">Scheduled</span>
-                      )}
+                      <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                        <Link href={`/courses/${course.id}/lessons`} className="btn btn-sm btn-outline">
+                          View Lessons
+                        </Link>
+                        {enrollment.isLive ? (
+                          <button
+                            className="btn btn-gold btn-sm"
+                            onClick={() => handleJoinClass(course.id)}
+                            disabled={joiningId === course.id}
+                            style={{ opacity: joiningId === course.id ? 0.65 : 1 }}
+                          >
+                            {joiningId === course.id ? 'Joining…' : 'Join Class'}
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                          </button>
+                        ) : (
+                          <span className="cc-soon">Scheduled</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -245,6 +282,47 @@ export default function StudentDashboard() {
                 ))}
               </div>
               <p className="streak-note">Attend a class today to start your streak!</p>
+            </div>
+
+            <div className="card pad">
+              <div className="col-head sm">
+                <h3>Quiz Results <span className="ar muted">نتائج الاختبارات</span></h3>
+              </div>
+              {quizResults.length === 0 ? (
+                <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>You haven&apos;t taken any quizzes yet.</p>
+              ) : (
+                <ul className="feed">
+                  {quizResults.map((r) => {
+                    const dotStyle = r.status === 'PENDING_REVIEW'
+                      ? { background: '#d97706' }
+                      : !r.passed ? { background: '#dc2626' } : undefined;
+                    const feedbacks = r.answers.filter((a) => a.feedback);
+                    return (
+                      <li key={r.id}>
+                        <span className={`fd-dot ${r.status === 'COMPLETE' && r.passed ? 'ok' : ''}`} style={dotStyle}></span>
+                        <div>
+                          <b>{r.quizTitle}</b> — {r.courseTitle}
+                          <br />
+                          <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+                            {r.status === 'PENDING_REVIEW'
+                              ? <>⏳ Pending Review · {r.score}% so far</>
+                              : <>Score: {r.score}% · {r.passed ? 'Passed' : 'Not passed'}</>}
+                          </span>
+                          {feedbacks.length > 0 && (
+                            <ul style={{ marginTop: 4, paddingLeft: 16, fontSize: 12, color: 'var(--ink-3)' }}>
+                              {feedbacks.map((a) => (
+                                <li key={a.questionId}>
+                                  <b>{a.text}:</b> {a.pointsAwarded}/{a.points} — {a.feedback}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
           </div>
 

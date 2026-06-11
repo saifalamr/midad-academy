@@ -25,6 +25,28 @@ enum LessonStatus {
   CANCELLED
 }
 
+enum ContentType {
+  VIDEO
+  PDF
+  EXERCISE
+}
+
+enum QuestionType {
+  MCQ
+  WRITTEN
+  TRUE_FALSE
+}
+
+enum AnswerStatus {
+  PENDING
+  GRADED
+}
+
+enum ResultStatus {
+  COMPLETE
+  PENDING_REVIEW
+}
+
 enum EnrollmentStatus {
   ACTIVE
   PAUSED
@@ -86,6 +108,7 @@ model StudentProfile {
   enrollments  Enrollment[]
   achievements Achievement[]
   pointEvents  PointTransaction[]
+  quizResults  StudentQuizResult[]
 }
 
 model ParentProfile {
@@ -114,8 +137,89 @@ model Course {
 
   teacher     TeacherProfile @relation(fields: [teacherId], references: [id])
   lessons     Lesson[]
+  content     CourseContent[]
   enrollments Enrollment[]
   payments    Payment[]
+}
+
+model CourseContent {
+  id          String      @id @default(cuid())
+  courseId    String
+  title       String
+  description String
+  order       Int
+  type        ContentType
+  contentUrl  String
+  duration    Int
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  quiz   Quiz?
+
+  @@index([courseId, order])
+}
+
+// ─── Quizzes & Assessments ────────────────────────────────────────────────────
+
+model Quiz {
+  id              String @id @default(cuid())
+  courseContentId String @unique
+  title           String
+  passingScore    Int    @default(70)
+
+  content   CourseContent       @relation(fields: [courseContentId], references: [id], onDelete: Cascade)
+  questions Question[]
+  results   StudentQuizResult[]
+}
+
+model Question {
+  id            String       @id @default(cuid())
+  quizId        String
+  text          String
+  questionType  QuestionType @default(MCQ)
+  options       Json?
+  correctAnswer String?
+  points        Int          @default(1)
+
+  quiz    Quiz           @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  answers StudentAnswer[]
+
+  @@index([quizId])
+}
+
+model StudentQuizResult {
+  id          String       @id @default(cuid())
+  studentId   String
+  quizId      String
+  score       Int
+  passed      Boolean
+  answers     Json
+  status      ResultStatus @default(COMPLETE)
+  completedAt DateTime     @default(now())
+
+  student        StudentProfile  @relation(fields: [studentId], references: [id])
+  quiz           Quiz            @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  studentAnswers StudentAnswer[]
+
+  @@index([studentId])
+  @@index([quizId])
+}
+
+model StudentAnswer {
+  id            String       @id @default(cuid())
+  resultId      String
+  questionId    String
+  answerText    String
+  status        AnswerStatus @default(GRADED)
+  correct       Boolean?
+  pointsAwarded Int?
+  feedback      String?
+
+  result   StudentQuizResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  question Question          @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([resultId])
+  @@index([questionId])
+  @@index([status])
 }
 
 model Lesson {

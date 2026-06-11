@@ -132,10 +132,15 @@ export default function TeacherDashboard() {
             <p className="dh-hi">Welcome back, <b>{userName}</b> <span className="ar dh-ar">أهلاً</span></p>
             <h1 className="dh-title">Your teaching, at a glance</h1>
           </div>
-          <button className="btn btn-gold btn-lg" onClick={() => setShowModal(true)}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M12 5v14M5 12h14"/></svg>
-            Create New Class
-          </button>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <Link href="/teacher/review-answers" className="btn btn-outline btn-lg">
+              📝 Review Answers
+            </Link>
+            <button className="btn btn-gold btn-lg" onClick={() => setShowModal(true)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M12 5v14M5 12h14"/></svg>
+              Create New Class
+            </button>
+          </div>
         </div>
 
         {/* ── Stats row ── */}
@@ -178,12 +183,20 @@ export default function TeacherDashboard() {
                         </span>
                         {course._count.enrollments} student{course._count.enrollments !== 1 ? 's' : ''}
                       </span>
-                      <button
-                        className="btn btn-sm btn-gold"
-                        onClick={() => router.push(`/classroom/${course.id}`)}
-                      >
-                        Start Class
-                      </button>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          className="btn btn-sm btn-outline"
+                          onClick={() => router.push(`/courses/${course.id}/content`)}
+                        >
+                          Manage Content
+                        </button>
+                        <button
+                          className="btn btn-sm btn-gold"
+                          onClick={() => router.push(`/classroom/${course.id}`)}
+                        >
+                          Start Class
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
