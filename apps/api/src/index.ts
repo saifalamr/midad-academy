@@ -3,6 +3,10 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import fastifyJwt from '@fastify/jwt';
+import multipart from '@fastify/multipart';
+import fastifyStatic from '@fastify/static';
+import path from 'node:path';
+import fs from 'node:fs/promises';
 import { ZodError } from 'zod';
 import { config } from './config';
 import { healthRoutes } from './routes/health';
@@ -13,6 +17,7 @@ import { contentRoutes } from './routes/content';
 import { quizRoutes } from './routes/quiz';
 import { studentRoutes } from './routes/students';
 import { teacherRoutes } from './routes/teacher';
+import { uploadRoutes } from './routes/upload';
 import { enrollmentRoutes } from './routes/enrollments';
 import { parentRoutes } from './routes/parent';
 import { paymentRoutes } from './routes/payments';
@@ -26,6 +31,14 @@ async function bootstrap() {
   await app.register(helmet);
   await app.register(cors, { origin: config.CORS_ORIGIN, credentials: true });
   await app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
+  await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024 } });
+
+  const uploadDir = path.join(process.cwd(), 'uploads');
+  await fs.mkdir(uploadDir, { recursive: true });
+  await app.register(fastifyStatic, {
+    root: uploadDir,
+    prefix: '/uploads/',
+  });
 
   // ── JWT ─────────────────────────────────────────────────────────────────
   // Registered at root level so app.authenticate is visible to all routes.
@@ -71,6 +84,7 @@ async function bootstrap() {
   await app.register(quizRoutes, { prefix: '/api/quiz' });
   await app.register(studentRoutes, { prefix: '/api/students' });
   await app.register(teacherRoutes, { prefix: '/api/teacher' });
+  await app.register(uploadRoutes, { prefix: '/api/upload' });
   await app.register(enrollmentRoutes, { prefix: '/api/enrollments' });
   await app.register(parentRoutes, { prefix: '/api/parent' });
   await app.register(sessionRoutes, { prefix: '/api/sessions' });

@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Midad Academy — مداد</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="landing.css">
+<link rel="stylesheet" href="screens.css">
+<link rel="stylesheet" href="app2.css">
+</head>
+<body>
+
+<!-- ============================================================
+     SCREEN 1 — LANDING
+     ============================================================ -->
+<section class="screen active" id="s-landing" data-screen-label="Landing">
+  <!-- marketing nav -->
+  <header class="nav">
+    <div class="nav-inner">
+      <a class="brand" href="#" data-go="landing">
+        <img src="assets/midad-logo-transparent.png" alt="Midad Academy" class="logo-full">
+      </a>
+      <nav class="nav-links">
+        <a class="on" href="#" data-go="landing">Home</a>
+        <a href="#" data-go="courses">Courses</a>
+        <a href="#pricing-anchor">Pricing</a>
+        <a href="#" data-go="student">Dashboard</a>
+        <a href="#" data-go="classroom">Classroom</a>
+      </nav>
+      <div class="nav-cta">
+        <a class="btn btn-sm btn-outline" href="#" data-go="login">Log in</a>
+        <a class="btn btn-sm btn-gold" href="#" data-go="register">Get Started</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- hero -->
+  <div class="hero geo">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <span class="pill">🕌 Trusted Arabic learning for ages 5–15</span>
+        <h1 class="hero-h1">Where children fall in<br>love with <span class="u-gold">Arabic</span>.</h1>
+        <p class="ar hero-ar">حيث يتعلّم الأطفال العربية بشغفٍ ومتعة</p>
+        <p class="hero-sub">Live classes with certified teachers, an interactive whiteboard built for kids, and a parent dashboard that keeps you in the loop — all in one warm, beautifully crafted academy.</p>
+        <div class="hero-actions">
+          <a class="btn btn-lg btn-gold" href="#" data-go="register">Get Started Free
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+          <a class="btn btn-lg btn-outline" href="#" data-go="courses">Browse Courses</a>
+        </div>
+        <div class="hero-trust">
+          <div class="stack">
+            <span class="av" style="background:#dce6f4">ن</span>
+            <span class="av" style="background:#f3e3c2">س</span>
+            <span class="av" style="background:#e3efe6">م</span>
+            <span class="av" style="background:#f4dede">ر</span>
+          </div>
+          <div><b>12,000+</b> families learning together · <span class="stars">★★★★★</span> 4.9</div>
+        </div>
+      </div>
+
+      <div class="hero-visual">
+        <div class="hero-card card">
+          <div class="hc-top">
+            <span class="badge-live"><span class="dot"></span> Live now</span>
+            <span class="hc-time">10:00 — 10:45</span>
+          </div>
+          <div class="hc-stage">
+            <div class="hc-ph"><span>teacher video feed</span></div>
+            <div class="hc-tn"><span>student</span></div>
+            <div class="hc-tn"><span>student</span></div>
+          </div>
+          <div class="hc-foot">
+            <div>
+              <div class="hc-title ar">الحروف الهجائية</div>
+              <div class="hc-sub">Arabic Letters · Beginner</div>
+            </div>
+            <a class="btn btn-sm btn-gold" href="#" data-go="classroom">Join</a>
+          </div>
+        </div>
+        <div class="float-chip chip-xp">
+          <div class="ci">⭐</div><div><b>+150 XP</b><span>earned today</span></div>
+        </div>
+        <div class="float-chip chip-streak">
+          <div class="ci">🔥</div><div><b>14 days</b><span>streak</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="hero-logos wrap">
+      <span>Aligned with national curricula</span>
+      <div class="lg-row"><b>القرآن</b><b>النحو</b><b>القراءة</b><b>الكتابة</b><b>المحادثة</b></div>
+    </div>
+  </div>
+
+  <!-- features -->
+  <div class="section" id="features">
+    <div class="wrap center">
+      <span class="eyebrow">Everything in one place</span>
+      <h2 class="sec-h2">A complete academy, built for kids</h2>
+      <p class="sec-sub">Three pillars that make every lesson feel personal, playful and effective.</p>
+    </div>
+    <div class="wrap feat-grid">
+      <div class="feat card">
+        <div class="feat-ic ic-navy">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="15" height="16" rx="2.5"/><path d="M17 9l5-3v12l-5-3"/></svg>
+        </div>
+        <h3>Live Classes</h3>
+        <p>Small-group sessions with certified native teachers. Cameras, audio, hand-raising and instant feedback — face to face, every week.</p>
+        <ul class="feat-list"><li>Max 6 students per class</li><li>Recorded for replay</li></ul>
+      </div>
+      <div class="feat card feat-feature">
+        <div class="feat-ic ic-gold">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="3.5" width="19" height="13" rx="2"/><path d="M8 21h8M12 16.5V21"/><path d="M7 9l2.5 2.5L7 14M12.5 13.5H16"/></svg>
+        </div>
+        <h3>Interactive Whiteboard</h3>
+        <p>A playful canvas with pens, shapes, Arabic text tools and stickers. Teachers and students draw, write and trace together in real time.</p>
+        <ul class="feat-list"><li>Arabic handwriting practice</li><li>Saveable lesson boards</li></ul>
+      </div>
+      <div class="feat card">
+        <div class="feat-ic ic-navy">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 13h4l2 5 4-12 2 7h6"/></svg>
+        </div>
+        <h3>Parent Dashboard</h3>
+        <p>Follow every child's attendance, XP, streaks and badges. Get weekly progress reports and never miss a class or milestone.</p>
+        <ul class="feat-list"><li>Multi-child overview</li><li>Weekly email reports</li></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- how it works strip -->
+  <div class="howstrip geo-navy">
+    <div class="wrap how-grid">
+      <div class="how"><span class="hn">1</span><b>Create an account</b><p>Pick a plan and add your children in minutes.</p></div>
+      <div class="how"><span class="hn">2</span><b>Choose courses</b><p>Match each child to the right level and teacher.</p></div>
+      <div class="how"><span class="hn">3</span><b>Join live & grow</b><p>Learn weekly, earn XP and watch progress soar.</p></div>
+    </div>
+  </div>
+
+  <!-- pricing -->
+  <div class="section" id="pricing-anchor">
+    <div class="wrap center">
+      <span class="eyebrow">Simple, family-friendly pricing</span>
+      <h2 class="sec-h2">Plans that grow with your child</h2>
+      <p class="sec-sub">No contracts. Cancel anytime. Every plan includes the parent dashboard.</p>
+    </div>
+    <div class="wrap price-grid">
+      <div class="price card">
+        <div class="pr-name">Explorer</div>
+        <div class="pr-amt"><b>$19</b><span>/ month</span></div>
+        <p class="pr-desc">A gentle start for one young learner.</p>
+        <ul class="pr-list">
+          <li>1 live class / week</li>
+          <li>Whiteboard access</li>
+          <li>Parent dashboard</li>
+          <li>XP, badges & streaks</li>
+        </ul>
+        <a class="btn btn-block btn-outline" href="#" data-go="register">Choose Explorer</a>
+      </div>
+      <div class="price card price-best">
+        <span class="pr-tag">Most popular</span>
+        <div class="pr-name">Scholar</div>
+        <div class="pr-amt"><b>$39</b><span>/ month</span></div>
+        <p class="pr-desc">Steady weekly progress with extras.</p>
+        <ul class="pr-list">
+          <li>3 live classes / week</li>
+          <li>Recorded class replays</li>
+          <li>Homework & quizzes</li>
+          <li>Priority teacher matching</li>
+          <li>Up to 2 children</li>
+        </ul>
+        <a class="btn btn-block btn-gold" href="#" data-go="register">Choose Scholar</a>
+      </div>
+      <div class="price card">
+        <div class="pr-name">Family</div>
+        <div class="pr-amt"><b>$69</b><span>/ month</span></div>
+        <p class="pr-desc">The whole family, one simple plan.</p>
+        <ul class="pr-list">
+          <li>Unlimited live classes</li>
+          <li>Up to 4 children</li>
+          <li>1-on-1 monthly review</li>
+          <li>Certificates of completion</li>
+        </ul>
+        <a class="btn btn-block btn-outline" href="#" data-go="register">Choose Family</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA band -->
+  <div class="wrap"><div class="cta-band geo-navy">
+    <div>
+      <h2 class="cta-h">Start your child's Arabic journey today</h2>
+      <p>Join 12,000+ families. Your first week is on us.</p>
+    </div>
+    <a class="btn btn-lg btn-gold" href="#" data-go="register">Get Started Free</a>
+  </div></div>
+
+  <!-- footer -->
+  <footer class="footer">
+    <div class="wrap">
+      <div class="foot-grid">
+        <div>
+          <div class="brand foot-brand">
+            <img src="assets/midad-logo-transparent.png" alt="Midad Academy" class="logo-full logo-white">
+          </div>
+          <p class="foot-about">A premium online academy helping children aged 5–15 read, write and speak Arabic with confidence and joy.</p>
+        </div>
+        <div><h5>Learn</h5><a href="#" data-go="courses">Browse Courses</a><a href="#pricing-anchor">Pricing</a><a href="#" data-go="register">Free Trial</a><a href="#">Curriculum</a></div>
+        <div><h5>Platform</h5><a href="#" data-go="student">Student</a><a href="#" data-go="teacher">Teacher</a><a href="#" data-go="parent">Parent</a><a href="#" data-go="classroom">Classroom</a></div>
+        <div><h5>Company</h5><a href="#">About</a><a href="#">Our Teachers</a><a href="#">Contact</a><a href="#">Help Center</a></div>
+      </div>
+      <div class="foot-bottom">
+        <span>© 2026 Midad Academy · مداد. All rights reserved.</span>
+        <span>Privacy · Terms · Cookies</span>
+      </div>
+    </div>
+  </footer>
+</section>
+
+<!-- screens 2–8 injected below -->
+<!-- ============================================================
+     SCREEN 2 — LOGIN
+     ============================================================ -->
+<section class="screen" id="s-login" data-screen-label="Login">
+  <div class="auth">
+    <aside class="auth-side geo-navy">
+      <a class="brand brand-light" href="#" data-go="landing">
+        <img src="assets/midad-logo-transparent.png" alt="Midad Academy" class="logo-full logo-white">
+      </a>
+      <div class="auth-side-body">
+        <h2 class="auth-head">Welcome back to the academy.</h2>
+        <p class="ar auth-head-ar">أهلاً بعودتك إلى مداد</p>
+        <p class="auth-side-p">Pick up right where you left off — your classes, progress and badges are waiting.</p>
+        <div class="auth-quote card-glass">
+          <p>"My daughter asks to log in every single day. The teachers are wonderful."</p>
+          <div class="aq-by"><span class="avatar" style="width:34px;height:34px">ر</span> Rana · Parent of 2</div>
+        </div>
+      </div>
+      <div class="auth-side-foot">© 2026 Midad Academy</div>
+    </aside>
+
+    <div class="auth-main">
+      <div class="auth-card">
+        <div class="auth-top-link">New here? <a href="#" data-go="register">Create an account</a></div>
+        <h1 class="auth-title">Log in</h1>
+        <p class="auth-sub">Enter your details to continue. <span class="ar">تسجيل الدخول</span></p>
+
+        <form onsubmit="return false">
+          <div class="field">
+            <label>Email address <span class="ar muted">البريد الإلكتروني</span></label>
+            <input class="input" type="email" placeholder="you@example.com" value="parent@midad.academy">
+          </div>
+          <div class="field">
+            <label>Password <span class="ar muted">كلمة المرور</span></label>
+            <div class="input-wrap">
+              <input class="input" type="password" placeholder="••••••••" value="midad2026">
+              <button type="button" class="eye" aria-label="show password">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="auth-row">
+            <label class="check"><input type="checkbox" checked> Remember me</label>
+            <a href="#" class="link-gold">Forgot password?</a>
+          </div>
+          <button class="btn btn-gold btn-block btn-lg" data-go="student">Log in</button>
+        </form>
+
+        <div class="auth-or"><span>or continue with</span></div>
+        <div class="auth-social">
+          <button class="social-btn">Google</button>
+          <button class="social-btn">Apple</button>
+        </div>
+        <p class="auth-foot-note">Logging in as a demo — opens the student dashboard.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SCREEN 3 — REGISTER
+     ============================================================ -->
+<section class="screen" id="s-register" data-screen-label="Register">
+  <div class="auth">
+    <aside class="auth-side geo-navy">
+      <a class="brand brand-light" href="#" data-go="landing">
+        <img src="assets/midad-logo-transparent.png" alt="Midad Academy" class="logo-full logo-white">
+      </a>
+      <div class="auth-side-body">
+        <h2 class="auth-head">Begin the journey today.</h2>
+        <p class="ar auth-head-ar">ابدأ رحلة التعلّم اليوم</p>
+        <ul class="auth-perks">
+          <li>First week completely free</li>
+          <li>Certified native-speaking teachers</li>
+          <li>Cancel anytime — no contracts</li>
+          <li>Parent dashboard included on every plan</li>
+        </ul>
+      </div>
+      <div class="auth-side-foot">© 2026 Midad Academy</div>
+    </aside>
+
+    <div class="auth-main">
+      <div class="auth-card">
+        <div class="auth-top-link">Already a member? <a href="#" data-go="login">Log in</a></div>
+        <h1 class="auth-title">Create your account</h1>
+        <p class="auth-sub">A few details and you're in. <span class="ar">إنشاء حساب جديد</span></p>
+
+        <form onsubmit="return false">
+          <div class="field">
+            <label>Full name <span class="ar muted">الاسم الكامل</span></label>
+            <input class="input" type="text" placeholder="e.g. Sara Al-Amin">
+          </div>
+          <div class="field">
+            <label>Email address <span class="ar muted">البريد الإلكتروني</span></label>
+            <input class="input" type="email" placeholder="you@example.com">
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label>Password <span class="ar muted">كلمة المرور</span></label>
+              <input class="input" type="password" placeholder="••••••••">
+            </div>
+            <div class="field">
+              <label>I am a… <span class="ar muted">الدور</span></label>
+              <select class="input" id="roleSel">
+                <option value="parent">Parent — وليّ أمر</option>
+                <option value="student">Student — طالب</option>
+                <option value="teacher">Teacher — معلّم</option>
+              </select>
+            </div>
+          </div>
+          <label class="check check-block"><input type="checkbox" checked> I agree to the <a href="#" class="link-gold">Terms</a> &amp; <a href="#" class="link-gold">Privacy Policy</a></label>
+          <button class="btn btn-gold btn-block btn-lg" data-go="parent">Create account</button>
+        </form>
+        <p class="auth-foot-note">Demo — creating an account opens the parent dashboard.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SCREEN 4 — STUDENT DASHBOARD
+     ============================================================ -->
+<section class="screen" id="s-student" data-screen-label="Student Dashboard">
+  <header class="appbar">
+    <div class="ab-inner">
+      <a class="brand" href="#" data-go="landing"><img src="assets/midad-logo-transparent.png" alt="Midad Academy" class="logo-full"></a>
+      <nav class="ab-nav">
+        <a class="on" href="#" data-go="student">Dashboard</a>
+        <a href="#" data-go="classroom">My Classes</a>
+        <a href="#" data-go="courses">Courses</a>
+        <a href="#">Achievements</a>
+      </nav>
+      <div class="ab-right">
+        <span class="mini-chip"><span class="mc-ic">🔥</span> 14</span>
+        <span class="mini-chip"><span class="mc-ic">⭐</span> 2,840</span>
+        <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><i class="dot"></i></button>
+        <div class="ab-user"><span class="avatar" style="width:38px;height:38px">س</span></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="dash">
+    <!-- greeting + level banner -->
+    <div class="dash-hero card">
+      <div class="dh-left">
+        <p class="dh-hi">Welcome back, <b>Sara</b> 👋 <span class="ar dh-ar">أهلاً سارة</span></p>
+        <h1 class="dh-title">Ready for today's lesson?</h1>
+        <p class="dh-sub">You have <b>1 live class</b> right now and 2 more this week.</p>
+        <a class="btn btn-gold" href="#" data-go="classroom">Join your live class
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </div>
+      <div class="dh-level">
+        <div class="lvl-ring" style="--p:72%">
+          <div class="lvl-in"><b>7</b><span>Level</span></div>
+        </div>
+        <div class="lvl-meta">
+          <div class="lvl-row"><span>2,840 XP</span><span>3,200</span></div>
+          <div class="bar"><i style="width:72%"></i></div>
+          <p class="lvl-note">360 XP to <b>Level 8 — قارئ متمكّن</b></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- stat tiles -->
+    <div class="stat-row">
+      <div class="stat card"><div class="st-ic st-gold">⭐</div><div><b>2,840</b><span>Total XP</span></div></div>
+      <div class="stat card"><div class="st-ic st-fire">🔥</div><div><b>14 days</b><span>Current streak</span></div></div>
+      <div class="stat card"><div class="st-ic st-navy">🏅</div><div><b>9</b><span>Badges earned</span></div></div>
+      <div class="stat card"><div class="st-ic st-green">✓</div><div><b>96%</b><span>Attendance</span></div></div>
+    </div>
+
+    <div class="dash-grid">
+      <!-- classes column -->
+      <div class="dash-col">
+        <div class="col-head"><h2>My Classes <span class="ar muted">صفوفي</span></h2><a href="#" data-go="courses" class="link-gold">Browse more →</a></div>
+
+        <div class="class-card card live">
+          <div class="cc-badge"><span class="badge-live"><span class="dot"></span> Live now</span></div>
+          <div class="cc-body">
+            <div class="cc-thumb th-1"><span>الحروف</span></div>
+            <div class="cc-info">
+              <div class="cc-title ar">الحروف الهجائية</div>
+              <div class="cc-en">Arabic Letters · Beginner</div>
+              <div class="cc-meta"><span class="avatar" style="width:24px;height:24px">خ</span> Ustadh Khaled · <span>10:00–10:45</span></div>
+            </div>
+            <a class="btn btn-gold" href="#" data-go="classroom">Join Class
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+          </div>
+        </div>
+
+        <div class="class-card card">
+          <div class="cc-body">
+            <div class="cc-thumb th-2"><span>القراءة</span></div>
+            <div class="cc-info">
+              <div class="cc-title ar">القراءة الجهرية</div>
+              <div class="cc-en">Reading Aloud · Level 2</div>
+              <div class="cc-meta"><span class="avatar" style="width:24px;height:24px">ن</span> Ustadha Noor · <span>Tomorrow · 16:00</span></div>
+            </div>
+            <span class="cc-soon">Starts in 21h</span>
+          </div>
+        </div>
+
+        <div class="class-card card">
+          <div class="cc-body">
+            <div class="cc-thumb th-3"><span>المحادثة</span></div>
+            <div class="cc-info">
+              <div class="cc-title ar">المحادثة اليومية</div>
+              <div class="cc-en">Everyday Conversation · Level 2</div>
+              <div class="cc-meta"><span class="avatar" style="width:24px;height:24px">م</span> Ustadh Majed · <span>Thu · 17:30</span></div>
+            </div>
+            <span class="cc-soon">This week</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- side column -->
+      <div class="dash-col">
+        <div class="card pad">
+          <div class="col-head sm"><h3>My Badges <span class="ar muted">أوسمتي</span></h3><a href="#" class="link-gold">All 9 →</a></div>
+          <div class="badge-grid">
+            <div class="bg-item"><div class="bg-ic earned">📖</div><span>First Word</span></div>
+            <div class="bg-item"><div class="bg-ic earned">🔥</div><span>7-Day</span></div>
+            <div class="bg-item"><div class="bg-ic earned">✍️</div><span>Neat Hand</span></div>
+            <div class="bg-item"><div class="bg-ic earned">⭐</div><span>2k XP</span></div>
+            <div class="bg-item"><div class="bg-ic earned">🗣️</div><span>Speaker</span></div>
+            <div class="bg-item"><div class="bg-ic locked">🔒</div><span>Level 10</span></div>
+          </div>
+        </div>
+
+        <div class="card pad">
+          <div class="col-head sm"><h3>Streak <span class="ar muted">المواظبة</span></h3><span class="pill">🔥 14 days</span></div>
+          <div class="streak-week">
+            <div class="sw-day done"><i></i><span>M</span></div>
+            <div class="sw-day done"><i></i><span>T</span></div>
+            <div class="sw-day done"><i></i><span>W</span></div>
+            <div class="sw-day done"><i></i><span>T</span></div>
+            <div class="sw-day today"><i></i><span>F</span></div>
+            <div class="sw-day"><i></i><span>S</span></div>
+            <div class="sw-day"><i></i><span>S</span></div>
+          </div>
+          <p class="streak-note">Keep it going! Attend today's class to reach <b>15 days</b>.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+</section>
+
+<!-- ============================================================
+     SCREEN 5 — TEACHER DASHBOARD
+     ============================================================ -->
+<section class="screen" id="s-teacher" data-screen-label="Teacher Dashboard">
+  <header class="appbar">
+    <div class="ab-inner">
+      <a class="brand" href="#" data-go="landing"><img src="assets/midad-logo-transparent.png" alt="Midad Academy" class="logo-full"></a>
+      <nav class="ab-nav">
+        <a class="on" href="#" data-go="teacher">Dashboard</a>
+        <a href="#">My Courses</a>
+        <a href="#">Students</a>
+        <a href="#">Schedule</a>
+      </nav>
+      <div class="ab-right">
+        <span class="role-tag">Teacher · معلّم</span>
+        <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><i class="dot"></i></button>
+        <div class="ab-user"><span class="avatar" style="width:38px;height:38px;background:rgba(27,58,107,.12);color:var(--navy)">خ</span></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="dash">
+    <div class="page-head">
+      <div>
+        <p class="dh-hi">Welcome back, <b>Ustadh Khaled</b> <span class="ar dh-ar">أهلاً أستاذ خالد</span></p>
+        <h1 class="dh-title">Your teaching, at a glance</h1>
+      </div>
+      <button class="btn btn-gold btn-lg" data-modal-open="m-create">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
+        Create New Class
+      </button>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat card"><div class="st-ic st-navy">📚</div><div><b>6</b><span>Active courses</span></div></div>
+      <div class="stat card"><div class="st-ic st-gold">👨‍🎓</div><div><b>48</b><span>Students</span></div></div>
+      <div class="stat card"><div class="st-ic st-fire">🗓️</div><div><b>11</b><span>Classes this week</span></div></div>
+      <div class="stat card"><div class="st-ic st-green">★</div><div><b>4.9</b><span>Avg. rating</span></div></div>
+    </div>
+
+    <div class="dash-grid t-grid">
+      <div class="dash-col">
+        <div class="col-head"><h2>My Classes <span class="ar muted">صفوفي</span></h2><a href="#" class="link-gold">View schedule →</a></div>
+        <div class="tc-grid">
+          <div class="tclass card live">
+            <div class="tc-top"><span class="badge-live"><span class="dot"></span> Live now</span><span class="tc-lvl">Beginner</span></div>
+            <div class="tc-thumb th-1"><span>الحروف الهجائية</span></div>
+            <div class="tc-name ar">الحروف الهجائية</div>
+            <div class="tc-en">Arabic Letters</div>
+            <div class="tc-foot">
+              <span class="tc-students"><span class="dotrow"><i></i><i></i><i></i></span> 5 students</span>
+              <a class="btn btn-sm btn-gold" href="#" data-go="classroom">Start Class</a>
+            </div>
+          </div>
+          <div class="tclass card">
+            <div class="tc-top"><span class="tc-when">Today · 16:00</span><span class="tc-lvl">Level 2</span></div>
+            <div class="tc-thumb th-2"><span>القراءة الجهرية</span></div>
+            <div class="tc-name ar">القراءة الجهرية</div>
+            <div class="tc-en">Reading Aloud</div>
+            <div class="tc-foot">
+              <span class="tc-students"><span class="dotrow"><i></i><i></i><i></i></span> 6 students</span>
+              <a class="btn btn-sm btn-navy" href="#" data-go="classroom">Start Class</a>
+            </div>
+          </div>
+          <div class="tclass card">
+            <div class="tc-top"><span class="tc-when">Tomorrow · 17:30</span><span class="tc-lvl">Level 2</span></div>
+            <div class="tc-thumb th-3"><span>المحادثة اليومية</span></div>
+            <div class="tc-name ar">المحادثة اليومية</div>
+            <div class="tc-en">Everyday Conversation</div>
+            <div class="tc-foot">
+              <span class="tc-students"><span class="dotrow"><i></i><i></i></span> 4 students</span>
+              <a class="btn btn-sm btn-navy" href="#" data-go="classroom">Start Class</a>
+            </div>
+          </div>
+          <button class="tclass card tclass-add" data-modal-open="m-create">
+            <span class="add-plus">+</span>
+            <b>Create New Class</b>
+            <span>Set up a course, level &amp; schedule</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="dash-col">
+        <div class="card pad">
+          <div class="col-head sm"><h3>Up next today</h3></div>
+          <ul class="agenda">
+            <li><span class="ag-time">16:00</span><div><b class="ar">القراءة الجهرية</b><span>6 students · Room A</span></div></li>
+            <li><span class="ag-time">17:30</span><div><b class="ar">قواعد النحو</b><span>5 students · Room B</span></div></li>
+            <li class="dim"><span class="ag-time">19:00</span><div><b class="ar">المحادثة</b><span>4 students · Room A</span></div></li>
+          </ul>
+        </div>
+        <div class="card pad">
+          <div class="col-head sm"><h3>Recent activity</h3></div>
+          <ul class="feed">
+            <li><span class="fd-dot ok"></span><div><b>Lina</b> submitted homework <span class="ar">الواجب ٣</span></div></li>
+            <li><span class="fd-dot gold"></span><div><b>Yusuf</b> earned the <b>Neat Hand</b> badge</div></li>
+            <li><span class="fd-dot"></span><div>New enrolment in <b class="ar">القراءة الجهرية</b></div></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Create New Class modal -->
+  <div class="modal-bg" id="m-create">
+    <div class="modal">
+      <div class="modal-head">
+        <div><h3>Create New Class</h3><p class="ar muted">إنشاء صفّ جديد</p></div>
+        <button class="modal-x" data-modal-close><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </div>
+      <form class="modal-body" onsubmit="return false">
+        <div class="field">
+          <label>Class name <span class="ar muted">اسم الصفّ</span></label>
+          <input class="input" type="text" placeholder="e.g. Arabic Letters — الحروف الهجائية">
+        </div>
+        <div class="grid-2">
+          <div class="field"><label>Course</label>
+            <select class="input"><option>Reading &amp; Writing</option><option>Conversation</option><option>Grammar — النحو</option><option>Qur'an Recitation</option></select>
+          </div>
+          <div class="field"><label>Level</label>
+            <select class="input"><option>Beginner</option><option>Level 2</option><option>Level 3</option><option>Advanced</option></select>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="field"><label>Age group</label>
+            <select class="input"><option>Ages 5–7</option><option>Ages 8–11</option><option>Ages 12–15</option></select>
+          </div>
+          <div class="field"><label>Max students</label>
+            <input class="input" type="number" value="6" min="1" max="12">
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="field"><label>Day</label>
+            <select class="input"><option>Monday</option><option>Wednesday</option><option>Friday</option><option>Saturday</option></select>
+          </div>
+          <div class="field"><label>Time</label>
+            <input class="input" type="time" value="16:00">
+          </div>
+        </div>
+        <div class="field"><label>Description <span class="muted">(optional)</span></label>
+          <textarea class="input" style="height:78px;padding:12px 16px" placeholder="What will students learn in this class?"></textarea>
+        </div>
+      </form>
+      <div class="modal-foot">
+        <button class="btn btn-outline" data-modal-close>Cancel</button>
+        <button class="btn btn-gold" data-modal-close>Create Class</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SCREEN 6 — PARENT DASHBOARD
+     ============================================================ -->
+<section class="screen" id="s-parent" data-screen-label="Parent Dashboard">
+  <header class="appbar">
+    <div class="ab-inner">
+      <a class="brand" href="#" data-go="landing"><img src="assets/midad-logo-transparent.png" alt="Midad Academy" class="logo-full"></a>
+      <nav class="ab-nav">
+        <a class="on" href="#" data-go="parent">Overview</a>
+        <a href="#">Children</a>
+        <a href="#">Reports</a>
+        <a href="#">Billing</a>
+      </nav>
+      <div class="ab-right">
+        <span class="role-tag">Parent · وليّ أمر</span>
+        <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><i class="dot"></i></button>
+        <div class="ab-user"><span class="avatar" style="width:38px;height:38px;background:#f4dede;color:#b3463b">ر</span></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="dash">
+    <div class="page-head">
+      <div>
+        <p class="dh-hi">Good morning, <b>Rana</b> <span class="ar dh-ar">صباح الخير رنا</span></p>
+        <h1 class="dh-title">Your family's progress</h1>
+      </div>
+      <button class="btn btn-outline">Download weekly report</button>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat card"><div class="st-ic st-navy">👧</div><div><b>2</b><span>Children enrolled</span></div></div>
+      <div class="stat card"><div class="st-ic st-fire">🗓️</div><div><b>5</b><span>Classes this week</span></div></div>
+      <div class="stat card"><div class="st-ic st-gold">⭐</div><div><b>4,610</b><span>Family XP</span></div></div>
+      <div class="stat card"><div class="st-ic st-green">✓</div><div><b>94%</b><span>Attendance</span></div></div>
+    </div>
+
+    <div class="col-head"><h2>My Children <span class="ar muted">أبنائي</span></h2><a href="#" class="link-gold">Add a child →</a></div>
+    <div class="child-grid">
+      <div class="child card">
+        <div class="ch-head">
+          <span class="avatar ch-av" style="background:#dce6f4;color:var(--navy)">س</span>
+          <div><div class="ch-name">Sara <span class="ar">سارة</span></div><div class="ch-meta">Age 9 · Level 7 · <span class="ar">قارئ</span></div></div>
+          <span class="mini-chip"><span class="mc-ic">🔥</span> 14</span>
+        </div>
+        <div class="ch-xp">
+          <div class="lvl-row"><span>2,840 XP</span><span>Level 7</span></div>
+          <div class="bar"><i style="width:72%"></i></div>
+        </div>
+        <div class="ch-stats">
+          <div><b>9</b><span>Badges</span></div>
+          <div><b>96%</b><span>Attendance</span></div>
+          <div><b>3</b><span>Classes/wk</span></div>
+        </div>
+        <div class="ch-next"><span class="nx-dot live"></span> <b>Live now:</b> <span class="ar">الحروف الهجائية</span></div>
+        <button class="btn btn-block btn-outline btn-sm" data-go="student">View details</button>
+      </div>
+
+      <div class="child card">
+        <div class="ch-head">
+          <span class="avatar ch-av" style="background:#e3efe6;color:#2a6d49">م</span>
+          <div><div class="ch-name">Majed <span class="ar">ماجد</span></div><div class="ch-meta">Age 12 · Level 5 · <span class="ar">متدرّب</span></div></div>
+          <span class="mini-chip"><span class="mc-ic">🔥</span> 6</span>
+        </div>
+        <div class="ch-xp">
+          <div class="lvl-row"><span>1,770 XP</span><span>Level 5</span></div>
+          <div class="bar"><i style="width:48%"></i></div>
+        </div>
+        <div class="ch-stats">
+          <div><b>5</b><span>Badges</span></div>
+          <div><b>91%</b><span>Attendance</span></div>
+          <div><b>2</b><span>Classes/wk</span></div>
+        </div>
+        <div class="ch-next"><span class="nx-dot"></span> <b>Next:</b> Tomorrow 16:00 · <span class="ar">المحادثة</span></div>
+        <button class="btn btn-block btn-outline btn-sm" data-go="student">View details</button>
+      </div>
+    </div>
+
+    <div class="dash-grid p-grid">
+      <div class="card pad">
+        <div class="col-head sm"><h3>Attendance timeline <span class="ar muted">سجلّ الحضور</span></h3><a href="#" class="link-gold">All history →</a></div>
+        <ul class="timeline">
+          <li><span class="tl-dot ok"></span><div class="tl-body"><div class="tl-row"><b class="ar">الحروف الهجائية</b><span class="tl-tag ok">Attended</span></div><span class="tl-sub">Sara · Today 10:00 · Ustadh Khaled</span></div></li>
+          <li><span class="tl-dot ok"></span><div class="tl-body"><div class="tl-row"><b class="ar">المحادثة اليومية</b><span class="tl-tag ok">Attended</span></div><span class="tl-sub">Majed · Yesterday 16:00 · Ustadh Majed</span></div></li>
+          <li><span class="tl-dot ok"></span><div class="tl-body"><div class="tl-row"><b class="ar">القراءة الجهرية</b><span class="tl-tag ok">Attended</span></div><span class="tl-sub">Sara · Mon 16:00 · Ustadha Noor</span></div></li>
+          <li><span class="tl-dot miss"></span><div class="tl-body"><div class="tl-row"><b class="ar">قواعد النحو</b><span class="tl-tag miss">Missed</span></div><span class="tl-sub">Majed · Sun 17:30 · Ustadh Khaled</span></div></li>
+          <li><span class="tl-dot ok"></span><div class="tl-body"><div class="tl-row"><b class="ar">الحروف الهجائية</b><span class="tl-tag ok">Attended</span></div><span class="tl-sub">Sara · Sat 10:00 · Ustadh Khaled</span></div></li>
+        </ul>
+      </div>
+      <div class="dash-col">
+        <div class="card pad report-card">
+          <div class="col-head sm"><h3>This week</h3></div>
+          <div class="rep-big"><b>5 / 5</b><span>classes attended</span></div>
+          <div class="rep-rows">
+            <div class="rep-row"><span>XP earned</span><b>+420</b></div>
+            <div class="rep-row"><span>Homework done</span><b>4 / 4</b></div>
+            <div class="rep-row"><span>New badges</span><b>2</b></div>
+          </div>
+          <p class="rep-note">Great week! Both children are on track. 🌟</p>
+        </div>
+        <div class="card pad upcoming-pay">
+          <div class="col-head sm"><h3>Plan</h3></div>
+          <div class="pay-row"><div><b>Scholar plan</b><span>Renews 1 Jul · $39/mo</span></div><a href="#" class="link-gold">Manage</a></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</section>
+
+<!-- ============================================================
+     SCREEN 7 — CLASSROOM (video + whiteboard)
+     ============================================================ -->
+<section class="screen" id="s-classroom" data-screen-label="Classroom">
+  <div class="room">
+    <!-- room top bar -->
+    <header class="room-top">
+      <div class="rt-left">
+        <button class="rt-back" data-go="student"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <div>
+          <div class="rt-title ar">الحروف الهجائية</div>
+          <div class="rt-sub">Arabic Letters · Beginner</div>
+        </div>
+      </div>
+      <div class="rt-center">
+        <span class="badge-live"><span class="dot"></span> Live</span>
+        <span class="rt-timer">12:48</span>
+        <span class="rt-count"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 19v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="3"/><path d="M22 19v-2a4 4 0 0 0-3-3.9"/></svg> 6</span>
+      </div>
+      <div class="rt-right">
+        <button class="rt-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>
+        <button class="btn btn-sm rt-leave" data-go="student">Leave</button>
+      </div>
+    </header>
+
+    <!-- video strip (top) -->
+    <div class="video-strip">
+      <div class="vtile vteacher">
+        <div class="vph"><span>teacher camera feed</span></div>
+        <div class="vlabel"><span class="vmic on"></span> Ustadh Khaled <span class="vhost">Host</span></div>
+      </div>
+      <div class="vtile"><div class="vph s1"><span>Sara</span></div><div class="vlabel"><span class="vmic"></span> Sara</div><span class="vhand">✋</span></div>
+      <div class="vtile"><div class="vph s2"><span>Yusuf</span></div><div class="vlabel"><span class="vmic on"></span> Yusuf</div></div>
+      <div class="vtile"><div class="vph s3"><span>Lina</span></div><div class="vlabel"><span class="vmic"></span> Lina</div></div>
+      <div class="vtile"><div class="vph s4"><span>Omar</span></div><div class="vlabel"><span class="vmic on"></span> Omar</div></div>
+      <div class="vtile vmore"><span>+2</span></div>
+    </div>
+
+    <!-- whiteboard -->
+    <div class="board-wrap">
+      <!-- vertical toolbar -->
+      <div class="wb-toolbar">
+        <button class="wb-tool on" data-tool="pen" title="Pen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 19l7-7 3 3-7 7-4 1 1-4z"/><path d="M18 13l-1.5-1.5"/><path d="M3 21l5-1 9-9-4-4-9 9z"/></svg></button>
+        <button class="wb-tool" data-tool="highlighter" title="Highlighter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l-4 4v3h3l4-4"/><path d="M13 7l4 4 4-4-4-4z"/><path d="M12 8l4 4"/></svg></button>
+        <button class="wb-tool" data-tool="eraser" title="Eraser"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 14l6-6 8 8-4 4H9z"/><path d="M5 20h14"/></svg></button>
+        <span class="wb-sep"></span>
+        <button class="wb-tool" data-tool="text" title="Text"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6V5h16v1M12 5v14M9 19h6"/></svg></button>
+        <button class="wb-tool" data-tool="rect" title="Rectangle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg></button>
+        <button class="wb-tool" data-tool="circle" title="Circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/></svg></button>
+        <button class="wb-tool" data-tool="line" title="Line"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 19L19 5"/></svg></button>
+        <span class="wb-sep"></span>
+        <button class="wb-tool" id="wbClear" title="Clear board"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+      </div>
+
+      <!-- combined board: shared content + draw-on-top canvas -->
+      <div class="board-stage">
+        <!-- board header: what's being shared + page nav -->
+        <div class="board-bar">
+          <div class="bb-left">
+            <span class="badge-live"><span class="dot"></span> Sharing</span>
+            <span class="bb-name ar">الدرس الثالث — حرف الباء</span>
+            <span class="bb-by"><span class="avatar" style="width:22px;height:22px;background:var(--gold-soft);color:var(--gold-600)">خ</span> Ustadh Khaled</span>
+          </div>
+          <div class="bb-right">
+            <button class="bb-ic" title="Previous page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+            <span class="bb-page">2 / 8</span>
+            <button class="bb-ic" title="Next page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+            <span class="bb-sep"></span>
+            <button class="bb-ic" title="Zoom out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4M8 11h6"/></svg></button>
+            <button class="bb-ic" title="Zoom in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4M11 8v6M8 11h6"/></svg></button>
+            <button class="bb-chip" title="Share another file">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>
+              Share content
+            </button>
+          </div>
+        </div>
+
+        <!-- the board itself: shared slide layer + transparent canvas on top -->
+        <div class="board-paper">
+          <!-- shared content layer (drawn under the ink) -->
+          <div class="board-shared">
+            <div class="bs-slide">
+              <div class="bs-eyebrow">الدرس الثالث · Lesson 3</div>
+              <h2 class="ar bs-h">حرف الباء — ب</h2>
+              <div class="bs-letter ar">بـ ـبـ ـب</div>
+              <div class="bs-examples">
+                <div class="bs-ex"><span class="ar">باب</span><small>door</small></div>
+                <div class="bs-ex"><span class="ar">بطة</span><small>duck</small></div>
+                <div class="bs-ex"><span class="ar">حليب</span><small>milk</small></div>
+              </div>
+            </div>
+          </div>
+          <!-- annotation canvas overlays the shared content -->
+          <canvas id="wbCanvas"></canvas>
+          <div class="board-guide ar">✍️ اكتب فوق المحتوى</div>
+
+          <!-- shared materials dock (floating, bottom) -->
+          <div class="board-dock">
+            <span class="dock-label">Shared</span>
+            <button class="dock-item on" title="Lesson 3"><span class="dk-ic doc">PDF</span></button>
+            <button class="dock-item" title="Letter flashcards"><span class="dk-ic img">IMG</span></button>
+            <button class="dock-item" title="Pronunciation audio"><span class="dk-ic aud">▶</span></button>
+            <button class="dock-item" title="Quick quiz"><span class="dk-ic quiz">?</span></button>
+            <button class="dock-add" title="Share a file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- color palette -->
+      <div class="wb-colors">
+        <button class="wb-color on" data-color="#1B3A6B" style="background:#1B3A6B"></button>
+        <button class="wb-color" data-color="#C9922A" style="background:#C9922A"></button>
+        <button class="wb-color" data-color="#e0483d" style="background:#e0483d"></button>
+        <button class="wb-color" data-color="#2f8f5b" style="background:#2f8f5b"></button>
+        <button class="wb-color" data-color="#1c2536" style="background:#1c2536"></button>
+        <button class="wb-color" data-color="#ffffff" style="background:#ffffff;box-shadow:inset 0 0 0 1px #ccc"></button>
+      </div>
+    </div>
+
+    <!-- bottom controls -->
+    <div class="room-controls">
+      <button class="rc-btn"><span class="rci">🎤</span><span>Mute</span></button>
+      <button class="rc-btn"><span class="rci">📷</span><span>Camera</span></button>
+      <button class="rc-btn"><span class="rci">✋</span><span>Raise hand</span></button>
+      <button class="rc-btn"><span class="rci">😊</span><span>React</span></button>
+      <button class="rc-btn rc-leave" data-go="student"><span class="rci">📞</span><span>Leave</span></button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SCREEN 8 — BROWSE COURSES
+     ============================================================ -->
+<section class="screen" id="s-courses" data-screen-label="Browse Courses">
+  <header class="nav">
+    <div class="nav-inner">
+      <a class="brand" href="#" data-go="landing"><img src="assets/midad-logo-transparent.png" alt="Midad Academy" class="logo-full"></a>
+      <nav class="nav-links">
+        <a href="#" data-go="landing">Home</a>
+        <a class="on" href="#" data-go="courses">Courses</a>
+        <a href="#" data-go="landing">Pricing</a>
+        <a href="#" data-go="student">Dashboard</a>
+        <a href="#" data-go="classroom">Classroom</a>
+      </nav>
+      <div class="nav-cta">
+        <a class="btn btn-sm btn-outline" href="#" data-go="login">Log in</a>
+        <a class="btn btn-sm btn-gold" href="#" data-go="register">Get Started</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="courses-hero geo">
+    <div class="wrap center">
+      <span class="eyebrow">Our Courses · دوراتنا</span>
+      <h1 class="ch-h1">Find the perfect class for your child</h1>
+      <p class="ch-sub">Live, small-group courses for ages 5–15 — taught by certified native teachers.</p>
+      <div class="course-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+        <input placeholder="Search courses — ابحث عن دورة…">
+        <button class="btn btn-gold btn-sm">Search</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap courses-bar">
+    <div class="filters">
+      <button class="filter on">All</button>
+      <button class="filter">Reading &amp; Writing</button>
+      <button class="filter">Conversation</button>
+      <button class="filter">Grammar — النحو</button>
+      <button class="filter">Qur'an</button>
+    </div>
+    <div class="age-filter">
+      <span>Age:</span>
+      <button class="chip-f on">All</button>
+      <button class="chip-f">5–7</button>
+      <button class="chip-f">8–11</button>
+      <button class="chip-f">12–15</button>
+    </div>
+  </div>
+
+  <div class="wrap course-grid">
+    <!-- 6 course cards -->
+    <article class="course card">
+      <div class="cv-thumb th-1"><span class="ar">الحروف الهجائية</span><span class="cv-age">Ages 5–7</span></div>
+      <div class="cv-body">
+        <div class="cv-tags"><span class="pill-navy pill">Beginner</span><span class="cv-rate">★ 4.9</span></div>
+        <h3 class="ar cv-title">الحروف الهجائية</h3>
+        <p class="cv-en">Arabic Letters</p>
+        <p class="cv-desc">Learn to recognise, write and pronounce all 28 letters through songs and play.</p>
+        <div class="cv-meta"><span class="avatar" style="width:24px;height:24px">خ</span> Ustadh Khaled · 24 lessons</div>
+      </div>
+      <div class="cv-foot"><div class="cv-price"><b>$19</b><span>/mo</span></div><a class="btn btn-sm btn-gold" data-go="register">Enroll</a></div>
+    </article>
+
+    <article class="course card">
+      <div class="cv-thumb th-2"><span class="ar">القراءة الجهرية</span><span class="cv-age">Ages 8–11</span></div>
+      <div class="cv-body">
+        <div class="cv-tags"><span class="pill-navy pill">Level 2</span><span class="cv-rate">★ 4.8</span></div>
+        <h3 class="ar cv-title">القراءة الجهرية</h3>
+        <p class="cv-en">Reading Aloud</p>
+        <p class="cv-desc">Build fluency and confidence reading short stories and passages aloud.</p>
+        <div class="cv-meta"><span class="avatar" style="width:24px;height:24px">ن</span> Ustadha Noor · 30 lessons</div>
+      </div>
+      <div class="cv-foot"><div class="cv-price"><b>$24</b><span>/mo</span></div><a class="btn btn-sm btn-gold" data-go="register">Enroll</a></div>
+    </article>
+
+    <article class="course card">
+      <div class="cv-thumb th-3"><span class="ar">المحادثة اليومية</span><span class="cv-age">Ages 8–11</span></div>
+      <div class="cv-body">
+        <div class="cv-tags"><span class="pill-navy pill">Level 2</span><span class="cv-rate">★ 5.0</span></div>
+        <h3 class="ar cv-title">المحادثة اليومية</h3>
+        <p class="cv-en">Everyday Conversation</p>
+        <p class="cv-desc">Speak Arabic naturally — greetings, family, school and daily life topics.</p>
+        <div class="cv-meta"><span class="avatar" style="width:24px;height:24px">م</span> Ustadh Majed · 28 lessons</div>
+      </div>
+      <div class="cv-foot"><div class="cv-price"><b>$24</b><span>/mo</span></div><a class="btn btn-sm btn-gold" data-go="register">Enroll</a></div>
+    </article>
+
+    <article class="course card">
+      <div class="cv-thumb th-4"><span class="ar">قواعد النحو</span><span class="cv-age">Ages 12–15</span></div>
+      <div class="cv-body">
+        <div class="cv-tags"><span class="pill-navy pill">Level 3</span><span class="cv-rate">★ 4.7</span></div>
+        <h3 class="ar cv-title">قواعد النحو</h3>
+        <p class="cv-en">Arabic Grammar</p>
+        <p class="cv-desc">Master the foundations of grammar: nouns, verbs, sentences and i'rab.</p>
+        <div class="cv-meta"><span class="avatar" style="width:24px;height:24px">خ</span> Ustadh Khaled · 36 lessons</div>
+      </div>
+      <div class="cv-foot"><div class="cv-price"><b>$29</b><span>/mo</span></div><a class="btn btn-sm btn-gold" data-go="register">Enroll</a></div>
+    </article>
+
+    <article class="course card">
+      <div class="cv-thumb th-5"><span class="ar">تلاوة القرآن</span><span class="cv-age">Ages 8–15</span></div>
+      <div class="cv-body">
+        <div class="cv-tags"><span class="pill-navy pill">All levels</span><span class="cv-rate">★ 5.0</span></div>
+        <h3 class="ar cv-title">تلاوة القرآن</h3>
+        <p class="cv-en">Qur'an Recitation</p>
+        <p class="cv-desc">Beautiful, accurate recitation with tajweed rules, step by step.</p>
+        <div class="cv-meta"><span class="avatar" style="width:24px;height:24px">ع</span> Ustadh Adil · 40 lessons</div>
+      </div>
+      <div class="cv-foot"><div class="cv-price"><b>$29</b><span>/mo</span></div><a class="btn btn-sm btn-gold" data-go="register">Enroll</a></div>
+    </article>
+
+    <article class="course card">
+      <div class="cv-thumb th-6"><span class="ar">الكتابة الإبداعية</span><span class="cv-age">Ages 12–15</span></div>
+      <div class="cv-body">
+        <div class="cv-tags"><span class="pill-navy pill">Level 3</span><span class="cv-rate">★ 4.8</span></div>
+        <h3 class="ar cv-title">الكتابة الإبداعية</h3>
+        <p class="cv-en">Creative Writing</p>
+        <p class="cv-desc">Write stories, journals and essays — express ideas clearly in Arabic.</p>
+        <div class="cv-meta"><span class="avatar" style="width:24px;height:24px">ن</span> Ustadha Noor · 32 lessons</div>
+      </div>
+      <div class="cv-foot"><div class="cv-price"><b>$29</b><span>/mo</span></div><a class="btn btn-sm btn-gold" data-go="register">Enroll</a></div>
+    </article>
+  </div>
+
+  <div class="wrap"><div class="cta-band geo-navy" style="margin-bottom:80px">
+    <div><h2 class="cta-h">Not sure which course fits?</h2><p>Book a free placement chat and we'll match your child to the right level.</p></div>
+    <a class="btn btn-lg btn-gold" data-go="register">Get a free placement</a>
+  </div></div>
+
+  <footer class="footer">
+    <div class="wrap">
+      <div class="foot-bottom" style="margin-top:0;border:none">
+        <span>© 2026 Midad Academy · مداد. All rights reserved.</span>
+        <span>Privacy · Terms · Cookies</span>
+      </div>
+    </div>
+  </footer>
+</section>
+
+<!-- ============================================================
+     SCREEN-JUMP REVIEW PANEL
+     ============================================================ -->
+<div class="jump" id="jump">
+  <div class="jump-menu">
+    <div class="jh">Midad — 8 screens</div>
+    <button data-go="landing"><span class="n">1</span> Landing page</button>
+    <button data-go="login"><span class="n">2</span> Login</button>
+    <button data-go="register"><span class="n">3</span> Register</button>
+    <button data-go="student"><span class="n">4</span> Student dashboard</button>
+    <button data-go="teacher"><span class="n">5</span> Teacher dashboard</button>
+    <button data-go="parent"><span class="n">6</span> Parent dashboard</button>
+    <button data-go="classroom"><span class="n">7</span> Classroom</button>
+    <button data-go="courses"><span class="n">8</span> Browse Courses</button>
+  </div>
+  <button class="jump-btn" id="jumpBtn"><span class="g"></span> Screens <span id="jumpCur">1 / 8</span></button>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -69,7 +69,6 @@ export default function Navbar() {
   }
 
   const dashboardHref = user ? DASHBOARD_PATH[user.role] : '/login';
-  const classroomHref = user ? DASHBOARD_PATH[user.role] : '/login';
 
   return (
     <header className="midad nav">
@@ -86,7 +85,6 @@ export default function Navbar() {
             </Link>
           ))}
           <Link className={pathname === dashboardHref ? 'on' : ''} href={dashboardHref}>Dashboard</Link>
-          <Link className={pathname === classroomHref ? 'on' : ''} href={classroomHref}>Classroom</Link>
         </nav>
 
         <div className="nav-cta">
@@ -126,7 +124,6 @@ export default function Navbar() {
           <Link key={link.href} href={link.href} onClick={() => setMobileOpen(false)}>{link.label}</Link>
         ))}
         <Link href={dashboardHref} onClick={() => setMobileOpen(false)}>Dashboard</Link>
-        <Link href={classroomHref} onClick={() => setMobileOpen(false)}>Classroom</Link>
 
         {user ? (
           <button className="logout" onClick={handleLogout}>🚪 Log out ({user.name})</button>

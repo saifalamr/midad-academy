@@ -22,6 +22,7 @@ type Enrollment = {
 
 const THUMBS = ['th-1', 'th-2', 'th-3', 'th-4', 'th-5', 'th-6'];
 const AGE_FILTERS = ['All', '5–7', '8–11', '12–15'];
+const CATEGORY_FILTERS = ['All courses', 'Reading & Writing', 'Conversation', 'Grammar', "Qur'an"];
 
 function authFetch(path: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -44,6 +45,7 @@ export default function BrowseCoursesPage() {
   const [message, setMessage] = useState('');
   const [search, setSearch] = useState('');
   const [ageFilter, setAgeFilter] = useState('All');
+  const [categoryFilter, setCategoryFilter] = useState('All courses');
 
   useEffect(() => {
     Promise.all([
@@ -129,11 +131,15 @@ export default function BrowseCoursesPage() {
       {/* ── Filter bar ── */}
       <div className="wrap courses-bar">
         <div className="filters">
-          <button className="filter on">All courses</button>
-          <button className="filter">Reading &amp; Writing</button>
-          <button className="filter">Conversation</button>
-          <button className="filter">Grammar — النحو</button>
-          <button className="filter">Qur&apos;an</button>
+          {CATEGORY_FILTERS.map((cat) => (
+            <button
+              key={cat}
+              className={`filter${categoryFilter === cat ? ' on' : ''}`}
+              onClick={() => setCategoryFilter(cat)}
+            >
+              {cat === 'Grammar' ? 'Grammar — النحو' : cat === "Qur'an" ? "Qur'an" : cat}
+            </button>
+          ))}
         </div>
         <div className="age-filter">
           <span>Age:</span>

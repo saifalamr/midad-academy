@@ -1,10 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   Canvas,
   PencilBrush,
-  IText,
+  Text as FabricText,
   Rect,
   Circle as FabricCircle,
   Line as FabricLine,
@@ -17,301 +17,394 @@ import { WebsocketProvider } from 'y-websocket';
 
 const WS_URL = process.env.NEXT_PUBLIC_WHITEBOARD_WS_URL || 'ws://localhost:1234';
 
-type Tool = 'select' | 'pen' | 'highlighter' | 'eraser' | 'text' | 'rectangle' | 'circle' | 'line';
+export type Tool = 'select' | 'pen' | 'highlighter' | 'eraser' | 'text' | 'rectangle' | 'circle' | 'line';
 
-const PALETTE = ['#1f2937', '#dc2626', '#2563eb', '#16a34a', '#d97706', '#7c3aed'];
+export const PALETTE = ['#1B3A6B', '#C9922A', '#e0483d', '#2f8f5b', '#1c2536', '#ffffff'];
+
+type TextOverlay = {
+  canvasX: number; canvasY: number;  // position in Fabric canvas units
+  cssX: number;    cssY: number;     // position in CSS px (relative to canvas wrapper)
+  color: string;
+  fontSizePx: number;                // textarea font-size matched to canvas scale
+};
 
 function hexToRgba(hex: string, alpha: number) {
   const n = parseInt(hex.replace('#', ''), 16);
-  const r = (n >> 16) & 255;
-  const g = (n >> 8) & 255;
-  const b = n & 255;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
 
-// Students get a live read-only mirror — lock every object so a stray tap
-// can't select or move something that just synced in from the teacher.
-function lockObjects(canvas: Canvas, unlocked: boolean) {
+function lockObjects(canvas: Canvas, editable: boolean) {
   canvas.forEachObject((obj: FabricObject) => {
-    obj.selectable = unlocked;
-    obj.evented = unlocked;
+    obj.selectable = editable;
+    obj.evented    = editable;
   });
 }
 
-interface WhiteboardProps {
-  /** LiveKit room id — used to derive the shared Yjs document name. */
-  roomId: string;
-  /** Teachers can draw; everyone else gets a synced, view-only board. */
-  canDraw: boolean;
+export interface WhiteboardHandle {
+  clear: () => void;
 }
 
-export default function Whiteboard({ roomId, canDraw }: WhiteboardProps) {
-  const canvasElRef = useRef<HTMLCanvasElement>(null);
-  const canvasRef = useRef<Canvas | null>(null);
-  const syncNowRef = useRef<() => void>(() => {});
-  const applyingRemoteRef = useRef(false);
+interface WhiteboardProps {
+  roomId: string;
+  canDraw: boolean;
+  tool: Tool;
+  color: string;
+  lineWidth: number;
+  /** When true, the canvas background is transparent so shared content
+   *  rendered behind it remains visible (teacher draws on top of it). */
+  overlay?: boolean;
+}
 
-  const [tool, setTool] = useState<Tool>('pen');
-  const [color, setColor] = useState(PALETTE[0]);
-  const [lineWidth, setLineWidth] = useState(3);
+const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteboard(
+  { roomId, canDraw, tool, color, lineWidth, overlay = false },
+  ref,
+) {
+  const canvasElRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef   = useRef<Canvas | null>(null);
+  const syncNowRef  = useRef<() => void>(() => {});
+  const applyingRef = useRef(false);
+
+  const canDrawRef   = useRef(canDraw);
+  canDrawRef.current = canDraw;
+
   const [connected, setConnected] = useState(false);
 
-  // Mirrors of the toolbar state for the `mouse:down` handler below — that
-  // handler is bound once when the canvas mounts, so it reads these refs
-  // instead of stale closure values.
-  const toolRef = useRef(tool);
+  const toolRef  = useRef(tool);
   const colorRef = useRef(color);
   const widthRef = useRef(lineWidth);
-  useEffect(() => { toolRef.current = tool; }, [tool]);
-  useEffect(() => { colorRef.current = color; }, [color]);
+  useEffect(() => { toolRef.current  = tool;      }, [tool]);
+  useEffect(() => { colorRef.current = color;     }, [color]);
   useEffect(() => { widthRef.current = lineWidth; }, [lineWidth]);
 
-  // ── Mount once: build the Fabric canvas and open the Yjs sync session ────
+  // ─── Text overlay ────────────────────────────────────────────────────────────
+  const [textOverlay, setTextOverlay] = useState<TextOverlay | null>(null);
+  // Ref mirrors so callbacks that close over stale state still see current values.
+  const textOverlayRef    = useRef<TextOverlay | null>(null);
+  textOverlayRef.current  = textOverlay;
+  // Prevents the click that dismisses the textarea from immediately opening a new one.
+  const justCommittedRef  = useRef(false);
+  const textareaRef       = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (textOverlay) textareaRef.current?.focus();
+  }, [textOverlay]);
+
+  // Commit: read textarea value, stamp a Fabric.Text object, close overlay.
+  // Only uses refs → no deps → stable callback (safe to call from effects).
+  const doCommit = useCallback(() => {
+    const overlay = textOverlayRef.current;
+    if (!overlay) return; // already committed or never opened
+    textOverlayRef.current = null;
+    setTextOverlay(null);
+    justCommittedRef.current = true;
+    setTimeout(() => { justCommittedRef.current = false; }, 0);
+
+    const canvas = canvasRef.current;
+    const value  = textareaRef.current?.value?.trim() ?? '';
+    if (!value || !canvas) return;
+
+    canvas.add(new FabricText(value, {
+      left:       overlay.canvasX,
+      top:        overlay.canvasY,
+      fill:       overlay.color,
+      fontSize:   22,
+      fontFamily: 'Tahoma, Arial, sans-serif',
+      direction:  'rtl',
+      textAlign:  'right',
+    }));
+    canvas.requestRenderAll();
+    syncNowRef.current();
+  }, []);
+
+  // Cancel: discard without creating a Fabric object.
+  const doCancel = useCallback(() => {
+    textOverlayRef.current = null;
+    setTextOverlay(null);
+    justCommittedRef.current = true;
+    setTimeout(() => { justCommittedRef.current = false; }, 0);
+  }, []);
+
+  // Commit when switching away from text tool while overlay is open.
+  useEffect(() => {
+    if (tool !== 'text') doCommit();
+  }, [tool, doCommit]);
+
+  // ─── Mount once per roomId ──────────────────────────────────────────────────
   useEffect(() => {
     const el = canvasElRef.current;
     if (!el) return;
 
     const canvas = new Canvas(el, {
-      isDrawingMode: canDraw,
-      selection: canDraw,
-      backgroundColor: '#ffffff',
+      isDrawingMode: false,
+      selection:     false,
+      backgroundColor: overlay ? 'transparent' : '#ffffff',
     });
     canvasRef.current = canvas;
-    lockObjects(canvas, canDraw);
+    lockObjects(canvas, canDrawRef.current);
 
-    // -- Yjs: every participant in the class opens the same named document
-    // (`whiteboard-<roomId>`) against our sync server. We keep things simple
-    // by storing the *whole* canvas as one serialized JSON snapshot inside a
-    // shared Y.Map — Yjs's CRDT merge then guarantees every client converges
-    // on the latest write, even across reconnects, without us having to
-    // reconcile individual strokes/shapes ourselves.
-    const ydoc = new Y.Doc();
+    // ── Yjs sync ────────────────────────────────────────────────────────────
+    const ydoc     = new Y.Doc();
     const provider = new WebsocketProvider(WS_URL, `whiteboard-${roomId}`, ydoc);
-    const state = ydoc.getMap<string>('state');
+    const state    = ydoc.getMap<string>('state');
 
-    provider.on('status', (e: { status: string }) => setConnected(e.status === 'connected'));
+    provider.on('status', ({ status }: { status: string }) =>
+      setConnected(status === 'connected'),
+    );
 
     let pushTimer: ReturnType<typeof setTimeout> | undefined;
+
     const pushSnapshot = () => {
-      if (applyingRemoteRef.current) return;
+      if (applyingRef.current) return;
       ydoc.transact(() => state.set('canvas', JSON.stringify(canvas.toJSON())));
     };
-    // Exposed so the "Clear board" button can force an immediate sync.
+
     syncNowRef.current = () => {
-      if (pushTimer) clearTimeout(pushTimer);
+      clearTimeout(pushTimer);
       pushSnapshot();
     };
+
     const scheduleSync = () => {
-      if (!canDraw) return;
-      if (pushTimer) clearTimeout(pushTimer);
-      pushTimer = setTimeout(pushSnapshot, 250);
+      if (!canDrawRef.current) return;
+      clearTimeout(pushTimer);
+      pushTimer = setTimeout(pushSnapshot, 300);
     };
 
-    // Reload the canvas whenever the shared CRDT state changes — this fires
-    // both for our own pushes (harmless no-op re-render) and for updates that
-    // arrive from other participants over the WebSocket.
     const applyRemote = () => {
       const json = state.get('canvas');
       if (!json) return;
-      applyingRemoteRef.current = true;
+      applyingRef.current = true;
       canvas.loadFromJSON(json).then(() => {
-        lockObjects(canvas, canDraw);
+        lockObjects(canvas, canDrawRef.current);
         canvas.requestRenderAll();
-        applyingRemoteRef.current = false;
+        applyingRef.current = false;
       });
     };
+
     state.observe(applyRemote);
-    provider.on('sync', (isSynced: boolean) => { if (isSynced) applyRemote(); });
+    provider.on('sync', (ok: boolean) => { if (ok) applyRemote(); });
 
-    canvas.on('object:added', scheduleSync);
+    canvas.on('object:added',    scheduleSync);
     canvas.on('object:modified', scheduleSync);
-    canvas.on('object:removed', scheduleSync);
-    canvas.on('path:created', scheduleSync);
+    canvas.on('object:removed',  scheduleSync);
+    canvas.on('path:created',    scheduleSync);
 
-    // -- Click-to-place handler for the text & shape tools (teacher only) --
+    // ── Shape tools (mouse:down) ──────────────────────────────────────────
+    // Cache the Fabric hit-tested target and canvas-space point here so the
+    // DOM 'click' handler (which fires after Fabric's own event processing)
+    // can use them without re-running hit testing.
+    let lastDownTarget: FabricObject | null = null;
+    let lastDownCanvas = { x: 0, y: 0 };
+    let lastDownCss    = { x: 0, y: 0 };
+
     const onMouseDown = (e: TPointerEventInfo<TPointerEvent>) => {
-      if (!canDraw) return;
-      const activeTool = toolRef.current;
-      if (!['text', 'rectangle', 'circle', 'line'].includes(activeTool)) return;
-
+      lastDownTarget = e.target ?? null;
       const p = canvas.getScenePoint(e.e);
-      const stroke = colorRef.current;
-      const width = widthRef.current;
+      lastDownCanvas = { x: p.x, y: p.y };
+      // offsetX/Y: CSS pixels relative to the canvas element (== relative to
+      // the wrapper div since the canvas fills it without offset).
+      const me = e.e as { offsetX: number; offsetY: number };
+      lastDownCss = { x: me.offsetX ?? 0, y: me.offsetY ?? 0 };
 
-      if (activeTool === 'text') {
-        // `direction: 'rtl'` + `textAlign: 'right'` make the box behave
-        // naturally for Arabic — the cursor starts on the right and text
-        // grows leftward, matching how students/teachers actually type it.
-        const text = new IText('اكتب هنا', {
-          left: p.x,
-          top: p.y,
-          fill: stroke,
-          fontSize: 22,
-          fontFamily: 'Tahoma, Arial, sans-serif',
-          direction: 'rtl',
-          textAlign: 'right',
-        });
-        canvas.add(text);
-        canvas.setActiveObject(text);
-        text.enterEditing();
-        text.selectAll();
-      } else if (activeTool === 'rectangle') {
+      if (!canDrawRef.current) return;
+      if (e.target) return; // don't stamp shapes on top of existing objects
+      const t  = toolRef.current;
+      const st = colorRef.current;
+      const sw = widthRef.current;
+
+      if (t === 'rectangle')
         canvas.add(new Rect({
           left: p.x - 60, top: p.y - 40, width: 120, height: 80,
-          fill: 'transparent', stroke, strokeWidth: width,
+          fill: 'transparent', stroke: st, strokeWidth: sw,
         }));
-      } else if (activeTool === 'circle') {
+      else if (t === 'circle')
         canvas.add(new FabricCircle({
           left: p.x - 50, top: p.y - 50, radius: 50,
-          fill: 'transparent', stroke, strokeWidth: width,
+          fill: 'transparent', stroke: st, strokeWidth: sw,
         }));
-      } else if (activeTool === 'line') {
-        canvas.add(new FabricLine([p.x - 60, p.y, p.x + 60, p.y], { stroke, strokeWidth: width }));
-      }
+      else if (t === 'line')
+        canvas.add(new FabricLine(
+          [p.x - 60, p.y, p.x + 60, p.y],
+          { stroke: st, strokeWidth: sw },
+        ));
     };
     canvas.on('mouse:down', onMouseDown);
 
+    // ── Text tool: DOM 'click' opens the HTML overlay textarea ────────────
+    //
+    // We deliberately use the native 'click' event rather than any Fabric
+    // canvas event.  Fabric's _onMouseUp calls discardActiveObject() on every
+    // click that started on empty canvas — any IText.enterEditing() call made
+    // inside a Fabric event handler is cancelled by that.  The DOM 'click'
+    // event fires *after* the entire mousedown→mouseup cycle has settled, so
+    // there is nothing left to fight against.
+    const onCanvasClick = () => {
+      if (!canDrawRef.current) return;
+      if (toolRef.current !== 'text') return;
+      if (lastDownTarget) return;        // clicked an existing object
+      if (justCommittedRef.current) return; // this is the click that blurred a textarea
+
+      const cssScale   = el.getBoundingClientRect().width / 1000;
+      const overlay: TextOverlay = {
+        canvasX:    lastDownCanvas.x,
+        canvasY:    lastDownCanvas.y,
+        cssX:       lastDownCss.x,
+        cssY:       lastDownCss.y,
+        color:      colorRef.current,
+        fontSizePx: Math.round(22 * cssScale),
+      };
+      textOverlayRef.current = overlay;
+      setTextOverlay(overlay);
+    };
+    el.addEventListener('click', onCanvasClick);
+
     return () => {
-      if (pushTimer) clearTimeout(pushTimer);
-      canvas.off('mouse:down', onMouseDown);
-      canvas.off('object:added', scheduleSync);
+      clearTimeout(pushTimer);
+      canvas.off('mouse:down',    onMouseDown);
+      el.removeEventListener('click', onCanvasClick);
+      canvas.off('object:added',    scheduleSync);
       canvas.off('object:modified', scheduleSync);
-      canvas.off('object:removed', scheduleSync);
-      canvas.off('path:created', scheduleSync);
+      canvas.off('object:removed',  scheduleSync);
+      canvas.off('path:created',    scheduleSync);
       state.unobserve(applyRemote);
       provider.destroy();
       ydoc.destroy();
       canvas.dispose();
       canvasRef.current = null;
     };
-  }, [roomId, canDraw]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId]);
 
-  // ── Keep the active brush in sync with the selected tool/colour/width ────
+  // ─── overlay (transparent background) toggle ────────────────────────────────
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.backgroundColor = overlay ? 'transparent' : '#ffffff';
+    canvas.requestRenderAll();
+  }, [overlay]);
+
+  // ─── canDraw permission changes ─────────────────────────────────────────────
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    lockObjects(canvas, canDraw);
+    if (!canDraw) {
+      canvas.isDrawingMode = false;
+      canvas.selection     = false;
+    }
+    canvas.requestRenderAll();
+  }, [canDraw]);
+
+  // ─── Tool / colour / line-width ─────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !canDraw) return;
 
     const freehand = tool === 'pen' || tool === 'highlighter' || tool === 'eraser';
     canvas.isDrawingMode = freehand;
-    canvas.selection = tool === 'select';
+    canvas.selection     = tool === 'select';
 
-    if (freehand) {
-      const brush = new PencilBrush(canvas);
-      if (tool === 'pen') {
-        brush.color = color;
-        brush.width = lineWidth;
-      } else if (tool === 'highlighter') {
-        brush.color = hexToRgba(color, 0.28);
-        brush.width = lineWidth * 5;
-      } else {
-        // Fabric's core build ships no object-level eraser brush — painting
-        // in the board's own background colour is the standard lightweight
-        // trick for "erasing" on a freehand whiteboard.
-        brush.color = '#ffffff';
-        brush.width = lineWidth * 6;
-      }
-      canvas.freeDrawingBrush = brush;
+    if (!freehand) return;
+    const brush = new PencilBrush(canvas);
+    if (tool === 'pen') {
+      brush.color = color;
+      brush.width = lineWidth;
+    } else if (tool === 'highlighter') {
+      brush.color = hexToRgba(color, 0.28);
+      brush.width = lineWidth * 5;
+    } else {
+      brush.color = '#ffffff';
+      brush.width = lineWidth * 6;
     }
+    canvas.freeDrawingBrush = brush;
   }, [tool, color, lineWidth, canDraw]);
 
+  // ─── Clear board ─────────────────────────────────────────────────────────────
   const clearBoard = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !canDraw) return;
+    if (!canvas || !canDrawRef.current) return;
     canvas.clear();
-    canvas.backgroundColor = '#ffffff';
+    canvas.backgroundColor = overlay ? 'transparent' : '#ffffff';
     canvas.requestRenderAll();
     syncNowRef.current();
-  }, [canDraw]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overlay]);
 
+  useImperativeHandle(ref, () => ({ clear: clearBoard }), [clearBoard]);
+
+  // ─── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
-      {canDraw ? (
-        <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-gray-200 bg-gray-50">
-          <ToolButton active={tool === 'pen'} label="✏️ Pen" onClick={() => setTool('pen')} />
-          <ToolButton active={tool === 'highlighter'} label="🖍️ Highlighter" onClick={() => setTool('highlighter')} />
-          <ToolButton active={tool === 'eraser'} label="🧽 Eraser" onClick={() => setTool('eraser')} />
-          <ToolButton active={tool === 'text'} label="🔤 Text" onClick={() => setTool('text')} />
-          <ToolButton active={tool === 'rectangle'} label="▭ Rectangle" onClick={() => setTool('rectangle')} />
-          <ToolButton active={tool === 'circle'} label="◯ Circle" onClick={() => setTool('circle')} />
-          <ToolButton active={tool === 'line'} label="／ Line" onClick={() => setTool('line')} />
-          <ToolButton active={tool === 'select'} label="↖ Select" onClick={() => setTool('select')} />
+    <div style={{ position: 'absolute', inset: 0 }}>
+      <canvas ref={canvasElRef} width={1000} height={520} style={{ width: '100%', height: '100%', display: 'block' }} />
 
-          <div className="h-6 w-px bg-gray-300 mx-1" />
-
-          <div className="flex items-center gap-1.5">
-            {PALETTE.map((c) => (
-              <button
-                key={c}
-                onClick={() => setColor(c)}
-                className={`w-6 h-6 rounded-full border-2 transition-transform ${
-                  color === c ? 'border-primary-600 scale-110' : 'border-gray-300'
-                }`}
-                style={{ backgroundColor: c }}
-                aria-label={`Color ${c}`}
-              />
-            ))}
-            <input
-              type="color"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              className="w-7 h-7 rounded cursor-pointer border border-gray-300"
-              aria-label="Custom color"
-            />
-          </div>
-
-          <div className="flex items-center gap-2 text-xs text-gray-600">
-            <span>Width</span>
-            <input
-              type="range"
-              min={1}
-              max={20}
-              value={lineWidth}
-              onChange={(e) => setLineWidth(Number(e.target.value))}
-              className="accent-primary-600"
-            />
-            <span className="w-5 text-center">{lineWidth}</span>
-          </div>
-
-          <button
-            onClick={clearBoard}
-            className="ml-auto text-xs font-medium text-red-600 hover:text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+      {/* ── Status badges ── */}
+      <div style={{ position: 'absolute', top: 10, left: 10, display: 'flex', gap: 6, zIndex: 5, pointerEvents: 'none' }}>
+        <span
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            background: 'rgba(16,30,52,.7)', color: '#dbe4f1',
+            fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 999,
+            backdropFilter: 'blur(4px)',
+          }}
+        >
+          <span style={{
+            width: 7, height: 7, borderRadius: '50%',
+            background: connected ? '#3fd07d' : '#6f86ab',
+          }} />
+          {connected ? 'Live' : 'Connecting…'}
+        </span>
+        {!canDraw && (
+          <span
+            style={{
+              background: 'rgba(16,30,52,.7)', color: '#dbe4f1',
+              fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 999,
+              backdropFilter: 'blur(4px)',
+            }}
           >
-            Clear board
-          </button>
-
-          <span className={`text-xs font-medium ${connected ? 'text-green-600' : 'text-gray-400'}`}>
-            ● {connected ? 'Live' : 'Connecting…'}
+            👁️ View only
           </span>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 bg-gray-50">
-          <span className="text-xs font-medium text-gray-500">
-            👁️ View only — your teacher controls this whiteboard
-          </span>
-          <span className={`text-xs font-medium ${connected ? 'text-green-600' : 'text-gray-400'}`}>
-            ● {connected ? 'Live' : 'Connecting…'}
-          </span>
-        </div>
-      )}
-
-      <div className="bg-white">
-        <canvas ref={canvasElRef} width={1000} height={520} className="w-full block" />
+        )}
       </div>
+
+      {textOverlay && (
+        <textarea
+          ref={textareaRef}
+          rows={1}
+          defaultValue=""
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doCommit(); }
+            if (e.key === 'Escape') doCancel();
+          }}
+          onInput={(e) => {
+            // Auto-grow height as the user types more lines.
+            const el = e.currentTarget;
+            el.style.height = 'auto';
+            el.style.height = `${el.scrollHeight}px`;
+          }}
+          onBlur={doCommit}
+          style={{
+            position:   'absolute',
+            left:       textOverlay.cssX,
+            top:        textOverlay.cssY,
+            color:      textOverlay.color,
+            fontSize:   textOverlay.fontSizePx,
+            fontFamily: 'Tahoma, Arial, sans-serif',
+            direction:  'rtl',
+            textAlign:  'right',
+            background: 'transparent',
+            border:     'none',
+            outline:    'none',
+            resize:     'none',
+            padding:    0,
+            margin:     0,
+            lineHeight: 1.3,
+            minWidth:   140,
+            overflow:   'hidden',
+            zIndex:     20,
+          }}
+        />
+      )}
     </div>
   );
-}
+});
 
-function ToolButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
-        active
-          ? 'bg-primary-600 text-white'
-          : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-100'
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
+export default Whiteboard;

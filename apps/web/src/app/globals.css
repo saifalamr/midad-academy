@@ -89,7 +89,7 @@
   font-weight:700;font-size:15px;line-height:1;
   padding:13px 22px;border-radius:999px;
   transition:transform .15s ease, box-shadow .2s ease, background .2s ease, color .2s;
-  white-space:nowrap;border:none;background:none;
+  white-space:nowrap;border:none;background:none;cursor:pointer;
 }
 .midad .btn:active{transform:translateY(1px)}
 .midad .btn svg{width:18px;height:18px}
@@ -586,20 +586,65 @@
 .midad .vmic{width:7px;height:7px;border-radius:50%;background:#6f86ab}
 .midad .vmic.on{background:#3fd07d}
 .midad .vhost{background:var(--gold);color:#fff;font-size:10px;font-weight:800;padding:2px 7px;border-radius:999px}
+.midad .vhand{position:absolute;top:8px;right:8px;font-size:17px;background:rgba(8,16,30,.7);width:30px;height:30px;display:grid;place-items:center;border-radius:9px}
 .midad .vmore{width:80px;display:grid;place-items:center;background:#16243c;color:#8ea0bb;font-weight:800;font-size:18px}
-.midad .board-wrap{flex:1;padding:0 22px 18px;display:flex;gap:14px;min-height:300px}
+.midad .board-wrap{flex:1;position:relative;padding:0 22px 18px;display:flex;gap:14px;min-height:0}
 .midad .wb-toolbar{display:flex;flex-direction:column;gap:6px;background:#101e34;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:10px;align-self:flex-start}
 .midad .wb-tool{width:44px;height:44px;border-radius:11px;display:grid;place-items:center;color:#aebbcf;transition:.15s;border:none;cursor:pointer;background:none}
 .midad .wb-tool svg{width:21px;height:21px}
 .midad .wb-tool:hover{background:rgba(255,255,255,.08);color:#fff}
 .midad .wb-tool.on{background:var(--gold);color:#fff}
 .midad .wb-sep{height:1px;background:rgba(255,255,255,.1);margin:4px 6px}
-.midad .board-stage{flex:1;min-width:0;display:flex}
-.midad .board-paper{flex:1;position:relative;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.3)}
-.midad .board-guide{position:absolute;top:18px;right:24px;font-size:18px;font-weight:600;color:#c2b189;pointer-events:none;z-index:1}
+
+.midad .board-stage{flex:1;min-width:0;min-height:340px;display:flex;flex-direction:column;gap:12px}
+.midad .board-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#101e34;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:9px 12px}
+.midad .bb-left{display:flex;align-items:center;gap:12px;min-width:0}
+.midad .bb-name{font-size:15px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.midad .bb-by{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:#8ea0bb;flex:none}
+.midad .bb-avatar{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--gold-soft);color:var(--gold-600);font-size:11px;font-weight:800;font-family:var(--font-en)}
+.midad .bb-right{display:flex;align-items:center;gap:5px;flex:none}
+.midad .bb-ic{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:#aebbcf;background:rgba(255,255,255,.06);transition:.15s;border:none;cursor:pointer}
+.midad .bb-ic svg{width:17px;height:17px}
+.midad .bb-ic:hover{background:rgba(255,255,255,.14);color:#fff}
+.midad .bb-ic:disabled{opacity:.4;cursor:not-allowed}
+.midad .bb-ic:disabled:hover{background:rgba(255,255,255,.06);color:#aebbcf}
+.midad .bb-page{font-size:13px;font-weight:700;color:#cdd7e6;padding:0 6px;font-variant-numeric:tabular-nums}
+.midad .bb-sep{width:1px;height:22px;background:rgba(255,255,255,.12);margin:0 4px}
+.midad .bb-chip{display:inline-flex;align-items:center;gap:7px;background:var(--gold);color:#fff;font-weight:700;font-size:13px;padding:8px 13px;border-radius:9px;margin-left:4px;transition:.15s;border:none;cursor:pointer}
+.midad .bb-chip svg{width:16px;height:16px}
+.midad .bb-chip:hover{background:var(--gold-600)}
+
+.midad .board-paper{flex:1;min-height:300px;position:relative;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.3);background-image:linear-gradient(#eef2f8 1px,transparent 1px),linear-gradient(90deg,#eef2f8 1px,transparent 1px);background-size:32px 32px}
+.midad .board-zoom{position:absolute;inset:0;transform-origin:center center;transition:transform .12s ease}
+.midad .board-shared{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:14px}
+.midad .board-shared img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.midad .board-shared canvas{max-width:100%;max-height:100%;object-fit:contain;box-shadow:0 6px 20px rgba(15,35,66,.18);background:#fff}
+.midad .board-shared iframe{width:100%;height:100%;border:none;border-radius:10px}
+.midad .board-shared video{width:100%;height:100%;object-fit:contain}
+.midad .bs-fallback{display:flex;flex-direction:column;align-items:center;gap:12px;color:var(--ink-2);font-weight:600;text-align:center}
+.midad .board-ink{position:absolute;inset:0}
+.midad .board-ink .canvas-container{width:100%!important;height:100%!important}
+.midad .board-ink .canvas-container canvas{width:100%!important;height:100%!important}
+.midad .board-guide{position:absolute;top:14px;right:18px;font-size:14px;font-weight:600;color:#b9a06f;pointer-events:none;background:rgba(255,255,255,.7);padding:5px 12px;border-radius:999px;backdrop-filter:blur(2px);z-index:2}
+
 .midad .wb-colors{display:flex;flex-direction:column;gap:9px;background:#101e34;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:11px;align-self:flex-start}
 .midad .wb-color{width:30px;height:30px;border-radius:50%;border:2px solid transparent;transition:.12s;cursor:pointer}
 .midad .wb-color.on{border-color:#fff;transform:scale(1.08);box-shadow:0 0 0 2px var(--gold)}
+.midad .wb-width{writing-mode:vertical-lr;direction:rtl;width:24px;height:90px;margin:6px auto 0;accent-color:var(--gold)}
+
+.midad .board-dock{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;align-items:center;gap:7px;background:rgba(16,30,52,.92);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:8px 10px;box-shadow:0 10px 28px rgba(0,0,0,.32);z-index:3}
+.midad .dock-label{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8ea0bb;padding:0 4px 0 2px}
+.midad .dock-item{width:42px;height:42px;border-radius:10px;display:grid;place-items:center;background:rgba(255,255,255,.06);border:1.5px solid transparent;transition:.15s;cursor:pointer}
+.midad .dock-item:hover{background:rgba(255,255,255,.14)}
+.midad .dock-item.on{border-color:var(--gold);background:rgba(201,146,42,.18)}
+.midad .dk-ic{font-size:11px;font-weight:800;color:#fff;border-radius:7px;width:30px;height:30px;display:grid;place-items:center}
+.midad .dk-ic.doc{background:#c0473d}
+.midad .dk-ic.img{background:#2f8f5b}
+.midad .dk-ic.aud{background:#2a6fae;font-size:13px}
+.midad .dk-ic.quiz{background:var(--gold);font-size:15px}
+.midad .dock-add{width:42px;height:42px;border-radius:10px;display:grid;place-items:center;color:#aebbcf;border:1.5px dashed rgba(255,255,255,.22);background:none;transition:.15s;cursor:pointer}
+.midad .dock-add svg{width:18px;height:18px}
+.midad .dock-add:hover{border-color:var(--gold);color:#fff}
 .midad .room-controls{display:flex;justify-content:center;gap:10px;padding:14px;background:#101e34;border-top:1px solid rgba(255,255,255,.08)}
 .midad .rc-btn{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:74px;padding:8px 12px;border-radius:13px;color:#dbe4f1;transition:.15s;border:none;cursor:pointer;background:none}
 .midad .rc-btn:hover{background:rgba(255,255,255,.08)}
@@ -607,6 +652,36 @@
 .midad .rc-btn > span:last-child{font-size:11.5px;font-weight:600}
 .midad .rc-leave{background:var(--live);color:#fff}
 .midad .rc-leave:hover{background:#c93b31}
+.midad .share-list{display:flex;flex-direction:column;gap:8px;margin:10px 0 18px}
+.midad .share-list-item{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:var(--paper);cursor:pointer;font-size:14px;font-weight:600}
+.midad .share-list-item:hover{border-color:var(--gold)}
+
+/* Raised-hand toasts */
+.midad .rh-list{position:fixed;top:80px;right:20px;display:flex;flex-direction:column;gap:8px;z-index:60;max-width:300px;pointer-events:none}
+.midad .rh-toast{background:rgba(255,255,255,.95);border:1px solid rgba(201,146,42,.5);border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:10px;font-size:13.5px;color:#1B3A6B;box-shadow:0 4px 18px rgba(0,0,0,.28);pointer-events:all}
+.midad .rh-dismiss{margin-left:auto;background:none;border:none;cursor:pointer;color:#888;padding:2px 6px;border-radius:6px;font-size:16px;line-height:1;flex-shrink:0}
+.midad .rh-dismiss:hover{background:rgba(0,0,0,.07)}
+
+/* Drawing-permission picker */
+.midad .perm-picker-bg{position:fixed;inset:0;z-index:100;background:rgba(15,35,66,.55);display:flex;align-items:center;justify-content:center}
+.midad .perm-picker{background:#1c2e48;border:1px solid rgba(201,146,42,.3);border-radius:16px;padding:22px;width:min(340px,90vw)}
+.midad .perm-picker h4{color:#fff;font-size:15.5px;font-weight:700;margin-bottom:14px}
+.midad .perm-picker-list{display:flex;flex-direction:column;gap:8px;max-height:240px;overflow-y:auto}
+.midad .perm-item{display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.06);border-radius:10px;padding:10px 14px}
+.midad .perm-item-name{color:#c5d2e6;font-size:14px;font-weight:500}
+.midad .perm-btn-grant{background:var(--gold);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer}
+.midad .perm-btn-grant:hover{background:var(--gold-600)}
+.midad .perm-btn-revoke{background:rgba(220,38,38,.18);color:#f87171;border:1px solid rgba(220,38,38,.3);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer}
+.midad .perm-btn-revoke:hover{background:rgba(220,38,38,.3)}
+.midad .perm-close{margin-top:12px;background:none;border:1px solid rgba(255,255,255,.15);color:#8ea0bb;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px;width:100%;font-family:inherit}
+.midad .perm-close:hover{border-color:rgba(255,255,255,.3);color:#c5d2e6}
+
+@keyframes wb-float-up{
+  0%  {transform:translateY(0);     opacity:1}
+  75% {opacity:1}
+  100%{transform:translateY(-110px);opacity:0}
+}
+.midad .reaction-float{position:fixed;pointer-events:none;font-size:2.2rem;line-height:1;animation:wb-float-up 2s ease-out forwards;z-index:9999;user-select:none}
 
 /* ============================================================
    COURSES (browse)
@@ -656,7 +731,9 @@
   .midad .board-wrap{flex-direction:column}
   .midad .wb-toolbar{flex-direction:row;flex-wrap:wrap;align-self:stretch}
   .midad .wb-sep{width:1px;height:auto;margin:6px 4px}
-  .midad .wb-colors{flex-direction:row;align-self:stretch;justify-content:center}
+  .midad .wb-colors{flex-direction:row;align-self:stretch;justify-content:center;flex-wrap:wrap}
+  .midad .wb-width{writing-mode:horizontal-tb;width:90px;height:24px;margin:0 6px}
+  .midad .board-bar{flex-wrap:wrap}
 }
 @media(max-width:680px){.midad .course-grid{grid-template-columns:1fr}}
 

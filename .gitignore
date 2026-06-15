@@ -33,3 +33,13 @@ packages/database/src/generated/
 # IDE
 .vscode/settings.json
 .idea/
+
+# Uploaded files
+apps/api/uploads/
+
+# Claude Code local settings/test artifacts
+.claude/
+
+# Personal/test files
+photo_6019500595422629289_y.jpg
+*.mp4

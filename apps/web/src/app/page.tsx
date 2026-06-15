@@ -173,7 +173,8 @@ export default function HomePage() {
           <div className="foot-grid">
             <div>
               <div className="brand foot-brand">
-                <span className="bn"><b style={{ color: '#fff', fontSize: 22 }}>مداد</b><span style={{ color: 'var(--gold-200)' }}>MIDAD ACADEMY</span></span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/midad-logo-transparent.png" alt="Midad Academy" className="logo-full logo-white" />
               </div>
               <p className="foot-about">A premium online academy helping children aged 5–15 read, write and speak Arabic with confidence and joy.</p>
             </div>

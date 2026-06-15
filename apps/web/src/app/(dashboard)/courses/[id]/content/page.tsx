@@ -65,6 +65,9 @@ export default function CourseContentPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -117,6 +120,46 @@ export default function CourseContentPage() {
       setFormError('Could not connect to server');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  function handleUploadClick() {
+    setUploadError('');
+    fileInputRef.current?.click();
+  }
+
+  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file later
+    if (!file) return;
+
+    setUploadError('');
+    setUploading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('http://localhost:4000/api/upload', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      const json = await res.json();
+      if (!res.ok) { setUploadError(json.error || 'Failed to upload file'); return; }
+
+      // Pre-fill the Add Lesson modal with the uploaded file's URL.
+      setTitle('');
+      setDescription('');
+      setType(file.type === 'application/pdf' ? 'PDF' : 'EXERCISE');
+      setContentUrl(json.data.url);
+      setDuration('');
+      setFormError('');
+      setShowModal(true);
+    } catch {
+      setUploadError('Could not connect to server');
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -276,11 +319,30 @@ export default function CourseContentPage() {
             <h1 className="dh-title">Manage Course Content</h1>
             <p className="dh-hi">Add, reorder, and remove lessons for this course.</p>
           </div>
-          <button className="btn btn-gold btn-lg" onClick={() => setShowModal(true)}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M12 5v14M5 12h14"/></svg>
-            Add Lesson
-          </button>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf,image/*"
+              style={{ display: 'none' }}
+              onChange={handleFileSelected}
+            />
+            <button className="btn btn-outline btn-lg" onClick={handleUploadClick} disabled={uploading}
+              style={{ opacity: uploading ? 0.65 : 1 }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>
+              {uploading ? 'Uploading…' : 'Upload File'}
+            </button>
+            <button className="btn btn-gold btn-lg" onClick={() => {
+              setTitle(''); setDescription(''); setType('VIDEO'); setContentUrl(''); setDuration(''); setFormError('');
+              setShowModal(true);
+            }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M12 5v14M5 12h14"/></svg>
+              Add Lesson
+            </button>
+          </div>
         </div>
+
+        {uploadError && <div className="auth-error" style={{ marginBottom: 16 }}>{uploadError}</div>}
 
         {loading ? (
           <div className="card pad" style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14 }}>
