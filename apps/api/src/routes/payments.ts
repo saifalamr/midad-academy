@@ -89,8 +89,8 @@ export async function paymentRoutes(app: FastifyInstance) {
         },
       ],
       metadata: { courseId, userId, studentId: studentProfile.id },
-      success_url: `${config.WEB_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${config.WEB_URL}/payment/cancel`,
+      success_url: `${config.FRONTEND_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${config.FRONTEND_URL}/payment/cancel`,
     });
 
     if (!session.url) {
