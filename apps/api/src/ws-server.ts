@@ -1,4 +1,4 @@
-import type { IncomingMessage } from 'http';
+import type { IncomingMessage, Server } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as Y from 'yjs';
 import * as syncProtocol from 'y-protocols/sync';
@@ -159,11 +159,14 @@ function setupConnection(conn: WebSocket, req: IncomingMessage) {
   }
 }
 
-export function startWhiteboardWebSocketServer(port: number) {
-  const wss = new WebSocketServer({ port });
+// Attach the Yjs sync server to the existing HTTP server so it shares the same
+// port (and, in production, the same TLS termination) as the REST API. The `ws`
+// library handles the HTTP `upgrade` handshake on this server for us. WebSocket
+// upgrade requests on any path are routed here; the room name is parsed from the
+// path inside `setupConnection`.
+export function startWhiteboardWebSocketServer(server: Server) {
+  const wss = new WebSocketServer({ server });
   wss.on('connection', setupConnection);
-  wss.on('listening', () => {
-    console.log(`[whiteboard] Yjs sync server listening on ws://localhost:${port}`);
-  });
+  console.log('[whiteboard] Yjs sync server attached to the HTTP server');
   return wss;
 }

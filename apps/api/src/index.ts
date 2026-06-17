@@ -93,9 +93,11 @@ async function bootstrap() {
   await app.listen({ port: config.PORT, host: '0.0.0.0' });
   app.log.info(`API running on http://localhost:${config.PORT}`);
 
-  // Separate raw WebSocket server (not Fastify) — the whiteboard's Yjs CRDT
-  // sync speaks a small binary protocol that doesn't fit into REST routing.
-  startWhiteboardWebSocketServer(config.WHITEBOARD_WS_PORT);
+  // Raw WebSocket server (not Fastify) — the whiteboard's Yjs CRDT sync speaks a
+  // small binary protocol that doesn't fit into REST routing. It's attached to
+  // Fastify's underlying HTTP server so it shares the same port, which keeps it
+  // reachable behind a single-port host like Railway (and over the same wss://).
+  startWhiteboardWebSocketServer(app.server);
 }
 
 bootstrap().catch((err) => {

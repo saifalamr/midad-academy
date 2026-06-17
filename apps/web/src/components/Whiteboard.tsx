@@ -15,7 +15,23 @@ import {
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 
-const WS_URL = process.env.NEXT_PUBLIC_WHITEBOARD_WS_URL || 'ws://localhost:1234';
+// Resolves the whiteboard sync server URL. Prefers the explicit env var (needed
+// when the API is on a different origin than the web app, e.g. separate Railway
+// services). Otherwise falls back to the current page's origin — the WS server
+// shares the API's port, so same-origin "just works" when both are co-hosted or
+// behind one proxy. Computed lazily because window is undefined during SSR.
+function getWhiteboardWsUrl(): string {
+  if (process.env.NEXT_PUBLIC_WHITEBOARD_WS_URL) {
+    return process.env.NEXT_PUBLIC_WHITEBOARD_WS_URL;
+  }
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${protocol}//${window.location.host}`;
+  }
+  // SSR fallback — never actually used to open a connection (provider is created
+  // client-side), but keeps the value well-defined.
+  return 'ws://localhost:1234';
+}
 
 export type Tool = 'select' | 'pen' | 'highlighter' | 'eraser' | 'text' | 'rectangle' | 'circle' | 'line';
 
@@ -144,7 +160,7 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
 
     // ── Yjs sync ────────────────────────────────────────────────────────────
     const ydoc     = new Y.Doc();
-    const provider = new WebsocketProvider(WS_URL, `whiteboard-${roomId}`, ydoc);
+    const provider = new WebsocketProvider(getWhiteboardWsUrl(), `whiteboard-${roomId}`, ydoc);
     const state    = ydoc.getMap<string>('state');
 
     provider.on('status', ({ status }: { status: string }) =>
