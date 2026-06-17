@@ -29,7 +29,30 @@ const app = Fastify({ logger: config.NODE_ENV !== 'test' });
 async function bootstrap() {
   // ── Security middleware ──────────────────────────────────────────────────
   await app.register(helmet);
-  await app.register(cors, { origin: config.CORS_ORIGIN, credentials: true });
+  await app.register(cors, {
+    origin: (origin, callback) => {
+      const allowed = [
+        'https://arabic-platformweb-production.up.railway.app',
+        'http://localhost:3000',
+        'http://localhost:3001',
+      ];
+      // No origin header → same-origin / non-browser clients (curl, health checks).
+      if (!origin || allowed.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'), false);
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['Authorization'],
+    preflight: true,
+    strictPreflight: false,
+    // Return 200 (not the default 204) for OPTIONS preflight so legacy/strict
+    // browser stacks (some Edge/Safari/SmartTV builds) don't choke on it.
+    optionsSuccessStatus: 200,
+  });
   await app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
   await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024 } });
 
