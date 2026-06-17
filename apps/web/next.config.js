@@ -1,3 +1,4 @@
+// cache-bust deploy
 // Content Security Policy. 'unsafe-eval' is required by our whiteboard stack
 // (Fabric.js / Yjs); 'unsafe-inline' is required by Next.js's inline bootstrap
 // scripts. connect-src allows https/wss so the prod API and whiteboard socket
