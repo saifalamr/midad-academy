@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
+import { API_URL } from '@/lib/config';
 
 type ContentType = 'VIDEO' | 'PDF' | 'EXERCISE';
 
@@ -46,7 +47,7 @@ const TYPE_ICON: Record<ContentType, string> = {
 
 function authFetch(path: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  return fetch(`http://localhost:4000${path}`, {
+  return fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -140,7 +141,7 @@ export default function CourseContentPage() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const res = await fetch('http://localhost:4000/api/upload', {
+      const res = await fetch(`${API_URL}/api/upload`, {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,

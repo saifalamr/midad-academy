@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
+import { API_URL } from '@/lib/config';
 
 type PendingAnswer = {
   id: string;
@@ -18,7 +19,7 @@ type PendingAnswer = {
 
 function authFetch(path: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  return fetch(`http://localhost:4000${path}`, {
+  return fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',

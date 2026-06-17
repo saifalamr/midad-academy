@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { API_URL } from '@/lib/config';
 
 type Enrollment = {
   id: string;
@@ -16,6 +17,16 @@ type Enrollment = {
     currency: string;
     teacherName: string;
   };
+};
+
+type UpcomingSession = {
+  id: string;
+  title: string;
+  scheduledAt: string;
+  durationMinutes: number;
+  status: string;
+  course: { id: string; title: string };
+  teacherName: string;
 };
 
 type QuizResult = {
@@ -43,7 +54,7 @@ type QuizResult = {
 
 function authFetch(path: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  return fetch(`http://localhost:4000${path}`, {
+  return fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -75,6 +86,7 @@ export default function StudentDashboard() {
   const [error, setError] = useState('');
   const [userName, setUserName] = useState('Student');
   const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
+  const [upcomingSessions, setUpcomingSessions] = useState<UpcomingSession[]>([]);
 
   useEffect(() => {
     const payload = getTokenPayload();
@@ -94,6 +106,14 @@ export default function StudentDashboard() {
         if (!res.ok) return;
         const json = await res.json();
         setQuizResults(json.data ?? []);
+      })
+      .catch(() => {});
+
+    authFetch('/api/sessions/upcoming')
+      .then(async (res) => {
+        if (!res.ok) return;
+        const json = await res.json();
+        setUpcomingSessions(json.data ?? []);
       })
       .catch(() => {});
   }, [router]);
@@ -257,6 +277,34 @@ export default function StudentDashboard() {
 
           {/* ── Side column ── */}
           <div className="dash-col">
+            <div className="card pad">
+              <div className="col-head sm">
+                <h3>Upcoming Classes <span className="ar muted">الحصص القادمة</span></h3>
+              </div>
+              {upcomingSessions.length === 0 ? (
+                <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No classes scheduled yet.</p>
+              ) : (
+                <ul className="agenda">
+                  {upcomingSessions.map((session) => {
+                    const dt = new Date(session.scheduledAt);
+                    return (
+                      <li key={session.id}>
+                        <span className="ag-time">
+                          {dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          <br />
+                          {dt.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                        </span>
+                        <div>
+                          <b>{session.title}</b>
+                          <span>{session.course.title} · {session.teacherName} · {session.durationMinutes} min</span>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+
             <div className="card pad">
               <div className="col-head sm">
                 <h3>My Badges <span className="ar muted">أوسمتي</span></h3>

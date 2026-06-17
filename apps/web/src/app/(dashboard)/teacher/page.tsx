@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { API_URL } from '@/lib/config';
 
 type Lesson = {
   id: string;
@@ -22,12 +23,22 @@ type Course = {
   lessons: Lesson[];
 };
 
+type ClassSession = {
+  id: string;
+  courseId: string;
+  title: string;
+  scheduledAt: string;
+  durationMinutes: number;
+  status: string;
+  course: { id: string; title: string };
+};
+
 const AGE_GROUPS = ['5–7', '8–10', '11–13', '14–15'];
 const THUMBS = ['th-1', 'th-2', 'th-3', 'th-4', 'th-5', 'th-6'];
 
 function authFetch(path: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  return fetch(`http://localhost:4000${path}`, {
+  return fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -62,6 +73,20 @@ export default function TeacherDashboard() {
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // ── Scheduling state ──
+  const [sessions, setSessions] = useState<ClassSession[]>([]);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduleCourse, setScheduleCourse] = useState<Course | null>(null);
+  const [sessionTitle, setSessionTitle] = useState('');
+  const [sessionDescription, setSessionDescription] = useState('');
+  const [scheduledAt, setScheduledAt] = useState('');
+  const [durationMinutes, setDurationMinutes] = useState('60');
+  const [scheduleError, setScheduleError] = useState('');
+  const [scheduling, setScheduling] = useState(false);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [startingId, setStartingId] = useState<string | null>(null);
+  const scheduleFormRef = useRef<HTMLFormElement>(null);
+
   useEffect(() => {
     const payload = getTokenPayload();
     setUserName(payload.name ?? 'Teacher');
@@ -74,7 +99,79 @@ export default function TeacherDashboard() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    authFetch('/api/sessions/upcoming')
+      .then(async (res) => {
+        if (!res.ok) return;
+        const json = await res.json();
+        setSessions(json.data ?? []);
+      })
+      .catch(() => {});
   }, [router]);
+
+  function openScheduleModal(course: Course) {
+    setScheduleCourse(course);
+    setSessionTitle('');
+    setSessionDescription('');
+    setScheduledAt('');
+    setDurationMinutes('60');
+    setScheduleError('');
+    setShowScheduleModal(true);
+  }
+
+  async function handleScheduleSession(e: React.FormEvent) {
+    e.preventDefault();
+    if (!scheduleCourse) return;
+    setScheduleError('');
+    setScheduling(true);
+    try {
+      const res = await authFetch('/api/sessions/schedule', {
+        method: 'POST',
+        body: JSON.stringify({
+          courseId: scheduleCourse.id,
+          title: sessionTitle,
+          description: sessionDescription || undefined,
+          scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
+          durationMinutes: parseInt(durationMinutes, 10) || 60,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setScheduleError(json.error || 'Failed to schedule class'); return; }
+      setSessions((prev) => [...prev, { ...json.data, course: { id: scheduleCourse.id, title: scheduleCourse.title } }]
+        .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()));
+      setShowScheduleModal(false);
+    } catch {
+      setScheduleError('Could not connect to server');
+    } finally {
+      setScheduling(false);
+    }
+  }
+
+  async function handleCancelSession(sessionId: string) {
+    setCancellingId(sessionId);
+    try {
+      const res = await authFetch(`/api/sessions/${sessionId}/cancel`, { method: 'PATCH', body: '{}' });
+      if (!res.ok) return;
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    } catch {
+      // ignore
+    } finally {
+      setCancellingId(null);
+    }
+  }
+
+  async function handleStartSession(session: ClassSession) {
+    setStartingId(session.id);
+    try {
+      const res = await authFetch(`/api/sessions/${session.id}/start`, { method: 'PATCH', body: '{}' });
+      if (!res.ok) return;
+      router.push(`/classroom/${session.courseId}`);
+    } catch {
+      // ignore
+    } finally {
+      setStartingId(null);
+    }
+  }
 
   async function handleCreateCourse(e: React.FormEvent) {
     e.preventDefault();
@@ -183,12 +280,18 @@ export default function TeacherDashboard() {
                         </span>
                         {course._count.enrollments} student{course._count.enrollments !== 1 ? 's' : ''}
                       </span>
-                      <div style={{ display: 'flex', gap: 8 }}>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <button
                           className="btn btn-sm btn-outline"
                           onClick={() => router.push(`/courses/${course.id}/content`)}
                         >
                           Manage Content
+                        </button>
+                        <button
+                          className="btn btn-sm btn-outline"
+                          onClick={() => openScheduleModal(course)}
+                        >
+                          Schedule Class
                         </button>
                         <button
                           className="btn btn-sm btn-gold"
@@ -213,6 +316,50 @@ export default function TeacherDashboard() {
 
           {/* ── Side column ── */}
           <div className="dash-col">
+            <div className="card pad">
+              <div className="col-head sm"><h3>Upcoming Sessions <span className="ar muted">الجلسات القادمة</span></h3></div>
+              {sessions.length === 0 ? (
+                <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No classes scheduled yet.</p>
+              ) : (
+                <ul className="agenda">
+                  {sessions.map((session) => {
+                    const dt = new Date(session.scheduledAt);
+                    return (
+                      <li key={session.id}>
+                        <span className="ag-time">
+                          {dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          <br />
+                          {dt.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                        </span>
+                        <div style={{ flex: 1 }}>
+                          <b>{session.title}</b>
+                          <span>{session.course.title} · {session.durationMinutes} min</span>
+                          <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                            <button
+                              className="btn btn-sm btn-gold"
+                              disabled={startingId === session.id}
+                              style={{ opacity: startingId === session.id ? 0.65 : 1 }}
+                              onClick={() => handleStartSession(session)}
+                            >
+                              {startingId === session.id ? 'Starting…' : 'Start Class'}
+                            </button>
+                            <button
+                              className="btn btn-sm btn-outline"
+                              disabled={cancellingId === session.id}
+                              style={{ opacity: cancellingId === session.id ? 0.65 : 1 }}
+                              onClick={() => handleCancelSession(session.id)}
+                            >
+                              {cancellingId === session.id ? 'Cancelling…' : 'Cancel'}
+                            </button>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+
             <div className="card pad">
               <div className="col-head sm"><h3>Up next today</h3></div>
               {courses.length === 0 ? (
@@ -302,6 +449,61 @@ export default function TeacherDashboard() {
                 style={{ opacity: submitting ? 0.65 : 1 }}
                 onClick={() => formRef.current?.requestSubmit()}>
                 {submitting ? 'Creating…' : 'Create Class'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Schedule class modal ── */}
+      {showScheduleModal && scheduleCourse && (
+        <div className="modal-bg" onClick={(e) => { if (e.target === e.currentTarget) setShowScheduleModal(false); }}>
+          <div className="modal">
+            <div className="modal-head">
+              <div><h3>Schedule Class</h3><p className="ar muted" style={{ fontSize: 14 }}>{scheduleCourse.title}</p></div>
+              <button className="modal-x" onClick={() => setShowScheduleModal(false)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 6l12 12M18 6 6 18"/></svg>
+              </button>
+            </div>
+
+            <form ref={scheduleFormRef} onSubmit={handleScheduleSession} className="modal-body">
+              <div className="field">
+                <label htmlFor="s-title">Session title</label>
+                <input id="s-title" className="input" type="text" required
+                  placeholder="e.g. Weekly conversation practice"
+                  value={sessionTitle} onChange={(e) => setSessionTitle(e.target.value)} />
+              </div>
+
+              <div className="field">
+                <label htmlFor="s-desc">Description <span className="muted" style={{ fontSize: 12 }}>(optional)</span></label>
+                <textarea id="s-desc" className="input" rows={3}
+                  placeholder="What will this session cover?"
+                  value={sessionDescription} onChange={(e) => setSessionDescription(e.target.value)}
+                  style={{ height: 78, padding: '12px 16px' }} />
+              </div>
+
+              <div className="grid-2">
+                <div className="field">
+                  <label htmlFor="s-when">Date &amp; time</label>
+                  <input id="s-when" className="input" type="datetime-local" required
+                    value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
+                </div>
+                <div className="field">
+                  <label htmlFor="s-duration">Duration (minutes)</label>
+                  <input id="s-duration" className="input" type="number" min="1" step="1"
+                    value={durationMinutes} onChange={(e) => setDurationMinutes(e.target.value)} />
+                </div>
+              </div>
+
+              {scheduleError && <div className="auth-error">{scheduleError}</div>}
+            </form>
+
+            <div className="modal-foot">
+              <button className="btn btn-outline" type="button" onClick={() => setShowScheduleModal(false)}>Cancel</button>
+              <button className="btn btn-gold" type="button" disabled={scheduling}
+                style={{ opacity: scheduling ? 0.65 : 1 }}
+                onClick={() => scheduleFormRef.current?.requestSubmit()}>
+                {scheduling ? 'Scheduling…' : 'Schedule Class'}
               </button>
             </div>
           </div>

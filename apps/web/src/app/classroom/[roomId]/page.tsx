@@ -16,6 +16,7 @@ import '@livekit/components-styles';
 import type { TrackReferenceOrPlaceholder } from '@livekit/components-react';
 import { Track, RoomEvent } from 'livekit-client';
 import Whiteboard, { PALETTE, type Tool, type WhiteboardHandle } from '@/components/Whiteboard';
+import { API_URL } from '@/lib/config';
 
 const LIVEKIT_URL = process.env.NEXT_PUBLIC_LIVEKIT_URL!;
 
@@ -27,7 +28,7 @@ declare global {
 
 function authFetch(path: string, options: RequestInit = {}) {
   const token = localStorage.getItem('token');
-  return fetch(`http://localhost:4000${path}`, {
+  return fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -822,7 +823,7 @@ export default function ClassroomPage() {
 
     console.log('[Classroom] Sending POST /api/sessions/create');
 
-    fetch('http://localhost:4000/api/sessions/create', {
+    fetch(`${API_URL}/api/sessions/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

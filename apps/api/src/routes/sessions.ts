@@ -12,6 +12,14 @@ const joinSessionSchema = z.object({
   roomName: z.string().min(1, 'Room name is required'),
 });
 
+const scheduleSessionSchema = z.object({
+  courseId: z.string().min(1, 'Course id is required'),
+  title: z.string().min(2, 'Title must be at least 2 characters'),
+  description: z.string().optional(),
+  scheduledAt: z.coerce.date(),
+  durationMinutes: z.number().int().min(1).optional(),
+});
+
 // LiveKit's RoomServiceClient needs an HTTP(S) URL, not WSS.
 function toHttpUrl(wsUrl: string) {
   return wsUrl.replace(/^wss:\/\//, 'https://').replace(/^ws:\/\//, 'http://');
@@ -122,5 +130,160 @@ export async function sessionRoutes(app: FastifyInstance) {
     const token = await at.toJwt();
 
     return reply.send({ data: { token, roomName, livekitUrl: config.LIVEKIT_URL } });
+  });
+
+  // ── POST /api/sessions/schedule ───────────────────────────────────────────
+  // A teacher schedules a class session for one of their courses.
+  app.post('/schedule', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const { id: userId, role } = request.user;
+
+    if (role !== 'TEACHER') {
+      return reply.status(403).send({ error: 'Only teachers can schedule classes' });
+    }
+
+    const teacherProfile = await prisma.teacherProfile.findUnique({ where: { userId } });
+    if (!teacherProfile) {
+      return reply.status(404).send({ error: 'Teacher profile not found' });
+    }
+
+    const body = scheduleSessionSchema.parse(request.body);
+
+    const course = await prisma.course.findUnique({ where: { id: body.courseId } });
+    if (!course || course.teacherId !== teacherProfile.id) {
+      return reply.status(404).send({ error: 'Course not found' });
+    }
+
+    const session = await prisma.classSession.create({
+      data: {
+        courseId: body.courseId,
+        teacherId: teacherProfile.id,
+        title: body.title,
+        description: body.description,
+        scheduledAt: body.scheduledAt,
+        durationMinutes: body.durationMinutes ?? 60,
+      },
+    });
+
+    return reply.status(201).send({ data: session });
+  });
+
+  // ── GET /api/sessions/upcoming ────────────────────────────────────────────
+  // Teachers see their own upcoming sessions; students see upcoming sessions
+  // for courses they're enrolled in.
+  app.get('/upcoming', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const { id: userId, role } = request.user;
+
+    if (role === 'TEACHER') {
+      const teacherProfile = await prisma.teacherProfile.findUnique({ where: { userId } });
+      if (!teacherProfile) {
+        return reply.status(404).send({ error: 'Teacher profile not found' });
+      }
+
+      const sessions = await prisma.classSession.findMany({
+        where: {
+          teacherId: teacherProfile.id,
+          scheduledAt: { gte: new Date() },
+          status: { not: 'CANCELLED' },
+        },
+        include: { course: { select: { id: true, title: true } } },
+        orderBy: { scheduledAt: 'asc' },
+      });
+
+      return reply.send({ data: sessions });
+    }
+
+    if (role === 'STUDENT') {
+      const studentProfile = await prisma.studentProfile.findUnique({ where: { userId } });
+      if (!studentProfile) {
+        return reply.status(404).send({ error: 'Student profile not found' });
+      }
+
+      const enrollments = await prisma.enrollment.findMany({
+        where: { studentId: studentProfile.id },
+        select: { courseId: true },
+      });
+      const courseIds = enrollments.map((e) => e.courseId);
+
+      const sessions = await prisma.classSession.findMany({
+        where: {
+          courseId: { in: courseIds },
+          scheduledAt: { gte: new Date() },
+          status: { not: 'CANCELLED' },
+        },
+        include: {
+          course: { select: { id: true, title: true } },
+          teacher: { include: { user: { select: { name: true } } } },
+        },
+        orderBy: { scheduledAt: 'asc' },
+      });
+
+      return reply.send({
+        data: sessions.map((s) => ({
+          ...s,
+          teacherName: s.teacher.user.name,
+          teacher: undefined,
+        })),
+      });
+    }
+
+    return reply.status(403).send({ error: 'Not authorized to view sessions' });
+  });
+
+  // ── PATCH /api/sessions/:id/cancel ────────────────────────────────────────
+  // The owning teacher cancels a scheduled class session.
+  app.patch<{ Params: { id: string } }>('/:id/cancel', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const { id: userId, role } = request.user;
+    const { id: sessionId } = request.params;
+
+    if (role !== 'TEACHER') {
+      return reply.status(403).send({ error: 'Only teachers can cancel sessions' });
+    }
+
+    const teacherProfile = await prisma.teacherProfile.findUnique({ where: { userId } });
+    if (!teacherProfile) {
+      return reply.status(404).send({ error: 'Teacher profile not found' });
+    }
+
+    const session = await prisma.classSession.findUnique({ where: { id: sessionId } });
+    if (!session || session.teacherId !== teacherProfile.id) {
+      return reply.status(404).send({ error: 'Session not found' });
+    }
+
+    const updated = await prisma.classSession.update({
+      where: { id: sessionId },
+      data: { status: 'CANCELLED' },
+    });
+
+    return reply.send({ data: updated });
+  });
+
+  // ── PATCH /api/sessions/:id/start ─────────────────────────────────────────
+  // The owning teacher starts a scheduled class session — marks it LIVE and
+  // records the LiveKit room (named after the course id, per the classroom
+  // join convention).
+  app.patch<{ Params: { id: string } }>('/:id/start', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const { id: userId, role } = request.user;
+    const { id: sessionId } = request.params;
+
+    if (role !== 'TEACHER') {
+      return reply.status(403).send({ error: 'Only teachers can start sessions' });
+    }
+
+    const teacherProfile = await prisma.teacherProfile.findUnique({ where: { userId } });
+    if (!teacherProfile) {
+      return reply.status(404).send({ error: 'Teacher profile not found' });
+    }
+
+    const session = await prisma.classSession.findUnique({ where: { id: sessionId } });
+    if (!session || session.teacherId !== teacherProfile.id) {
+      return reply.status(404).send({ error: 'Session not found' });
+    }
+
+    const updated = await prisma.classSession.update({
+      where: { id: sessionId },
+      data: { status: 'LIVE', liveKitRoomId: session.courseId },
+    });
+
+    return reply.send({ data: updated });
   });
 }

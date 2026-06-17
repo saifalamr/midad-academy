@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { API_URL } from '@/lib/config';
 
 type CurrentUser = { name: string; role: 'TEACHER' | 'STUDENT' | 'PARENT' };
 
@@ -20,7 +21,7 @@ const NAV_LINKS = [
 
 function authFetch(path: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  return fetch(`http://localhost:4000${path}`, {
+  return fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
