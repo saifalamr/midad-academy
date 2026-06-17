@@ -20,12 +20,6 @@ import { API_URL } from '@/lib/config';
 
 const LIVEKIT_URL = process.env.NEXT_PUBLIC_LIVEKIT_URL!;
 
-declare global {
-  interface Window {
-    pdfjsLib: any;
-  }
-}
-
 function authFetch(path: string, options: RequestInit = {}) {
   const token = localStorage.getItem('token');
   return fetch(`${API_URL}${path}`, {
@@ -119,86 +113,8 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
   const [manualName, setManualName] = useState('');
   const [shareError, setShareError] = useState('');
 
-  // ── PDF.js rendering for shared PDF documents ────────────────────────────
-  const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
-  const pdfDocRef = useRef<any>(null);
-  const [pdfPage, setPdfPage] = useState(1);
-  const [pdfNumPages, setPdfNumPages] = useState(0);
-  const [pdfError, setPdfError] = useState('');
-
-  // Load the PDF.js library + worker from CDN once.
-  useEffect(() => {
-    if (window.pdfjsLib) return;
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-    script.onload = () => {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    };
-    document.body.appendChild(script);
-  }, []);
-
   // Reset zoom whenever the shared content changes.
   useEffect(() => { setZoom(1); }, [sharedDoc?.url]);
-
-  // Load the PDF document whenever a new PDF is shared.
-  useEffect(() => {
-    if (!sharedDoc || sharedDoc.docType !== 'pdf') {
-      pdfDocRef.current = null;
-      setPdfNumPages(0);
-      setPdfPage(1);
-      return;
-    }
-
-    let cancelled = false;
-    setPdfError('');
-    setPdfPage(1);
-    setPdfNumPages(0);
-    pdfDocRef.current = null;
-
-    function load() {
-      if (!window.pdfjsLib) {
-        if (!cancelled) setTimeout(load, 200);
-        return;
-      }
-      window.pdfjsLib
-        .getDocument(sharedDoc!.url)
-        .promise.then((pdf: any) => {
-          if (cancelled) return;
-          pdfDocRef.current = pdf;
-          setPdfNumPages(pdf.numPages);
-        })
-        .catch(() => {
-          if (!cancelled) setPdfError('Could not load PDF preview');
-        });
-    }
-    load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [sharedDoc]);
-
-  // Render the current page to the canvas whenever the page or doc changes.
-  useEffect(() => {
-    const pdf = pdfDocRef.current;
-    const canvas = pdfCanvasRef.current;
-    if (!pdf || !canvas) return;
-
-    let cancelled = false;
-    pdf.getPage(pdfPage).then((page: any) => {
-      if (cancelled) return;
-      const viewport = page.getViewport({ scale: 1.5 });
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      const context = canvas.getContext('2d');
-      page.render({ canvasContext: context, viewport });
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [pdfPage, pdfNumPages]);
 
   // ── Data channel: receive raise-hand, draw-permission, reaction, and doc-share msgs ───
   useEffect(() => {
@@ -212,7 +128,6 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
           emoji?: string;
           url?: string;
           docType?: DocType;
-          page?: number;
         };
 
         if (msg.type === 'raise-hand') {
@@ -229,8 +144,6 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
           setSharedDoc({ url: msg.url, name: msg.name ?? 'Document', docType: msg.docType ?? 'pdf' });
         } else if (msg.type === 'stop-share') {
           setSharedDoc(null);
-        } else if (msg.type === 'doc-page' && typeof msg.page === 'number') {
-          setPdfPage(msg.page);
         }
       } catch { /* malformed message — ignore */ }
     };
@@ -279,16 +192,6 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
     const url = manualUrl.trim();
     if (!url) { setShareError('Enter a document or image URL'); return; }
     shareDocument(url, manualName.trim() || 'Document', detectDocType(url));
-  }
-
-  // ── PDF page navigation: only the teacher can change pages, broadcast to all ──
-  function goToPdfPage(page: number) {
-    if (!isTeacher || page < 1 || page > pdfNumPages) return;
-    setPdfPage(page);
-    const payload = new TextEncoder().encode(
-      JSON.stringify({ type: 'doc-page', identity: localParticipant.identity, page }),
-    );
-    localParticipant.publishData(payload, { reliable: true });
   }
 
   function stopSharing() {
@@ -341,13 +244,14 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
 
   // ── Derived view helpers ──────────────────────────────────────────────────
   const teacherName = teacherTrack?.participant.name ?? teacherTrack?.participant.identity ?? 'Teacher';
-  // Documents (PDF/image) are annotated on top → the ink layer stays interactive
-  // and the content layer ignores pointer events. For video/YouTube, playback
-  // takes priority, so the content layer is interactive and the ink layer isn't.
-  const annotatable = !sharedDoc || sharedDoc.docType === 'pdf' || sharedDoc.docType === 'image';
+  // Images are annotated on top → the ink layer stays interactive and the
+  // content layer ignores pointer events. For PDFs (rendered in an embedded
+  // viewer the user scrolls/navigates), video, and YouTube, the content layer
+  // is interactive and the ink layer isn't.
+  const annotatable = !sharedDoc || sharedDoc.docType === 'image';
   const inkInteractive = drawPermission && annotatable;
   const raisedSet = new Set(raisedHands.map((h) => h.identity));
-  const showZoom = !!sharedDoc && (sharedDoc.docType === 'pdf' || sharedDoc.docType === 'image');
+  const showZoom = !!sharedDoc && sharedDoc.docType === 'image';
 
   return (
     <div className="midad room">
@@ -522,27 +426,6 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
             </div>
 
             <div className="bb-right">
-              {sharedDoc?.docType === 'pdf' && pdfNumPages > 0 && (
-                <>
-                  <button
-                    className="bb-ic" title="Previous page"
-                    onClick={() => goToPdfPage(pdfPage - 1)}
-                    disabled={!isTeacher || pdfPage <= 1}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
-                  </button>
-                  <span className="bb-page">{pdfPage} / {pdfNumPages}</span>
-                  <button
-                    className="bb-ic" title="Next page"
-                    onClick={() => goToPdfPage(pdfPage + 1)}
-                    disabled={!isTeacher || pdfPage >= pdfNumPages}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
-                  </button>
-                  {showZoom && <span className="bb-sep"></span>}
-                </>
-              )}
-
               {showZoom && (
                 <>
                   <button
@@ -599,15 +482,15 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
                   ) : sharedDoc.docType === 'image' ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={sharedDoc.url} alt={sharedDoc.name} />
-                  ) : pdfError ? (
-                    <div className="bs-fallback">
-                      <p>{pdfError}</p>
-                      <a className="btn btn-sm btn-gold" href={sharedDoc.url} target="_blank" rel="noreferrer">
-                        Open in new tab
-                      </a>
-                    </div>
                   ) : (
-                    <canvas ref={pdfCanvasRef} />
+                    // PDFs render in the Google Docs viewer, which reliably
+                    // embeds any public URL (e.g. Cloudinary) cross-origin —
+                    // unlike a client-side fetch, which Cloudinary can block.
+                    <iframe
+                      src={`https://docs.google.com/viewer?url=${encodeURIComponent(sharedDoc.url)}&embedded=true`}
+                      title={sharedDoc.name}
+                      style={{ width: '100%', height: '100%', border: 'none' }}
+                    />
                   )}
                 </div>
               )}
