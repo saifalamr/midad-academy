@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { prisma } from '@arabic-platform/database';
+import { prisma } from '../lib/prisma';
 
 const updateContentSchema = z.object({
   order: z.number().int().min(0, 'Order must be 0 or more'),

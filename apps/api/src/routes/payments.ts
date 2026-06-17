@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
 import { z } from 'zod';
-import { prisma } from '@arabic-platform/database';
+import { prisma } from '../lib/prisma';
 import { config } from '../config';
 
 const stripe = new Stripe(config.STRIPE_SECRET_KEY);

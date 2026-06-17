@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { prisma } from '@arabic-platform/database';
+import { prisma } from '../lib/prisma';
 
 const gradeAnswerSchema = z.object({
   pointsAwarded: z.number().int().min(0),

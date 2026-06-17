@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { RoomServiceClient } from 'livekit-server-sdk';
 import { z } from 'zod';
-import { prisma } from '@arabic-platform/database';
+import { prisma } from '../lib/prisma';
 import { config } from '../config';
 
 const createEnrollmentSchema = z.object({

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { prisma } from '@arabic-platform/database';
+import { prisma } from '../lib/prisma';
 
 // Counts consecutive days ending today/yesterday that have at least one point event.
 function computeStreak(events: { createdAt: Date }[]): number {

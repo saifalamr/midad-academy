@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { prisma } from '@arabic-platform/database';
+import { prisma } from '../lib/prisma';
 
 const createQuizSchema = z.object({
   title: z.string().min(2, 'Title must be at least 2 characters'),

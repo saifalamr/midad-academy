@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { prisma } from '@arabic-platform/database';
+import { prisma } from '../lib/prisma';
 
 export async function studentRoutes(app: FastifyInstance) {
   // ── GET /api/students/results ─────────────────────────────────────────────
