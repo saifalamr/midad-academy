@@ -28,6 +28,7 @@ type LessonItem = {
 type QuestionType = 'MCQ' | 'WRITTEN' | 'TRUE_FALSE';
 
 type DraftQuestion = {
+  id?: string; // present when editing an existing question; absent for new ones
   text: string;
   questionType: QuestionType;
   options: string[];
@@ -35,8 +36,34 @@ type DraftQuestion = {
   points: string;
 };
 
+// Shape of a question returned by GET /api/quiz/:id (teacher view).
+type FetchedQuestion = {
+  id: string;
+  text: string;
+  questionType: QuestionType;
+  options: string[] | null;
+  correctAnswer: string | null;
+  points: number;
+};
+
 function emptyQuestion(): DraftQuestion {
   return { text: '', questionType: 'MCQ', options: ['', ''], correctAnswer: '', points: '1' };
+}
+
+// Builds the API payload for a single question, shared by create & edit flows.
+function buildQuestionPayload(q: DraftQuestion): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    text: q.text.trim(),
+    questionType: q.questionType,
+    points: parseInt(q.points, 10) || 1,
+  };
+  if (q.questionType === 'MCQ') {
+    payload.options = q.options.map((o) => o.trim()).filter(Boolean);
+    payload.correctAnswer = q.correctAnswer.trim();
+  } else if (q.questionType === 'TRUE_FALSE') {
+    payload.correctAnswer = q.correctAnswer;
+  }
+  return payload;
 }
 
 const TYPE_ICON: Record<ContentType, string> = {
@@ -78,8 +105,14 @@ export default function CourseContentPage() {
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // ── Quiz builder modal ────────────────────────────────────────────────────
+  // ── Quiz builder / editor modal ───────────────────────────────────────────
   const [quizLesson, setQuizLesson] = useState<LessonItem | null>(null);
+  const [quizMode, setQuizMode] = useState<'create' | 'edit'>('create');
+  const [editingQuizId, setEditingQuizId] = useState<string | null>(null);
+  // Ids of questions that existed when the editor opened — used to detect which
+  // ones the teacher removed so they can be DELETEd on save.
+  const [originalQuestionIds, setOriginalQuestionIds] = useState<string[]>([]);
+  const [quizLoading, setQuizLoading] = useState(false);
   const [quizTitle, setQuizTitle] = useState('');
   const [passingScore, setPassingScore] = useState('70');
   const [questions, setQuestions] = useState<DraftQuestion[]>([emptyQuestion()]);
@@ -189,11 +222,56 @@ export default function CourseContentPage() {
   }
 
   function openQuizModal(lesson: LessonItem) {
+    setQuizMode('create');
+    setEditingQuizId(null);
+    setOriginalQuestionIds([]);
+    setQuizLoading(false);
     setQuizLesson(lesson);
     setQuizTitle(`${lesson.title} — Quiz`);
     setPassingScore('70');
     setQuestions([emptyQuestion()]);
     setQuizError('');
+  }
+
+  async function openEditQuiz(lesson: LessonItem) {
+    if (!lesson.quiz) return;
+    setQuizMode('edit');
+    setEditingQuizId(lesson.quiz.id);
+    setQuizLesson(lesson);
+    setQuizError('');
+    setQuizLoading(true);
+    // Seed with what we already know; the GET fills in questions.
+    setQuizTitle(lesson.quiz.title);
+    setPassingScore(String(lesson.quiz.passingScore));
+    setQuestions([]);
+    setOriginalQuestionIds([]);
+
+    try {
+      const res = await authFetch(`/api/quiz/${lesson.quiz.id}`);
+      const json = await res.json();
+      if (!res.ok) { setQuizError(json.error || 'Failed to load quiz'); return; }
+
+      const fetched: FetchedQuestion[] = json.data?.questions ?? [];
+      const drafts: DraftQuestion[] = fetched.map((q) => ({
+        id: q.id,
+        text: q.text ?? '',
+        questionType: q.questionType ?? 'MCQ',
+        options: Array.isArray(q.options)
+          ? q.options.map(String)
+          : q.questionType === 'TRUE_FALSE' ? ['True', 'False'] : ['', ''],
+        correctAnswer: q.correctAnswer ?? '',
+        points: String(q.points ?? 1),
+      }));
+
+      setQuizTitle(json.data?.title ?? lesson.quiz.title);
+      setPassingScore(String(json.data?.passingScore ?? lesson.quiz.passingScore));
+      setQuestions(drafts.length ? drafts : [emptyQuestion()]);
+      setOriginalQuestionIds(drafts.map((d) => d.id).filter((id): id is string => Boolean(id)));
+    } catch {
+      setQuizError('Could not connect to server');
+    } finally {
+      setQuizLoading(false);
+    }
   }
 
   function updateQuestion(idx: number, patch: Partial<DraftQuestion>) {
@@ -256,14 +334,58 @@ export default function CourseContentPage() {
       }
     }
 
+    const nextPassingScore = parseInt(passingScore, 10) || 70;
     setQuizSubmitting(true);
     try {
+      if (quizMode === 'edit' && editingQuizId) {
+        // 1. Update the quiz's title + passing score.
+        const metaRes = await authFetch(`/api/quiz/${editingQuizId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ title: quizTitle.trim(), passingScore: nextPassingScore }),
+        });
+        if (!metaRes.ok) {
+          const j = await metaRes.json();
+          setQuizError(j.error || 'Failed to update quiz');
+          return;
+        }
+
+        // 2. Delete questions the teacher removed.
+        const currentIds = new Set(questions.map((q) => q.id).filter(Boolean));
+        const toDelete = originalQuestionIds.filter((id) => !currentIds.has(id));
+        for (const qid of toDelete) {
+          const delRes = await authFetch(`/api/quiz/${editingQuizId}/questions/${qid}`, { method: 'DELETE' });
+          if (!delRes.ok && delRes.status !== 204) {
+            setQuizError('Failed to remove a question');
+            return;
+          }
+        }
+
+        // 3. Update existing questions; create newly-added ones.
+        for (const q of questions) {
+          const payload = buildQuestionPayload(q);
+          const res = q.id
+            ? await authFetch(`/api/quiz/${editingQuizId}/questions/${q.id}`, { method: 'PATCH', body: JSON.stringify(payload) })
+            : await authFetch(`/api/quiz/${editingQuizId}/questions`, { method: 'POST', body: JSON.stringify(payload) });
+          if (!res.ok) {
+            const j = await res.json();
+            setQuizError(j.error || 'Failed to save a question');
+            return;
+          }
+        }
+
+        setLessons((prev) => prev.map((l) => (
+          l.id === quizLesson.id && l.quiz
+            ? { ...l, quiz: { ...l.quiz, title: quizTitle.trim(), passingScore: nextPassingScore } }
+            : l
+        )));
+        setQuizLesson(null);
+        return;
+      }
+
+      // ── Create mode ──────────────────────────────────────────────────────
       const quizRes = await authFetch(`/api/content/${quizLesson.id}/quiz`, {
         method: 'POST',
-        body: JSON.stringify({
-          title: quizTitle,
-          passingScore: parseInt(passingScore, 10) || 70,
-        }),
+        body: JSON.stringify({ title: quizTitle, passingScore: nextPassingScore }),
       });
       const quizJson = await quizRes.json();
       if (!quizRes.ok) { setQuizError(quizJson.error || 'Failed to create quiz'); return; }
@@ -271,20 +393,9 @@ export default function CourseContentPage() {
       const quizId = quizJson.data.id as string;
 
       for (const q of questions) {
-        const payload: Record<string, unknown> = {
-          text: q.text.trim(),
-          questionType: q.questionType,
-          points: parseInt(q.points, 10) || 1,
-        };
-        if (q.questionType === 'MCQ') {
-          payload.options = q.options.map((o) => o.trim()).filter(Boolean);
-          payload.correctAnswer = q.correctAnswer.trim();
-        } else if (q.questionType === 'TRUE_FALSE') {
-          payload.correctAnswer = q.correctAnswer;
-        }
         const qRes = await authFetch(`/api/quiz/${quizId}/questions`, {
           method: 'POST',
-          body: JSON.stringify(payload),
+          body: JSON.stringify(buildQuestionPayload(q)),
         });
         if (!qRes.ok) {
           const qJson = await qRes.json();
@@ -295,7 +406,7 @@ export default function CourseContentPage() {
 
       setLessons((prev) => prev.map((l) => (
         l.id === quizLesson.id
-          ? { ...l, quiz: { id: quizId, title: quizTitle, passingScore: parseInt(passingScore, 10) || 70 } }
+          ? { ...l, quiz: { id: quizId, title: quizTitle, passingScore: nextPassingScore } }
           : l
       )));
       setQuizLesson(null);
@@ -398,9 +509,14 @@ export default function CourseContentPage() {
                 <span style={{ fontSize: 13, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{lesson.duration} min</span>
 
                 {lesson.quiz ? (
-                  <span className="pill" style={{ background: 'rgba(27,58,107,.08)', color: 'var(--navy)', whiteSpace: 'nowrap' }}>
-                    ✓ Quiz added
-                  </span>
+                  <>
+                    <span className="pill" style={{ background: 'rgba(27,58,107,.08)', color: 'var(--navy)', whiteSpace: 'nowrap' }}>
+                      ✓ Quiz added
+                    </span>
+                    <button className="btn btn-sm btn-outline" onClick={() => openEditQuiz(lesson)}>
+                      Edit Quiz
+                    </button>
+                  </>
                 ) : (
                   <button className="btn btn-sm btn-outline" onClick={() => openQuizModal(lesson)}>
                     Add Quiz
@@ -491,7 +607,7 @@ export default function CourseContentPage() {
           <div className="modal" style={{ maxWidth: 640 }}>
             <div className="modal-head">
               <div>
-                <h3>Add Quiz</h3>
+                <h3>{quizMode === 'edit' ? 'Edit Quiz' : 'Add Quiz'}</h3>
                 <p className="muted" style={{ fontSize: 13, margin: '4px 0 0' }}>For lesson: {quizLesson.title}</p>
               </div>
               <button className="modal-x" onClick={() => setQuizLesson(null)}>
@@ -499,6 +615,11 @@ export default function CourseContentPage() {
               </button>
             </div>
 
+            {quizLoading ? (
+              <div className="modal-body" style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14, padding: '32px 28px' }}>
+                Loading quiz…
+              </div>
+            ) : (
             <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
               <div className="grid-2">
                 <div className="field">
@@ -626,13 +747,14 @@ export default function CourseContentPage() {
 
               {quizError && <div className="auth-error" style={{ marginTop: 16 }}>{quizError}</div>}
             </div>
+            )}
 
             <div className="modal-foot">
               <button className="btn btn-outline" type="button" onClick={() => setQuizLesson(null)}>Cancel</button>
-              <button className="btn btn-gold" type="button" disabled={quizSubmitting}
-                style={{ opacity: quizSubmitting ? 0.65 : 1 }}
+              <button className="btn btn-gold" type="button" disabled={quizSubmitting || quizLoading}
+                style={{ opacity: quizSubmitting || quizLoading ? 0.65 : 1 }}
                 onClick={handleSaveQuiz}>
-                {quizSubmitting ? 'Saving…' : 'Save Quiz'}
+                {quizSubmitting ? 'Saving…' : quizMode === 'edit' ? 'Save Changes' : 'Save Quiz'}
               </button>
             </div>
           </div>
