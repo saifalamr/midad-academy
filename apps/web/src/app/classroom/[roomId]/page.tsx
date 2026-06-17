@@ -42,9 +42,10 @@ function getRole(trackRef: TrackReferenceOrPlaceholder): string {
 
 type RaisedHand = { identity: string; name: string };
 type Reaction  = { id: string; emoji: string; x: number };
-type DocType = 'pdf' | 'image' | 'youtube' | 'video';
-type SharedDoc = { url: string; name: string; docType: DocType };
+type DocType = 'pdf' | 'image' | 'youtube' | 'video' | 'html';
+type SharedDoc = { url: string; name: string; docType: DocType; htmlContent?: string };
 type CourseContentItem = { id: string; title: string; type: string; contentUrl: string };
+type ShareTab = 'content' | 'url' | 'html';
 
 function getYouTubeId(url: string): string | null {
   const match = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
@@ -111,12 +112,17 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
   const [courseContent, setCourseContent] = useState<CourseContentItem[]>([]);
   const [manualUrl, setManualUrl] = useState('');
   const [manualName, setManualName] = useState('');
+  const [htmlContent, setHtmlContent] = useState('');
+  const [shareTab, setShareTab] = useState<ShareTab>('content');
   const [shareError, setShareError] = useState('');
 
-  // Reset zoom whenever the shared content changes.
-  useEffect(() => { setZoom(1); }, [sharedDoc?.url]);
+  // ── PDF page sync — teacher drives the page, students follow ──────────────
+  const [pdfPage, setPdfPage] = useState(1);
 
-  // ── Data channel: receive raise-hand, draw-permission, reaction, and doc-share msgs ───
+  // Reset zoom + PDF page whenever the shared content changes.
+  useEffect(() => { setZoom(1); setPdfPage(1); }, [sharedDoc?.url]);
+
+  // ── Data channel: receive raise-hand, draw-permission, reaction, doc-share, pdf-page ───
   useEffect(() => {
     const onData = (payload: Uint8Array) => {
       try {
@@ -128,6 +134,8 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
           emoji?: string;
           url?: string;
           docType?: DocType;
+          htmlContent?: string;
+          page?: number;
         };
 
         if (msg.type === 'raise-hand') {
@@ -140,10 +148,16 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
           setDrawPermission(msg.canDraw ?? false);
         } else if (msg.type === 'reaction') {
           addReaction(msg.emoji ?? '👍');
-        } else if (msg.type === 'share-doc' && msg.url) {
-          setSharedDoc({ url: msg.url, name: msg.name ?? 'Document', docType: msg.docType ?? 'pdf' });
+        } else if (msg.type === 'share-doc') {
+          if (msg.docType === 'html') {
+            setSharedDoc({ url: '', name: msg.name ?? 'Interactive Lesson', docType: 'html', htmlContent: msg.htmlContent ?? '' });
+          } else if (msg.url) {
+            setSharedDoc({ url: msg.url, name: msg.name ?? 'Document', docType: msg.docType ?? 'pdf' });
+          }
         } else if (msg.type === 'stop-share') {
           setSharedDoc(null);
+        } else if (msg.type === 'pdf-page' && typeof msg.page === 'number') {
+          setPdfPage(msg.page);
         }
       } catch { /* malformed message — ignore */ }
     };
@@ -169,6 +183,8 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
     setShareError('');
     setManualUrl('');
     setManualName('');
+    setHtmlContent('');
+    setShareTab('content');
     setShowShareModal(true);
     authFetch(`/api/courses/${roomId}/lessons`)
       .then(async (res) => {
@@ -179,12 +195,19 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
       .catch(() => {});
   }
 
-  function shareDocument(url: string, name: string, docType: DocType) {
+  function shareDocument(url: string, name: string, docType: DocType, html = '') {
     const payload = new TextEncoder().encode(
-      JSON.stringify({ type: 'share-doc', identity: localParticipant.identity, url, name, docType }),
+      JSON.stringify({
+        type: 'share-doc',
+        identity: localParticipant.identity,
+        url,
+        name,
+        docType,
+        ...(docType === 'html' ? { htmlContent: html } : {}),
+      }),
     );
     localParticipant.publishData(payload, { reliable: true });
-    setSharedDoc({ url, name, docType });
+    setSharedDoc({ url, name, docType, ...(docType === 'html' ? { htmlContent: html } : {}) });
     setShowShareModal(false);
   }
 
@@ -194,12 +217,27 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
     shareDocument(url, manualName.trim() || 'Document', detectDocType(url));
   }
 
+  function handleShareHtml() {
+    if (!htmlContent.trim()) { setShareError('Paste some HTML to share'); return; }
+    shareDocument('', manualName.trim() || 'Interactive Lesson', 'html', htmlContent);
+  }
+
   function stopSharing() {
     const payload = new TextEncoder().encode(
       JSON.stringify({ type: 'stop-share', identity: localParticipant.identity }),
     );
     localParticipant.publishData(payload, { reliable: true });
     setSharedDoc(null);
+  }
+
+  // ── PDF page navigation: teacher changes the page and broadcasts to all ───
+  function goPdfPage(page: number) {
+    const next = Math.max(1, page);
+    setPdfPage(next);
+    const payload = new TextEncoder().encode(
+      JSON.stringify({ type: 'pdf-page', identity: localParticipant.identity, page: next }),
+    );
+    localParticipant.publishData(payload, { reliable: true });
   }
 
   // ── Emoji reaction: broadcast to all, also show locally ──────────────────
@@ -245,13 +283,22 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
   // ── Derived view helpers ──────────────────────────────────────────────────
   const teacherName = teacherTrack?.participant.name ?? teacherTrack?.participant.identity ?? 'Teacher';
   // Images are annotated on top → the ink layer stays interactive and the
-  // content layer ignores pointer events. For PDFs (rendered in an embedded
-  // viewer the user scrolls/navigates), video, and YouTube, the content layer
-  // is interactive and the ink layer isn't.
+  // content layer ignores pointer events. For PDFs, video, YouTube and HTML the
+  // content layer is interactive (per role) and the ink layer isn't.
   const annotatable = !sharedDoc || sharedDoc.docType === 'image';
   const inkInteractive = drawPermission && annotatable;
   const raisedSet = new Set(raisedHands.map((h) => h.identity));
   const showZoom = !!sharedDoc && sharedDoc.docType === 'image';
+
+  // Pointer-events for the shared-content layer:
+  //  • image → none (so the teacher draws on top via the ink layer)
+  //  • pdf   → teacher can navigate/scroll; students are locked out (follow only)
+  //  • html / video / youtube → interactive for everyone
+  const sharedPointer: 'none' | 'auto' =
+    !sharedDoc ? 'none'
+    : sharedDoc.docType === 'image' ? 'none'
+    : sharedDoc.docType === 'pdf' ? (isTeacher ? 'auto' : 'none')
+    : 'auto';
 
   return (
     <div className="midad room">
@@ -445,6 +492,26 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
                 </>
               )}
 
+              {/* PDF page controls — teacher only; students just follow */}
+              {isTeacher && sharedDoc?.docType === 'pdf' && (
+                <>
+                  <button
+                    className="bb-ic" title="Previous page"
+                    onClick={() => goPdfPage(pdfPage - 1)}
+                    disabled={pdfPage <= 1}
+                  >
+                    ◀
+                  </button>
+                  <span className="bb-page">{pdfPage}</span>
+                  <button
+                    className="bb-ic" title="Next page"
+                    onClick={() => goPdfPage(pdfPage + 1)}
+                  >
+                    ▶
+                  </button>
+                </>
+              )}
+
               {isTeacher && (
                 <button className="bb-chip" title="Share content" onClick={openShareModal}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>
@@ -459,7 +526,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
             <div className="board-zoom" style={{ transform: `scale(${zoom})` }}>
               {/* shared content layer — sits UNDER the ink so the teacher draws on top */}
               {sharedDoc && (
-                <div className="board-shared" style={{ pointerEvents: annotatable ? 'none' : 'auto' }}>
+                <div className="board-shared" style={{ pointerEvents: sharedPointer }}>
                   {sharedDoc.docType === 'youtube' ? (
                     (() => {
                       const videoId = getYouTubeId(sharedDoc.url);
@@ -482,12 +549,24 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
                   ) : sharedDoc.docType === 'image' ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={sharedDoc.url} alt={sharedDoc.name} />
+                  ) : sharedDoc.docType === 'html' ? (
+                    // Interactive HTML lesson — sandboxed so pasted markup can't
+                    // touch the parent page; scripts/forms are allowed so the
+                    // lesson can be interactive for both teacher and students.
+                    <iframe
+                      srcDoc={sharedDoc.htmlContent}
+                      title={sharedDoc.name}
+                      sandbox="allow-scripts allow-forms"
+                      style={{ width: '100%', height: '100%', border: 'none', borderRadius: 10 }}
+                    />
                   ) : (
                     // PDFs render in the Google Docs viewer, which reliably
                     // embeds any public URL (e.g. Cloudinary) cross-origin —
                     // unlike a client-side fetch, which Cloudinary can block.
+                    // The teacher drives the page via the pg param; students
+                    // receive page updates over the data channel and can't scroll.
                     <iframe
-                      src={`https://docs.google.com/viewer?url=${encodeURIComponent(sharedDoc.url)}&embedded=true`}
+                      src={`https://docs.google.com/viewer?url=${encodeURIComponent(sharedDoc.url)}&embedded=true&pg=${pdfPage}`}
                       title={sharedDoc.name}
                       style={{ width: '100%', height: '100%', border: 'none' }}
                     />
@@ -574,7 +653,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
           className="rc-btn"
           onClick={() => localParticipant.setCameraEnabled(!isCameraEnabled)}
         >
-          <span className="rci">📷</span>
+          <span className="rci">{isCameraEnabled ? '📷' : '📵'}</span>
           <span>{isCameraEnabled ? 'Stop Video' : 'Start Video'}</span>
         </button>
 
@@ -621,51 +700,99 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
         <div className="modal-bg" onClick={(e) => { if (e.target === e.currentTarget) setShowShareModal(false); }}>
           <div className="modal">
             <div className="modal-head">
-              <div><h3>Share Document</h3></div>
+              <div><h3>Share Content</h3></div>
               <button className="modal-x" onClick={() => setShowShareModal(false)}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 6l12 12M18 6 6 18"/></svg>
               </button>
             </div>
 
+            {/* Tab switcher */}
+            <div style={{ display: 'flex', gap: 8, padding: '14px 28px 0' }}>
+              {([['content', 'Course Content'], ['url', 'URL'], ['html', 'Interactive HTML']] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`btn btn-sm ${shareTab === key ? 'btn-gold' : 'btn-outline'}`}
+                  onClick={() => { setShareTab(key); setShareError(''); }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
             <div className="modal-body">
-              <div className="field">
-                <label>From course content</label>
-                {courseContent.length === 0 ? (
-                  <p style={{ fontSize: 13, color: 'var(--ink-3)' }}>This course has no content yet.</p>
-                ) : (
-                  <div className="share-list">
-                    {courseContent.map((c) => {
-                      const docType = detectDocType(c.contentUrl);
-                      const icon = docType === 'youtube' || docType === 'video' ? '🎬' : docType === 'image' ? '🖼️' : '📄';
-                      return (
-                        <button key={c.id} type="button" className="share-list-item"
-                          onClick={() => shareDocument(c.contentUrl, c.title, docType)}>
-                          {icon} {c.title}
-                        </button>
-                      );
-                    })}
+              {shareTab === 'content' && (
+                <div className="field">
+                  <label>From course content</label>
+                  {courseContent.length === 0 ? (
+                    <p style={{ fontSize: 13, color: 'var(--ink-3)' }}>This course has no content yet.</p>
+                  ) : (
+                    <div className="share-list">
+                      {courseContent.map((c) => {
+                        const docType = detectDocType(c.contentUrl);
+                        const icon = docType === 'youtube' || docType === 'video' ? '🎬' : docType === 'image' ? '🖼️' : '📄';
+                        return (
+                          <button key={c.id} type="button" className="share-list-item"
+                            onClick={() => shareDocument(c.contentUrl, c.title, docType)}>
+                            {icon} {c.title}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {shareTab === 'url' && (
+                <>
+                  <div className="field">
+                    <label htmlFor="doc-url">Document / image URL</label>
+                    <input id="doc-url" className="input" type="text" placeholder="https://…"
+                      value={manualUrl} onChange={(e) => setManualUrl(e.target.value)} />
                   </div>
-                )}
-              </div>
 
-              <div className="field">
-                <label htmlFor="doc-url">Or paste a document/image URL</label>
-                <input id="doc-url" className="input" type="text" placeholder="https://…"
-                  value={manualUrl} onChange={(e) => setManualUrl(e.target.value)} />
-              </div>
+                  <div className="field">
+                    <label htmlFor="doc-name">Name <span className="muted" style={{ fontSize: 12 }}>(optional)</span></label>
+                    <input id="doc-name" className="input" type="text" placeholder="e.g. Worksheet 1"
+                      value={manualName} onChange={(e) => setManualName(e.target.value)} />
+                  </div>
+                </>
+              )}
 
-              <div className="field">
-                <label htmlFor="doc-name">Name <span className="muted" style={{ fontSize: 12 }}>(optional)</span></label>
-                <input id="doc-name" className="input" type="text" placeholder="e.g. Worksheet 1"
-                  value={manualName} onChange={(e) => setManualName(e.target.value)} />
-              </div>
+              {shareTab === 'html' && (
+                <>
+                  <div className="field">
+                    <label htmlFor="html-content">HTML lesson</label>
+                    <textarea
+                      id="html-content"
+                      className="input"
+                      rows={8}
+                      placeholder="Paste your HTML lesson here…"
+                      value={htmlContent}
+                      onChange={(e) => setHtmlContent(e.target.value)}
+                      style={{ height: 'auto', minHeight: 160, padding: '12px 16px', fontFamily: 'monospace', fontSize: 13 }}
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="html-name">Name <span className="muted" style={{ fontSize: 12 }}>(optional)</span></label>
+                    <input id="html-name" className="input" type="text" placeholder="e.g. Interactive Quiz"
+                      value={manualName} onChange={(e) => setManualName(e.target.value)} />
+                  </div>
+                </>
+              )}
 
               {shareError && <div className="auth-error">{shareError}</div>}
             </div>
 
             <div className="modal-foot">
               <button className="btn btn-outline" type="button" onClick={() => setShowShareModal(false)}>Cancel</button>
-              <button className="btn btn-gold" type="button" onClick={handleShareUrl}>Share</button>
+              {shareTab === 'url' && (
+                <button className="btn btn-gold" type="button" onClick={handleShareUrl}>Share</button>
+              )}
+              {shareTab === 'html' && (
+                <button className="btn btn-gold" type="button" onClick={handleShareHtml}>Share</button>
+              )}
             </div>
           </div>
         </div>
