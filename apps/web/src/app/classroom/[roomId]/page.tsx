@@ -60,6 +60,66 @@ function detectDocType(url: string): DocType {
   return 'pdf';
 }
 
+// ── PDF viewer — renders pages with PDF.js onto a canvas ─────────────────────
+// The teacher drives the page; students receive page updates over the data
+// channel and follow along. Rendering client-side avoids the Google Docs
+// viewer, which is unreliable for cross-origin URLs.
+function PdfViewer({ url, page, isTeacher, onPageChange }: {
+  url: string;
+  page: number;
+  isTeacher: boolean;
+  onPageChange?: (page: number) => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [totalPages, setTotalPages] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function render() {
+      setLoading(true);
+      const pdfjsLib = await import('pdfjs-dist');
+      // pdfjs v4+ ships an ESM worker (.mjs). jsDelivr mirrors npm, so this
+      // always resolves to the exact installed version's worker file.
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+      const pdf = await pdfjsLib.getDocument({ url }).promise;
+      if (cancelled) return;
+      setTotalPages(pdf.numPages);
+      const pageObj = await pdf.getPage(Math.min(page, pdf.numPages));
+      if (cancelled) return;
+      const viewport = pageObj.getViewport({ scale: 1.5 });
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d')!;
+      await pageObj.render({ canvas, canvasContext: ctx, viewport }).promise;
+      setLoading(false);
+    }
+    render().catch(console.error);
+    return () => { cancelled = true; };
+  }, [url, page]);
+
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, overflow: 'auto', padding: 12 }}>
+      {loading && <p style={{ color: '#8ea0bb', fontSize: 13 }}>Loading page {page}…</p>}
+      <canvas ref={canvasRef} style={{ maxWidth: '100%', boxShadow: '0 4px 20px rgba(0,0,0,.3)', borderRadius: 8, display: loading ? 'none' : 'block' }} />
+      {isTeacher && totalPages > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(16,30,52,.9)', padding: '8px 16px', borderRadius: 999, position: 'sticky', bottom: 8 }}>
+          <button className="bb-ic" onClick={() => onPageChange?.(Math.max(1, page - 1))} disabled={page <= 1}>◀</button>
+          <span style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>{page} / {totalPages}</span>
+          <button className="bb-ic" onClick={() => onPageChange?.(Math.min(totalPages, page + 1))} disabled={page >= totalPages}>▶</button>
+        </div>
+      )}
+      {!isTeacher && totalPages > 0 && (
+        <div style={{ color: '#8ea0bb', fontSize: 12, padding: '4px 12px', background: 'rgba(16,30,52,.7)', borderRadius: 999 }}>
+          Page {page} of {totalPages} — teacher controls navigation
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Inner classroom UI (inside LiveKitRoom context) ──────────────────────────
 
 function ClassroomContent({ roomId, isTeacher, onLeave }: {
@@ -492,25 +552,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
                 </>
               )}
 
-              {/* PDF page controls — teacher only; students just follow */}
-              {isTeacher && sharedDoc?.docType === 'pdf' && (
-                <>
-                  <button
-                    className="bb-ic" title="Previous page"
-                    onClick={() => goPdfPage(pdfPage - 1)}
-                    disabled={pdfPage <= 1}
-                  >
-                    ◀
-                  </button>
-                  <span className="bb-page">{pdfPage}</span>
-                  <button
-                    className="bb-ic" title="Next page"
-                    onClick={() => goPdfPage(pdfPage + 1)}
-                  >
-                    ▶
-                  </button>
-                </>
-              )}
+              {/* PDF page controls now live inside PdfViewer itself. */}
 
               {isTeacher && (
                 <button className="bb-chip" title="Share content" onClick={openShareModal}>
@@ -560,15 +602,14 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
                       style={{ width: '100%', height: '100%', border: 'none', borderRadius: 10 }}
                     />
                   ) : (
-                    // PDFs render in the Google Docs viewer, which reliably
-                    // embeds any public URL (e.g. Cloudinary) cross-origin —
-                    // unlike a client-side fetch, which Cloudinary can block.
-                    // The teacher drives the page via the pg param; students
-                    // receive page updates over the data channel and can't scroll.
-                    <iframe
-                      src={`https://docs.google.com/viewer?url=${encodeURIComponent(sharedDoc.url)}&embedded=true&pg=${pdfPage}`}
-                      title={sharedDoc.name}
-                      style={{ width: '100%', height: '100%', border: 'none' }}
+                    // PDFs render client-side with PDF.js onto a canvas. The
+                    // teacher navigates pages; students follow over the data
+                    // channel. Page controls live inside PdfViewer itself.
+                    <PdfViewer
+                      url={sharedDoc.url}
+                      page={pdfPage}
+                      isTeacher={isTeacher}
+                      onPageChange={(p) => goPdfPage(p)}
                     />
                   )}
                 </div>
@@ -894,8 +935,8 @@ export default function ClassroomPage() {
       serverUrl={LIVEKIT_URL}
       token={token}
       connect
-      video
-      audio
+      video={false}
+      audio={false}
       onDisconnected={handleLeave}
       style={{ height: '100vh' }}
     >
