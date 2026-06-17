@@ -21,17 +21,9 @@ export const metadata: Metadata = {
   description: 'Live Arabic classes for children aged 5–15',
 };
 
-// Kept identical to the CSP header in next.config.js so the two policies don't
-// intersect into something stricter. 'unsafe-eval' is needed by Fabric.js / Yjs.
-const contentSecurityPolicy =
-  "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https: blob:; media-src 'self' https: blob:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' https:;";
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${inter.variable} ${ibmPlexArabic.variable}`}>
-      <head>
-        <meta httpEquiv="Content-Security-Policy" content={contentSecurityPolicy} />
-      </head>
       <body className="antialiased">{children}</body>
     </html>
   );
