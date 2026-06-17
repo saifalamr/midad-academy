@@ -13,4 +13,7 @@ export const config = {
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
   WEB_URL: process.env.WEB_URL || 'http://localhost:3000',
   API_URL: process.env.API_URL || 'http://localhost:4000',
+  CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || '',
+  CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY || '',
+  CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET || '',
 } as const;
