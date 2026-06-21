@@ -147,6 +147,10 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, textAlign: 'center', padding: '8px', fontSize: '12px', color: '#fff', background: 'rgba(16,30,52,0.9)', backdropFilter: 'blur(4px)', zIndex: 50, borderTop: '1px solid var(--line)' }}>
+        By Yousef Al-Omari
+      </div>
     </div>
   );
 }

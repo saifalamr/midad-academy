@@ -188,6 +188,10 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
+
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, textAlign: 'center', padding: '8px', fontSize: '12px', color: 'var(--ink-3)', background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', zIndex: 50, borderTop: '1px solid var(--line)' }}>
+        By Yousef Al-Omari
+      </div>
     </main>
   );
 }
