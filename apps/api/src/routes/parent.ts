@@ -141,12 +141,12 @@ export async function parentRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Parent profile not found' });
     }
 
-    const childUser = await prisma.user.findUnique({
-      where: { email: childEmail },
+    const childUser = await prisma.user.findFirst({
+      where: { email: { equals: childEmail, mode: 'insensitive' }, role: 'STUDENT' },
       include: { studentProfile: true },
     });
 
-    if (!childUser || childUser.role !== 'STUDENT' || !childUser.studentProfile) {
+    if (!childUser || !childUser.studentProfile) {
       return reply.status(404).send({ error: 'No student found with that email' });
     }
 
@@ -181,8 +181,8 @@ export async function parentRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Parent profile not found' });
     }
 
-    const childUser = await prisma.user.findUnique({
-      where: { email: childEmail },
+    const childUser = await prisma.user.findFirst({
+      where: { email: { equals: childEmail, mode: 'insensitive' }, role: 'STUDENT' },
       include: { studentProfile: true },
     });
 
