@@ -1,5 +1,10 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+
+const childEmailSchema = z.object({
+  childEmail: z.string().email('Invalid email address'),
+});
 
 // Counts consecutive days ending today/yesterday that have at least one point event.
 function computeStreak(events: { createdAt: Date }[]): number {
@@ -41,7 +46,7 @@ export async function parentRoutes(app: FastifyInstance) {
       include: {
         children: {
           include: {
-            user: { select: { name: true } },
+            user: { select: { name: true, email: true } },
             // Last 90 point events for streak calculation
             pointEvents: {
               select: { createdAt: true },
@@ -106,6 +111,7 @@ export async function parentRoutes(app: FastifyInstance) {
       return {
         id: child.id,
         name: child.user.name,
+        email: child.user.email,
         level: child.level,
         totalPoints: child.totalPoints,
         streak,
@@ -117,5 +123,83 @@ export async function parentRoutes(app: FastifyInstance) {
     });
 
     return reply.send({ data: { children } });
+  });
+
+  // ── POST /api/parent/link-child ───────────────────────────────────────────
+  // Links a registered student (by email) to the authenticated parent.
+  app.post('/link-child', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const { id: userId, role } = request.user;
+
+    if (role !== 'PARENT') {
+      return reply.status(403).send({ error: 'Only parents can link children' });
+    }
+
+    const { childEmail } = childEmailSchema.parse(request.body);
+
+    const parentProfile = await prisma.parentProfile.findUnique({ where: { userId } });
+    if (!parentProfile) {
+      return reply.status(404).send({ error: 'Parent profile not found' });
+    }
+
+    const childUser = await prisma.user.findUnique({
+      where: { email: childEmail },
+      include: { studentProfile: true },
+    });
+
+    if (!childUser || childUser.role !== 'STUDENT' || !childUser.studentProfile) {
+      return reply.status(404).send({ error: 'No student found with that email' });
+    }
+
+    if (childUser.studentProfile.parentId) {
+      return reply.status(400).send({ error: 'This student is already linked to a parent' });
+    }
+
+    await prisma.studentProfile.update({
+      where: { id: childUser.studentProfile.id },
+      data: { parentId: parentProfile.id },
+    });
+
+    return reply.send({
+      message: 'Child linked successfully',
+      child: { name: childUser.name, email: childUser.email },
+    });
+  });
+
+  // ── DELETE /api/parent/unlink-child ───────────────────────────────────────
+  // Unlinks a child — only if they are currently linked to this parent.
+  app.delete('/unlink-child', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const { id: userId, role } = request.user;
+
+    if (role !== 'PARENT') {
+      return reply.status(403).send({ error: 'Only parents can unlink children' });
+    }
+
+    const { childEmail } = childEmailSchema.parse(request.body);
+
+    const parentProfile = await prisma.parentProfile.findUnique({ where: { userId } });
+    if (!parentProfile) {
+      return reply.status(404).send({ error: 'Parent profile not found' });
+    }
+
+    const childUser = await prisma.user.findUnique({
+      where: { email: childEmail },
+      include: { studentProfile: true },
+    });
+
+    // Only allow unlinking a child that belongs to THIS parent.
+    if (
+      !childUser ||
+      !childUser.studentProfile ||
+      childUser.studentProfile.parentId !== parentProfile.id
+    ) {
+      return reply.status(404).send({ error: 'No linked child found with that email' });
+    }
+
+    await prisma.studentProfile.update({
+      where: { id: childUser.studentProfile.id },
+      data: { parentId: null },
+    });
+
+    return reply.send({ message: 'Child unlinked' });
   });
 }

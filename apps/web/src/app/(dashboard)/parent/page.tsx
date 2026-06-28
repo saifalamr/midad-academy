@@ -25,6 +25,7 @@ type CourseProgress = {
 type Child = {
   id: string;
   name: string;
+  email: string;
   level: string;
   totalPoints: number;
   streak: number;
@@ -70,6 +71,10 @@ export default function ParentDashboard() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState('Parent');
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [childEmail, setChildEmail] = useState('');
+  const [linkError, setLinkError] = useState('');
+  const [linkLoading, setLinkLoading] = useState(false);
 
   useEffect(() => {
     const payload = getTokenPayload();
@@ -129,7 +134,10 @@ export default function ParentDashboard() {
             <p className="dh-hi">Good morning, <b>{userName}</b> <span className="ar dh-ar">صباح الخير</span></p>
             <h1 className="dh-title">Your family&apos;s progress</h1>
           </div>
-          <button className="btn btn-outline">Download weekly report</button>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button className="btn btn-gold" onClick={() => setShowLinkModal(true)}>+ Add Child</button>
+            <button className="btn btn-outline">Download weekly report</button>
+          </div>
         </div>
 
         {/* ── Stats row ── */}
@@ -146,8 +154,8 @@ export default function ParentDashboard() {
           </div>
         ) : children.length === 0 ? (
           <div className="card pad" style={{ textAlign: 'center' }}>
-            <p style={{ color: 'var(--ink-3)', fontSize: 14, marginBottom: 14 }}>No children linked to your account yet.</p>
-            <Link href="/courses" className="btn btn-gold btn-sm">Browse courses</Link>
+            <p style={{ color: 'var(--ink-3)', fontSize: 14, marginBottom: 14 }}>No children linked yet. Click &apos;+ Add Child&apos; to link your child&apos;s account.</p>
+            <button className="btn btn-gold btn-sm" onClick={() => setShowLinkModal(true)}>+ Add Child</button>
           </div>
         ) : (
           <>
@@ -172,6 +180,21 @@ export default function ParentDashboard() {
                         <div className="ch-meta capitalize">{child.level}</div>
                       </div>
                       <span className="mini-chip"><span className="mc-ic">🔥</span> {child.streak}</span>
+                      <button
+                        style={{ fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}
+                        onClick={async () => {
+                          if (!window.confirm('Unlink this child?')) return;
+                          const token = localStorage.getItem('token');
+                          await fetch(`${API_URL}/api/parent/unlink-child`, {
+                            method: 'DELETE',
+                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                            body: JSON.stringify({ childEmail: child.email }),
+                          });
+                          window.location.reload();
+                        }}
+                      >
+                        Unlink
+                      </button>
                     </div>
 
                     <div className="ch-xp">
@@ -292,6 +315,53 @@ export default function ParentDashboard() {
               </div>
             </div>
           </>
+        )}
+
+        {/* ── Link-a-child modal ── */}
+        {showLinkModal && (
+          <div className="modal-bg" onClick={(e) => { if (e.target === e.currentTarget) setShowLinkModal(false); }}>
+            <div className="modal">
+              <div className="modal-head">
+                <h3>Link a Child</h3>
+                <button className="modal-x" onClick={() => setShowLinkModal(false)}>✕</button>
+              </div>
+              <div className="modal-body">
+                <p style={{ fontSize: 14, color: 'var(--ink-2)', marginBottom: 16 }}>
+                  Enter your child&apos;s registered email address to link them to your account.
+                </p>
+                <div className="field">
+                  <label>Child&apos;s email address</label>
+                  <input className="input" type="email" placeholder="child@example.com"
+                    value={childEmail} onChange={(e) => setChildEmail(e.target.value)} />
+                </div>
+                {linkError && <div className="auth-error">{linkError}</div>}
+              </div>
+              <div className="modal-foot">
+                <button className="btn btn-outline" onClick={() => setShowLinkModal(false)}>Cancel</button>
+                <button className="btn btn-gold" disabled={linkLoading}
+                  onClick={async () => {
+                    setLinkError('');
+                    setLinkLoading(true);
+                    try {
+                      const token = localStorage.getItem('token');
+                      const res = await fetch(`${API_URL}/api/parent/link-child`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ childEmail }),
+                      });
+                      const data = await res.json();
+                      if (!res.ok) { setLinkError(data.error || 'Failed to link child'); return; }
+                      setShowLinkModal(false);
+                      setChildEmail('');
+                      window.location.reload(); // refresh to show new child
+                    } catch { setLinkError('Could not connect to server'); }
+                    finally { setLinkLoading(false); }
+                  }}>
+                  {linkLoading ? 'Linking…' : 'Link Child'}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </main>
     </div>
