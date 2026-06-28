@@ -146,8 +146,16 @@ export async function parentRoutes(app: FastifyInstance) {
       include: { studentProfile: true },
     });
 
-    if (!childUser || !childUser.studentProfile) {
+    // TODO: temporary debug logging — remove once linking is verified.
+    console.log('[link-child] childEmail:', childEmail);
+    console.log('[link-child] found user:', childUser?.email, childUser?.role, 'studentProfile:', childUser?.studentProfile?.id);
+
+    if (!childUser) {
       return reply.status(404).send({ error: 'No student found with that email' });
+    }
+
+    if (!childUser.studentProfile) {
+      return reply.status(400).send({ error: 'Student profile not found for this user' });
     }
 
     if (childUser.studentProfile.parentId) {
