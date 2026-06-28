@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+} from 'recharts';
 import { API_URL } from '@/lib/config';
 
 type Session = {
@@ -182,6 +185,23 @@ export default function ParentDashboard() {
                       <div><b>{child.streak}</b><span>Day streak</span></div>
                     </div>
 
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-2)', marginBottom: 6 }}>Lesson Progress</div>
+                      {child.courseProgress.length === 0 ? (
+                        <p style={{ fontSize: 12, color: 'var(--ink-3)' }}>No courses yet.</p>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={80}>
+                          <BarChart data={child.courseProgress.map((c) => ({ name: c.courseTitle?.slice(0, 8) ?? 'Course', completed: c.completed, total: c.total }))}>
+                            <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                            <YAxis hide />
+                            <Tooltip />
+                            <Bar dataKey="total" fill="#1B3A6B" opacity={0.2} radius={4} />
+                            <Bar dataKey="completed" fill="#C9922A" radius={4} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+
                     <div className="ch-next">
                       <span className="nx-dot"></span>
                       <b>Progress:</b> {child.lessonsCompleted} of {child.totalLessons} lessons
@@ -193,6 +213,7 @@ export default function ParentDashboard() {
 
             {/* ── Bottom grid ── */}
             <div className="dash-grid p-grid">
+              <div className="dash-col">
               <div className="card pad">
                 <div className="col-head sm">
                   <h3>Attendance timeline <span className="ar muted">سجلّ الحضور</span></h3>
@@ -222,6 +243,28 @@ export default function ParentDashboard() {
                     })}
                   </ul>
                 )}
+              </div>
+
+              {/* ── Children progress overview: XP & streak comparison ── */}
+              <div className="card pad" style={{ marginTop: 16 }}>
+                <div className="col-head sm">
+                  <h3>XP Comparison <span className="ar muted">مقارنة النقاط</span></h3>
+                </div>
+                {children.length === 0 ? (
+                  <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No children linked yet.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={children.map((c) => ({ name: c.name, xp: c.totalPoints, streak: c.streak }))}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" />
+                      <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Bar dataKey="xp" name="Total XP" fill="#C9922A" radius={6} />
+                      <Bar dataKey="streak" name="Streak (days)" fill="#1B3A6B" radius={6} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
               </div>
 
               <div className="dash-col">
