@@ -3,6 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import {
+  LineChart, Line, BarChart, Bar, Cell,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+} from 'recharts';
 import { API_URL } from '@/lib/config';
 
 type Enrollment = {
@@ -52,6 +56,17 @@ type QuizResult = {
   }[];
 };
 
+type StudentStats = {
+  totalPoints: number;
+  level: string;
+  streak: number;
+  lessonsCompleted: number;
+  totalLessons: number;
+  courseProgress: { courseId: string; title: string; completed: number; total: number }[];
+  quizResults: { quizTitle: string; score: number; passed: boolean; createdAt: string }[];
+  recentSessions: { title: string; scheduledAt: string; attended: boolean }[];
+};
+
 function authFetch(path: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   return fetch(`${API_URL}${path}`, {
@@ -76,7 +91,6 @@ function getTokenPayload(): { name?: string } {
 
 const THUMBS = ['th-1', 'th-2', 'th-3', 'th-4', 'th-5', 'th-6'];
 const BADGES: [string, string][] = [['📖','First Word'],['🔥','7-Day'],['✍️','Neat Hand'],['⭐','2k XP'],['🗣️','Speaker'],['🔒','Level 10']];
-const DAYS = ['M','T','W','T','F','S','S'];
 
 export default function StudentDashboard() {
   const router = useRouter();
@@ -87,10 +101,19 @@ export default function StudentDashboard() {
   const [userName, setUserName] = useState('Student');
   const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
   const [upcomingSessions, setUpcomingSessions] = useState<UpcomingSession[]>([]);
+  const [stats, setStats] = useState<StudentStats | null>(null);
 
   useEffect(() => {
     const payload = getTokenPayload();
     setUserName(payload.name ?? 'Student');
+
+    authFetch('/api/students/me')
+      .then(async (res) => {
+        if (!res.ok) return;
+        const json = await res.json();
+        setStats(json.data ?? null);
+      })
+      .catch(() => {});
 
     authFetch('/api/enrollments')
       .then(async (res) => {
@@ -139,6 +162,51 @@ export default function StudentDashboard() {
   const liveEnrollments = enrollments.filter((e) => e.isLive);
   const initial = userName.charAt(0).toUpperCase();
 
+  // ── Real progress, derived from /api/students/me (falls back to 0 / empty) ──
+  const totalPoints = stats?.totalPoints ?? 0;
+  const level = stats?.level ?? 'beginner';
+  const streak = stats?.streak ?? 0;
+  const lessonsCompleted = stats?.lessonsCompleted ?? 0;
+
+  // XP progresses in 500-point bands toward the next level threshold.
+  const xpInLevel = totalPoints % 500;
+  const xpPct = Math.round((xpInLevel / 500) * 100);
+  const xpToNext = 500 - xpInLevel;
+  const nextThreshold = (Math.floor(totalPoints / 500) + 1) * 500;
+
+  // Streak-week strip: the last 7 calendar days, marked done if a session that
+  // day was attended (today gets the dashed marker).
+  const todayKey = new Date().toISOString().split('T')[0];
+  const last7Days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    const key = d.toISOString().split('T')[0];
+    const attended = (stats?.recentSessions ?? []).some(
+      (s) => s.attended && new Date(s.scheduledAt).toISOString().split('T')[0] === key,
+    );
+    return { letter: ['S', 'M', 'T', 'W', 'T', 'F', 'S'][d.getDay()], attended, isToday: key === todayKey };
+  });
+
+  // ── Recharts datasets ──────────────────────────────────────────────────────
+  const quizChart = (stats?.quizResults ?? [])
+    .slice()
+    .reverse() // chronological for the line
+    .map((q) => ({ name: q.quizTitle.slice(0, 10), score: q.score }));
+
+  const courseChart = (stats?.courseProgress ?? []).map((c) => ({
+    name: c.title.slice(0, 10),
+    completed: c.completed,
+    total: c.total,
+  }));
+
+  const attendanceChart = (stats?.recentSessions ?? [])
+    .slice(0, 7)
+    .reverse() // recentSessions is newest-first; show oldest → newest
+    .map((s) => ({
+      name: new Date(s.scheduledAt).toLocaleDateString(undefined, { weekday: 'short' }),
+      attended: s.attended ? 1 : 0,
+    }));
+
   return (
     <div className="midad" style={{ minHeight: '100vh', background: 'var(--cream)' }}>
 
@@ -185,22 +253,25 @@ export default function StudentDashboard() {
             )}
           </div>
           <div className="dh-level">
-            <div className="lvl-ring" style={{ '--p': '0%' } as React.CSSProperties}>
-              <div className="lvl-in"><b>1</b><span>Level</span></div>
+            <div className="lvl-ring" style={{ '--p': `${xpPct}%` } as React.CSSProperties}>
+              <div className="lvl-in">
+                <b style={{ fontSize: 18, textTransform: 'capitalize' }}>{level}</b>
+                <span>Level</span>
+              </div>
             </div>
             <div className="lvl-meta">
-              <div className="lvl-row"><span>0 XP</span><span>500</span></div>
-              <div className="bar"><i style={{ width: '0%' }}></i></div>
-              <p className="lvl-note">500 XP to <b>Level 2</b></p>
+              <div className="lvl-row"><span>{totalPoints} XP</span><span>{nextThreshold}</span></div>
+              <div className="bar"><i style={{ width: `${xpPct}%` }}></i></div>
+              <p className="lvl-note"><b>{xpToNext} XP</b> to next level</p>
             </div>
           </div>
         </div>
 
         {/* ── Stats row ── */}
         <div className="stat-row">
-          <div className="stat card"><div className="st-ic st-gold">⭐</div><div><b>0</b><span>Total XP</span></div></div>
-          <div className="stat card"><div className="st-ic st-fire">🔥</div><div><b>0 days</b><span>Current streak</span></div></div>
-          <div className="stat card"><div className="st-ic st-navy">🏅</div><div><b>0</b><span>Badges earned</span></div></div>
+          <div className="stat card"><div className="st-ic st-gold">⭐</div><div><b>{totalPoints}</b><span>Total XP</span></div></div>
+          <div className="stat card"><div className="st-ic st-fire">🔥</div><div><b>{streak} days</b><span>Current streak</span></div></div>
+          <div className="stat card"><div className="st-ic st-navy">📚</div><div><b>{lessonsCompleted}</b><span>Lessons done</span></div></div>
           <div className="stat card"><div className="st-ic st-green">✓</div><div><b>{enrollments.length}</b><span>Enrolled classes</span></div></div>
         </div>
 
@@ -322,16 +393,88 @@ export default function StudentDashboard() {
             <div className="card pad">
               <div className="col-head sm">
                 <h3>Streak <span className="ar muted">المواظبة</span></h3>
-                <span className="pill">🔥 0 days</span>
+                <span className="pill">🔥 {streak} days</span>
               </div>
               <div className="streak-week">
-                {DAYS.map((day, i) => (
-                  <div key={i} className="sw-day"><i></i><span>{day}</span></div>
+                {last7Days.map((d, i) => (
+                  <div key={i} className={`sw-day${d.attended ? ' done' : ''}${d.isToday ? ' today' : ''}`}>
+                    <i></i><span>{d.letter}</span>
+                  </div>
                 ))}
               </div>
-              <p className="streak-note">Attend a class today to start your streak!</p>
+              <p className="streak-note">
+                {streak > 0
+                  ? <>🔥 {streak}-day streak — keep it going!</>
+                  : 'Attend a class today to start your streak!'}
+              </p>
             </div>
 
+            {/* ── Quiz performance (LineChart) ── */}
+            <div className="card pad">
+              <div className="col-head sm">
+                <h3>Quiz Performance <span className="ar muted">أداء الاختبارات</span></h3>
+              </div>
+              {quizChart.length === 0 ? (
+                <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No quiz data yet.</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={quizChart} margin={{ top: 8, right: 10, bottom: 0, left: -18 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                    <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="score" stroke="#C9922A" strokeWidth={2} dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            {/* ── Lesson progress by course (BarChart) ── */}
+            <div className="card pad">
+              <div className="col-head sm">
+                <h3>Lesson Progress by Course <span className="ar muted">التقدّم</span></h3>
+              </div>
+              {courseChart.length === 0 ? (
+                <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No course data yet.</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={courseChart} margin={{ top: 8, right: 10, bottom: 0, left: -18 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Bar dataKey="total" fill="#1B3A6B" fillOpacity={0.3} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="completed" fill="#C9922A" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            {/* ── Recent attendance (BarChart, green = attended / red = missed) ── */}
+            <div className="card pad">
+              <div className="col-head sm">
+                <h3>Recent Attendance <span className="ar muted">الحضور</span></h3>
+              </div>
+              {attendanceChart.length === 0 ? (
+                <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No attendance data yet.</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={attendanceChart} margin={{ top: 8, right: 10, bottom: 0, left: -18 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                    <YAxis domain={[0, 1]} ticks={[0, 1]} allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Bar dataKey="attended" radius={[4, 4, 0, 0]}>
+                      {attendanceChart.map((d, i) => (
+                        <Cell key={i} fill={d.attended ? '#2f8f5b' : '#dc2626'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            {/* ── Quiz results feed ── */}
             <div className="card pad">
               <div className="col-head sm">
                 <h3>Quiz Results <span className="ar muted">نتائج الاختبارات</span></h3>
