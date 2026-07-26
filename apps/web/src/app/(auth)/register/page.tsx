@@ -143,7 +143,7 @@ export default function RegisterPage() {
 
             <label className="check check-block">
               <input type="checkbox" required />
-              I agree to the <a href="#" className="link-gold">Terms</a> &amp; <a href="#" className="link-gold">Privacy Policy</a>
+              I agree to the <span className="link-gold" style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">Terms</span> &amp; <span className="link-gold" style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">Privacy Policy</span>
             </label>
 
             <button

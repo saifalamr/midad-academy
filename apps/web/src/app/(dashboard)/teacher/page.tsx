@@ -209,8 +209,8 @@ export default function TeacherDashboard() {
           </Link>
           <nav className="ab-nav">
             <a className="on">Dashboard</a>
-            <a>My Courses</a>
-            <a>Students</a>
+            <span className="nav-disabled" style={{ opacity: 0.4, cursor: 'not-allowed' }} title="Coming soon">My Courses</span>
+            <span className="nav-disabled" style={{ opacity: 0.4, cursor: 'not-allowed' }} title="Coming soon">Students</span>
           </nav>
           <div className="ab-right">
             <span className="role-tag">Teacher · معلّم</span>

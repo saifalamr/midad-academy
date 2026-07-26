@@ -127,7 +127,7 @@ export default function LoginPage() {
               <label className="check">
                 <input type="checkbox" defaultChecked /> Remember me
               </label>
-              <a href="#" className="link-gold">Forgot password?</a>
+              <span className="link-gold" style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">Forgot password?</span>
             </div>
 
             <button
@@ -142,8 +142,8 @@ export default function LoginPage() {
 
           <div className="auth-or"><span>or continue with</span></div>
           <div className="auth-social">
-            <button className="social-btn">Google</button>
-            <button className="social-btn">Apple</button>
+            <button className="social-btn" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">Google</button>
+            <button className="social-btn" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">Apple</button>
           </div>
         </div>
       </div>

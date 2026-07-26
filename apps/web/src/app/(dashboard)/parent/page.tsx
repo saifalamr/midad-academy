@@ -114,8 +114,8 @@ export default function ParentDashboard() {
           </Link>
           <nav className="ab-nav">
             <a className="on">Overview</a>
-            <a>Children</a>
-            <a>Reports</a>
+            <span className="nav-disabled" style={{ opacity: 0.4, cursor: 'not-allowed' }} title="Coming soon">Children</span>
+            <span className="nav-disabled" style={{ opacity: 0.4, cursor: 'not-allowed' }} title="Coming soon">Reports</span>
           </nav>
           <div className="ab-right">
             <span className="role-tag">Parent · وليّ أمر</span>
@@ -136,7 +136,7 @@ export default function ParentDashboard() {
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn btn-gold" onClick={() => setShowLinkModal(true)}>+ Add Child</button>
-            <button className="btn btn-outline">Download weekly report</button>
+            <button className="btn btn-outline" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">Download weekly report</button>
           </div>
         </div>
 

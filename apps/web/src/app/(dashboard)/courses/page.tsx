@@ -124,7 +124,6 @@ export default function BrowseCoursesPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
-            <button className="btn btn-gold btn-sm">Search</button>
           </div>
         </div>
       </div>

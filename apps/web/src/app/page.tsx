@@ -178,9 +178,9 @@ export default function HomePage() {
               </div>
               <p className="foot-about">A premium online academy helping children aged 5–15 read, write and speak Arabic with confidence and joy.</p>
             </div>
-            <div><h5>Learn</h5><Link href="/courses">Browse Courses</Link><a href="#pricing-anchor">Pricing</a><Link href="/register">Free Trial</Link><a href="#">Curriculum</a></div>
+            <div><h5>Learn</h5><Link href="/courses">Browse Courses</Link><a href="#pricing-anchor">Pricing</a><Link href="/register">Free Trial</Link><span style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">Curriculum</span></div>
             <div><h5>Platform</h5><Link href="/student">Student</Link><Link href="/teacher">Teacher</Link><Link href="/parent">Parent</Link><Link href="/courses">Classroom</Link></div>
-            <div><h5>Company</h5><a href="#">About</a><a href="#">Our Teachers</a><a href="#">Contact</a><a href="#">Help Center</a></div>
+            <div><h5>Company</h5><span style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">About</span><span style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">Our Teachers</span><span style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">Contact</span><span style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">Help Center</span></div>
           </div>
           <div className="foot-bottom">
             <span>© 2026 Midad Academy · مداد. All rights reserved.</span>
