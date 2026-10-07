@@ -18,7 +18,7 @@ import {
 import '@livekit/components-styles';
 import type { TrackReferenceOrPlaceholder } from '@livekit/components-react';
 import { Track, RoomEvent, type RemoteParticipant } from 'livekit-client';
-import Whiteboard, { PALETTE, type Tool, type WhiteboardHandle } from '@/components/Whiteboard';
+import Whiteboard, { PALETTE, type Tool, type EraserMode, type WhiteboardHandle } from '@/components/Whiteboard';
 import { API_URL } from '@/lib/config';
 
 
@@ -182,6 +182,8 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
   const [tool, setTool] = useState<Tool>('pen');
   const [color, setColor] = useState(PALETTE[0]);
   const [lineWidth, setLineWidth] = useState(3);
+  const [eraserMode, setEraserMode] = useState<EraserMode>('object');
+  const [eraserSize, setEraserSize] = useState(24);
   const [zoom, setZoom] = useState(1);
   const whiteboardRef = useRef<WhiteboardHandle>(null);
 
@@ -660,6 +662,8 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
                   tool={tool}
                   color={color}
                   lineWidth={lineWidth}
+                  eraserMode={eraserMode}
+                  eraserSize={eraserSize}
                   overlay={!!sharedDoc}
                 />
               </div>
@@ -698,6 +702,13 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
 
         {/* Color palette + line width — right sidebar */}
         <div className="wb-colors">
+          {tool === 'eraser' && <div style={{ position: 'absolute', right: 16, top: 100, zIndex: 22, background: '#fff', color: '#101e34', padding: 8, borderRadius: 8 }}>
+            <select aria-label="نوع الممحاة" value={eraserMode} onChange={e => setEraserMode(e.target.value as EraserMode)}>
+              <option value="object">حذف الشكل كامل</option><option value="partial">مسح جزء من الشكل</option>
+            </select>
+            {eraserMode === 'partial' && <input aria-label="حجم الممحاة" type="range" min="8" max="100" value={eraserSize} onChange={e => setEraserSize(Number(e.target.value))} />}
+          </div>}
+
           {PALETTE.map((c) => (
             <button
               key={c}

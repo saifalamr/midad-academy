@@ -1,9 +1,12 @@
 'use client';
 
+import { flushSync } from 'react-dom';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   Canvas,
   PencilBrush,
+  Path as FabricPath,
+  Group,
   Text as FabricText,
   Rect,
   Circle as FabricCircle,
@@ -22,6 +25,8 @@ function getWhiteboardWsUrl(): string {
 }
 
 export type Tool = 'select' | 'pen' | 'highlighter' | 'eraser' | 'text' | 'rectangle' | 'circle' | 'line';
+
+export type EraserMode = 'object' | 'partial';
 
 export const PALETTE = ['#1B3A6B', '#C9922A', '#e0483d', '#2f8f5b', '#1c2536', '#ffffff'];
 
@@ -57,13 +62,15 @@ interface WhiteboardProps {
   tool: Tool;
   color: string;
   lineWidth: number;
+  eraserMode?: EraserMode;
+  eraserSize?: number;
   /** When true, the canvas background is transparent so shared content
    *  rendered behind it remains visible (teacher draws on top of it). */
   overlay?: boolean;
 }
 
 const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteboard(
-  { roomId, canDraw, tool, color, lineWidth, overlay = false },
+  { roomId, canDraw, tool, color, lineWidth, overlay = false, eraserMode = 'object', eraserSize = 24 },
   ref,
 ) {
   const canvasElRef = useRef<HTMLCanvasElement>(null);
@@ -83,6 +90,8 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
   const toolRef  = useRef(tool);
   const colorRef = useRef(color);
   const widthRef = useRef(lineWidth);
+  const eraserModeRef = useRef(eraserMode); eraserModeRef.current = eraserMode;
+  const eraserSizeRef = useRef(eraserSize); eraserSizeRef.current = eraserSize;
   useEffect(() => { toolRef.current  = tool;      }, [tool]);
   useEffect(() => { colorRef.current = color;     }, [color]);
   useEffect(() => { widthRef.current = lineWidth; }, [lineWidth]);
@@ -115,10 +124,11 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
     if (!value || !canvas || !canDrawRef.current || !connectedRef.current) return;
 
     canvas.add(new FabricText(value, {
+      originX: 'left', originY: 'top',
       left:       overlay.canvasX,
       top:        overlay.canvasY,
       fill:       overlay.color,
-      fontSize:   22,
+      fontSize:   40,
       fontFamily: 'Tahoma, Arial, sans-serif',
       direction:  'rtl',
       textAlign:  'right',
@@ -146,6 +156,7 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
     if (!el) return;
 
     const canvas = new Canvas(el, {
+      enablePointerEvents: true,
       isDrawingMode: false,
       selection:     false,
       backgroundColor: overlay ? 'transparent' : '#ffffff',
@@ -188,7 +199,7 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
             const existing = canvas.getObjects().find(obj => ids.get(obj) === id);
             if (existing) canvas.remove(existing);
             ids.set(object, id); applied.set(id, json);
-            object.selectable = canDrawRef.current; object.evented = canDrawRef.current;
+            object.selectable = canDrawRef.current && connectedRef.current && toolRef.current === 'select'; object.evented = object.selectable;
             canvas.add(object);
             applyingRef.current = false;
           } catch { applyingRef.current = false; }
@@ -251,34 +262,97 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
     if (wrapperRef.current) observer.observe(wrapperRef.current);
     resize();
     let erasing = false;
+    let erasePoints: { x: number; y: number }[] = [];
+    let gestureMode: EraserMode = 'object';
+    let radius = 12;
+    const previewErase = () => {
+      canvas.clearContext(canvas.contextTop);
+      const ctx = canvas.contextTop;
+      ctx.save(); ctx.transform(...canvas.viewportTransform);
+      ctx.strokeStyle = 'rgba(224,72,61,.25)'; ctx.fillStyle = ctx.strokeStyle;
+      ctx.lineWidth = radius * 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath(); erasePoints.forEach((p, i) => { if (!i) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); }); ctx.stroke();
+      if (erasePoints.length === 1) { const p = erasePoints[0]; ctx.beginPath(); ctx.arc(p.x, p.y, radius, 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore();
+    };
     const erase = (e: TPointerEventInfo<TPointerEvent>) => {
       if (!erasing || toolRef.current !== 'eraser' || !canDrawRef.current || !connectedRef.current) return;
       const p = canvas.getScenePoint(e.e);
-      const hit = [...canvas.getObjects()].reverse().find(obj => obj.containsPoint(p));
-      if (hit) canvas.remove(hit);
+      if (gestureMode === 'object') {
+        const hit = [...canvas.getObjects()].reverse().find(obj => obj.containsPoint(p));
+        if (hit) canvas.remove(hit);
+      } else {
+        const last = erasePoints.at(-1);
+        if (!last || Math.hypot(last.x - p.x, last.y - p.y) >= 1) erasePoints.push({ x: p.x, y: p.y });
+        previewErase();
+      }
     };
-    const endErase = () => { erasing = false; undo.stopCapturing(); };
+    const endErase = () => {
+      if (!erasing) return;
+      erasing = false; canvas.clearContext(canvas.contextTop);
+      if (gestureMode === 'partial' && erasePoints.length && canDrawRef.current && connectedRef.current) {
+        // Filled capsules form a true transparency mask. No white paint is added,
+        // and the mask lives in the object's plane so it follows moves/scaling.
+        const parts: string[] = [];
+        erasePoints.forEach((p, i) => {
+          parts.push(`M ${p.x + radius} ${p.y} A ${radius} ${radius} 0 1 0 ${p.x - radius} ${p.y} A ${radius} ${radius} 0 1 0 ${p.x + radius} ${p.y} Z`);
+          if (!i) return;
+          const previous = erasePoints[i - 1];
+          const length = Math.hypot(p.x - previous.x, p.y - previous.y);
+          if (!length) return;
+          const nx = -(p.y - previous.y) / length * radius, ny = (p.x - previous.x) / length * radius;
+          parts.push(`M ${previous.x + nx} ${previous.y + ny} L ${p.x + nx} ${p.y + ny} L ${p.x - nx} ${p.y - ny} L ${previous.x - nx} ${previous.y - ny} Z`);
+        });
+        const minX = Math.min(...erasePoints.map(p => p.x)) - radius, maxX = Math.max(...erasePoints.map(p => p.x)) + radius;
+        const minY = Math.min(...erasePoints.map(p => p.y)) - radius, maxY = Math.max(...erasePoints.map(p => p.y)) + radius;
+        ydoc.transact(() => {
+          canvas.getObjects().forEach(object => {
+            const bounds = object.getBoundingRect();
+            if (bounds.left > maxX || bounds.top > maxY || bounds.left + bounds.width < minX || bounds.top + bounds.height < minY) return;
+            const mask = new FabricPath(parts.join(' '), { fill: '#000', strokeWidth: 0, inverted: true });
+            util.sendObjectToPlane(mask, undefined, object.calcTransformMatrix());
+            const old = object.clipPath as FabricObject | undefined;
+            if (old?.inverted) {
+              // A group of masks is their union; invert the group, not its children.
+              old.inverted = false; mask.inverted = false;
+              object.set('clipPath', new Group([old, mask], { inverted: true }));
+            } else object.set('clipPath', old ? util.mergeClipPaths(old, mask) : mask);
+            object.set('dirty', true); writeObject({ target: object });
+          });
+        }, origin);
+        canvas.requestRenderAll();
+      }
+      erasePoints = []; undo.stopCapturing();
+    };
     canvas.on('mouse:move', erase); canvas.on('mouse:up', endErase);
 
     // ── Shape tools (mouse:down) ──────────────────────────────────────────
     // Cache the Fabric hit-tested target and canvas-space point here so the
     // DOM 'click' handler (which fires after Fabric's own event processing)
     // can use them without re-running hit testing.
-    let lastDownTarget: FabricObject | null = null;
-    let lastDownCanvas = { x: 0, y: 0 };
-    let lastDownCss    = { x: 0, y: 0 };
 
     const onMouseDown = (e: TPointerEventInfo<TPointerEvent>) => {
-      lastDownTarget = e.target ?? null;
       const p = canvas.getScenePoint(e.e);
-      lastDownCanvas = { x: p.x, y: p.y };
-      // offsetX/Y: CSS pixels relative to the canvas element (== relative to
-      // the wrapper div since the canvas fills it without offset).
-      const me = e.e as { offsetX: number; offsetY: number };
-      lastDownCss = { x: me.offsetX ?? 0, y: me.offsetY ?? 0 };
-
       if (!canDrawRef.current || !connectedRef.current) return;
-      if (toolRef.current === 'eraser') { erasing = true; erase(e); return; }
+      if (toolRef.current === 'eraser') {
+        undo.stopCapturing(); canvas.discardActiveObject(); erasing = true; erasePoints = [];
+        gestureMode = eraserModeRef.current; radius = Math.max(2, eraserSizeRef.current) / 2;
+        erase(e); return;
+      }
+      if (toolRef.current === 'text') {
+        if (textOverlayRef.current || justCommittedRef.current) return;
+        const css = util.transformPoint(p, canvas.viewportTransform);
+        const box = wrapperRef.current?.getBoundingClientRect();
+        const editor: TextOverlay = {
+          canvasX: p.x, canvasY: p.y,
+          cssX: Math.max(0, Math.min(css.x, (box?.width ?? 300) - 170)), cssY: css.y,
+          color: colorRef.current, fontSizePx: Math.max(16, Math.round(40 * canvas.getZoom())),
+        };
+        textOverlayRef.current = editor;
+        // Safari requires focus in the original touch gesture to open its keyboard.
+        flushSync(() => setTextOverlay(editor)); textareaRef.current?.focus();
+        return;
+      }
       if (e.target) return; // don't stamp shapes on top of existing objects
       const t  = toolRef.current;
       const st = colorRef.current;
@@ -286,56 +360,29 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
 
       if (t === 'rectangle')
         canvas.add(new Rect({
+          originX: 'left', originY: 'top',
           left: p.x - 60, top: p.y - 40, width: 120, height: 80,
           fill: 'transparent', stroke: st, strokeWidth: sw,
         }));
       else if (t === 'circle')
         canvas.add(new FabricCircle({
+          originX: 'left', originY: 'top',
           left: p.x - 50, top: p.y - 50, radius: 50,
           fill: 'transparent', stroke: st, strokeWidth: sw,
         }));
       else if (t === 'line')
         canvas.add(new FabricLine(
           [p.x - 60, p.y, p.x + 60, p.y],
-          { stroke: st, strokeWidth: sw },
+          { originX: 'left', originY: 'top', stroke: st, strokeWidth: sw },
         ));
     };
     canvas.on('mouse:down', onMouseDown);
-
-    // ── Text tool: DOM 'click' opens the HTML overlay textarea ────────────
-    //
-    // We deliberately use the native 'click' event rather than any Fabric
-    // canvas event.  Fabric's _onMouseUp calls discardActiveObject() on every
-    // click that started on empty canvas — any IText.enterEditing() call made
-    // inside a Fabric event handler is cancelled by that.  The DOM 'click'
-    // event fires *after* the entire mousedown→mouseup cycle has settled, so
-    // there is nothing left to fight against.
-    const onCanvasClick = () => {
-      if (!canDrawRef.current || !connectedRef.current) return;
-      if (toolRef.current !== 'text') return;
-      if (lastDownTarget) return;        // clicked an existing object
-      if (justCommittedRef.current) return; // this is the click that blurred a textarea
-
-      const cssScale = canvas.getZoom();
-      const overlay: TextOverlay = {
-        canvasX:    lastDownCanvas.x,
-        canvasY:    lastDownCanvas.y,
-        cssX:       lastDownCss.x,
-        cssY:       lastDownCss.y,
-        color:      colorRef.current,
-        fontSizePx: Math.round(22 * cssScale),
-      };
-      textOverlayRef.current = overlay;
-      setTextOverlay(overlay);
-    };
-    canvas.upperCanvasEl.addEventListener('click', onCanvasClick);
 
     return () => {
       disposed = true; connectedRef.current = false;
       observer.disconnect();
       canvas.off('mouse:down', onMouseDown);
       canvas.off('mouse:move', erase); canvas.off('mouse:up', endErase);
-      canvas.upperCanvasEl.removeEventListener('click', onCanvasClick);
       canvas.off('object:added', writeObject);
       canvas.off('object:modified', modifyObject);
       canvas.off('object:removed', removeObject);
@@ -377,7 +424,9 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
 
     const freehand = tool === 'pen' || tool === 'highlighter';
     canvas.isDrawingMode = freehand && connected;
-    canvas.selection     = tool === 'select';
+    canvas.selection = tool === 'select' && connected;
+    canvas.discardActiveObject();
+    lockObjects(canvas, tool === 'select' && connected);
 
     if (!freehand) return;
     const brush = new PencilBrush(canvas);
@@ -439,9 +488,15 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
         )}
       </div>
 
-      {textOverlay && (
+      {textOverlay && (<>
+        <div style={{ position: 'absolute', left: textOverlay.cssX, top: Math.max(0, textOverlay.cssY - 36), display: 'flex', gap: 8, zIndex: 21 }}>
+          <button type="button" onPointerDown={e => e.preventDefault()} onClick={doCommit} style={{ background: '#1B3A6B', color: '#fff', borderRadius: 6, padding: '4px 12px' }}>تثبيت النص</button>
+          <button type="button" onPointerDown={e => e.preventDefault()} onClick={doCancel} style={{ background: '#fff', color: '#1B3A6B', borderRadius: 6, padding: '4px 12px' }}>إلغاء النص</button>
+        </div>
         <textarea
           ref={textareaRef}
+          aria-label="نص السبورة"
+          placeholder="اكتب هنا…"
           rows={1}
           defaultValue=""
           onKeyDown={(e) => {
@@ -464,8 +519,8 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
             fontFamily: 'Tahoma, Arial, sans-serif',
             direction:  'rtl',
             textAlign:  'right',
-            background: 'transparent',
-            border:     'none',
+            background: 'rgba(255,255,255,.95)',
+            border:     '1px dashed #1B3A6B',
             outline:    'none',
             resize:     'none',
             padding:    0,
@@ -476,7 +531,7 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
             zIndex:     20,
           }}
         />
-      )}
+      </>)}
     </div>
   );
 });
