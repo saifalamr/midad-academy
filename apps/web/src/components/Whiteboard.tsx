@@ -170,6 +170,7 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
     const provider = new WebsocketProvider(getWhiteboardWsUrl(), `whiteboard-${roomId}`, ydoc, {
       params: { token: localStorage.getItem('token') ?? sessionStorage.getItem('token') ?? '' },
       disableBc: true,
+      connect: navigator.onLine,
     });
     const state = ydoc.getMap<string>('objects');
     const origin = {};
@@ -230,6 +231,16 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
     provider.on('status', ({ status }: { status: string }) => {
       if (status !== 'connected') { connectedRef.current = false; setConnected(false); canvas.isDrawingMode = false; }
     });
+    // Mobile browsers can report offline before the socket times out. Freeze
+    // edits immediately so unsent ink is never presented as synchronized.
+    const offline = () => {
+      connectedRef.current = false; setConnected(false);
+      canvas.isDrawingMode = false;
+      provider.disconnect();
+    };
+    const online = () => provider.connect();
+    window.addEventListener('offline', offline);
+    window.addEventListener('online', online);
     provider.on('sync', (ok: boolean) => {
       connectedRef.current = ok; setConnected(ok);
       // Migrate previous single-snapshot documents without discarding saved ink.
@@ -379,6 +390,8 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
     canvas.on('mouse:down', onMouseDown);
 
     return () => {
+      window.removeEventListener('offline', offline);
+      window.removeEventListener('online', online);
       disposed = true; connectedRef.current = false;
       observer.disconnect();
       canvas.off('mouse:down', onMouseDown);

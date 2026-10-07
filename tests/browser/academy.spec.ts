@@ -135,3 +135,25 @@ test('a full course shows its active count and blocks enrollment on mobile', asy
   await expect(card).toContainText('1 student');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
 });
+
+
+test('a student can retry joining after a connection failure without leaving the classroom page', async ({ page, request }) => {
+  const login = await request.post('http://127.0.0.1:4000/api/auth/login', { data: { email: 'student@preview.midad.test', password: 'MidadPreview2026!' } });
+  const token = (await login.json()).data.token;
+  await page.addInitScript(value => localStorage.setItem('token', value), token);
+  let attempts = 0;
+  await page.route('**/api/sessions/join', route => {
+    attempts++;
+    return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'This class is not live' }) });
+  });
+  await page.goto('/classroom/preview-arabic');
+  await page.getByRole('button', { name: 'دخول الحصة', exact: true }).click();
+  await expect(page.locator('p[role="alert"]')).toContainText('الحصة غير مباشرة الآن');
+  expect(attempts).toBe(1);
+  await page.getByRole('button', { name: 'إعادة دخول الحصة', exact: true }).click();
+  await expect.poll(() => attempts).toBe(2);
+  await expect(page.locator('p[role="alert"]')).toBeVisible();
+  await expect(page).toHaveURL(/classroom\/preview-arabic/);
+  await page.getByRole('button', { name: 'الرجوع للوحة التحكم', exact: true }).click();
+  await expect(page).toHaveURL(/student/);
+});

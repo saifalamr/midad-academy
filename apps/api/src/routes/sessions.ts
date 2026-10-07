@@ -4,7 +4,9 @@ import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { config } from '../config';
-import { canAccessCourse } from '../lib/access';
+import { canAccessCourse, httpError } from '../lib/access';
+import { lockCourse } from '../lib/enrollment';
+import { completeClassroom } from '../lib/classroom';
 import { setDrawingPermission } from '../ws-server';
 
 const createSessionSchema = z.object({
@@ -254,10 +256,11 @@ export async function sessionRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Session not found' });
     }
 
-    if (session.status !== 'SCHEDULED') return reply.status(409).send({ error: 'Only scheduled sessions can be cancelled' });
-    const updated = await prisma.classSession.update({
-      where: { id: sessionId },
-      data: { status: 'CANCELLED' },
+    const updated = await prisma.$transaction(async tx => {
+      await lockCourse(tx, session.courseId);
+      const changed = await tx.classSession.updateMany({ where: { id: sessionId, status: 'SCHEDULED' }, data: { status: 'CANCELLED' } });
+      if (!changed.count) throw httpError(409, 'Only scheduled sessions can be cancelled');
+      return tx.classSession.findUniqueOrThrow({ where: { id: sessionId } });
     });
 
     return reply.send({ data: updated });
@@ -285,50 +288,52 @@ export async function sessionRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Session not found' });
     }
 
-    if (session.status !== 'SCHEDULED' && session.status !== 'LIVE') return reply.status(409).send({ error: 'This session cannot be started' });
-    const otherLive = await prisma.classSession.findFirst({ where: { courseId: session.courseId, status: 'LIVE', id: { not: sessionId } } });
-    if (otherLive) return reply.status(409).send({ error: 'End the current live session first' });
     if (!config.LIVEKIT_URL || !config.LIVEKIT_API_KEY || !config.LIVEKIT_API_SECRET) return reply.status(503).send({ error: 'Live classroom service is not configured' });
-    const liveKitRoomId = `class-${session.id}`;
     const service = new RoomServiceClient(toHttpUrl(config.LIVEKIT_URL), config.LIVEKIT_API_KEY, config.LIVEKIT_API_SECRET);
-    const course = await prisma.course.findUniqueOrThrow({ where: { id: session.courseId }, select: { maxStudents: true } });
-    await service.createRoom({ name: liveKitRoomId, emptyTimeout: 600, maxParticipants: course.maxStudents + 1 });
-    // Serialize starts for this course so two scheduled sessions cannot become live together.
+    // Starts, ends and provider completion share the same course lock. Re-entering
+    // a LIVE session must never recreate an expired room with an old room name.
     const updated = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM "Course" WHERE id = ${session.courseId} FOR UPDATE`;
+      const course = await lockCourse(tx, session.courseId);
       const current = await tx.classSession.findUniqueOrThrow({ where: { id: sessionId } });
-      if (!['SCHEDULED', 'LIVE'].includes(current.status) || await tx.classSession.findFirst({ where: { courseId: session.courseId, status: 'LIVE', id: { not: sessionId } } })) return null;
+      if (!['SCHEDULED', 'LIVE'].includes(current.status)) throw httpError(409, 'This session cannot be started');
+      if (await tx.classSession.findFirst({ where: { courseId: session.courseId, status: 'LIVE', id: { not: sessionId } } })) throw httpError(409, 'End the current live session first');
+      if (current.status === 'LIVE') {
+        const existing = current.liveKitRoomId ? await service.listRooms([current.liveKitRoomId]) : [];
+        if (!existing.length) throw httpError(409, 'This class has ended; end it in the dashboard and schedule a new session');
+        return current;
+      }
+      const liveKitRoomId = `class-${current.id}`;
+      await service.createRoom({ name: liveKitRoomId, emptyTimeout: 600, maxParticipants: course.maxStudents + 1 });
       return tx.classSession.update({ where: { id: sessionId }, data: { status: 'LIVE', liveKitRoomId } });
-    });
-    if (!updated) { await service.deleteRoom(liveKitRoomId); return reply.status(409).send({ error: 'This course already has a live class or the session was cancelled' }); }
+    }, { timeout: 20_000, maxWait: 20_000 });
 
     return reply.send({ data: updated });
   });
   app.post('/end', { preHandler: [app.authenticate] }, async (request, reply) => {
     const { roomName } = createSessionSchema.parse(request.body);
     if (request.user.role !== 'TEACHER' || !await canAccessCourse(request.user, roomName)) return reply.status(403).send({ error: 'Only the course teacher can end this class' });
-    const sessions = await prisma.classSession.findMany({ where: { courseId: roomName, status: 'LIVE' } });
-    if (config.LIVEKIT_URL) {
-      const service = new RoomServiceClient(toHttpUrl(config.LIVEKIT_URL), config.LIVEKIT_API_KEY, config.LIVEKIT_API_SECRET);
+    const service = config.LIVEKIT_URL && config.LIVEKIT_API_KEY && config.LIVEKIT_API_SECRET
+      ? new RoomServiceClient(toHttpUrl(config.LIVEKIT_URL), config.LIVEKIT_API_KEY, config.LIVEKIT_API_SECRET) : null;
+    await prisma.$transaction(async tx => {
+      await lockCourse(tx, roomName);
+      const sessions = await tx.classSession.findMany({ where: { courseId: roomName, status: 'LIVE' } });
       for (const session of sessions) {
-        if (!session.liveKitRoomId) continue;
-        const rooms = await service.listRooms([session.liveKitRoomId]);
-        if (rooms.length) await service.deleteRoom(session.liveKitRoomId);
+        if (service && session.liveKitRoomId && (await service.listRooms([session.liveKitRoomId])).length) await service.deleteRoom(session.liveKitRoomId);
       }
-    }
-    await prisma.classSession.updateMany({ where: { id: { in: sessions.map(s => s.id) }, status: 'LIVE' }, data: { status: 'COMPLETED' } });
-    const grants = await prisma.drawingPermission.findMany({ where: { courseId: roomName } });
-    await prisma.drawingPermission.deleteMany({ where: { courseId: roomName } });
-    grants.forEach(g => setDrawingPermission(roomName, g.userId, false));
+      await completeClassroom(tx, roomName, sessions.map(s => s.id));
+    }, { timeout: 20_000, maxWait: 20_000 });
     return { message: 'Class ended' };
   });
   app.post('/drawing-permission', { preHandler: [app.authenticate] }, async (request, reply) => {
     const { roomName, studentId, canDraw } = z.object({ roomName: z.string(), studentId: z.string(), canDraw: z.boolean() }).parse(request.body);
     if (request.user.role !== 'TEACHER' || !await canAccessCourse(request.user, roomName)) return reply.status(403).send({ error: 'Only the course teacher can manage drawing access' });
     if (!await canAccessCourse({ id: studentId, role: 'STUDENT' }, roomName)) return reply.status(404).send({ error: 'Student not enrolled' });
-    if (canDraw) await prisma.drawingPermission.upsert({ where: { courseId_userId: { courseId: roomName, userId: studentId } }, create: { courseId: roomName, userId: studentId }, update: {} });
-    else await prisma.drawingPermission.deleteMany({ where: { courseId: roomName, userId: studentId } });
-    setDrawingPermission(roomName, studentId, canDraw);
+    await prisma.$transaction(async tx => {
+      await lockCourse(tx, roomName);
+      if (canDraw) await tx.drawingPermission.upsert({ where: { courseId_userId: { courseId: roomName, userId: studentId } }, create: { courseId: roomName, userId: studentId }, update: {} });
+      else await tx.drawingPermission.deleteMany({ where: { courseId: roomName, userId: studentId } });
+      setDrawingPermission(roomName, studentId, canDraw);
+    });
     return { message: 'Drawing permission updated' };
   });
   app.get<{ Params: { courseId: string } }>('/state/:courseId', { preHandler: [app.authenticate] }, async (request, reply) => {
@@ -378,7 +383,13 @@ export async function sessionRoutes(app: FastifyInstance) {
           });
         }
       }
-      if (event.event === 'room_finished') await prisma.classSession.updateMany({ where: { courseId: roomName, status: 'LIVE' }, data: { status: 'COMPLETED' } });
+      if (event.event === 'room_finished') {
+        const session = await prisma.classSession.findFirst({ where: { liveKitRoomId: roomName, status: 'LIVE' } });
+        if (session) await prisma.$transaction(async tx => {
+          await lockCourse(tx, session.courseId);
+          await completeClassroom(tx, session.courseId, [session.id]);
+        });
+      }
       return { received: true };
     });
   });

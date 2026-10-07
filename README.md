@@ -105,3 +105,11 @@ Paid checkout reserves a seat before contacting Stripe, with a 35-minute Checkou
 Replayed paid events cannot reactivate paused/cancelled enrollments. A legacy/late paid checkout without an available seat is recorded as COMPLETED with `requiresReview=true`; it does not create active access. The buyer sees a review message and the owning teacher sees a payment-review notice. Refunds and manual resolution remain outside this batch and are not automatic. Existing over-capacity courses are not automatically unenrolled.
 
 Attendance totals and absence charts include only COMPLETED class sessions after enrollment (plus actual attendance if scheduling changed). SCHEDULED, LIVE and CANCELLED sessions are excluded, preventing premature absences. Material completion remains independent. Apply migration `20261007234500_seat_reservations` before starting the updated hosted API. Deployment remains paused.
+
+### Classroom lifecycle hardening (deployment paused)
+
+- Starting, cancelling and ending a class now serialize against the course row. Concurrent starts create only one live room; re-entering an existing live class does not recreate a room that has expired.
+- A signed `room_finished` webhook completes the session identified by its unique LiveKit room name and removes its drawing grants. Repeated or delayed completion events do not close a newer class or remove its grants. The saved course board and shared materials remain available.
+- Classroom join failures and unrecoverable connection failures offer an Arabic retry action that requests a fresh participant token while preserving device choices. Intentional exits and provider-ended rooms return to the dashboard.
+- API checks exercise concurrent starts, signed completion, replay isolation, room deletion and revocation on an already-connected board socket. Browser checks exercise join retry and an offline mobile board receiving missed ink when reconnecting. These checks do not substitute for the pending real LiveKit audio/video acceptance test.
+- Database lifecycle operations allow up to 20 seconds for provider requests while holding the course lock. Provider room creation/deletion and database commits cannot be atomic; an outage during a commit requires reconciliation of provider rooms and session status before handover.

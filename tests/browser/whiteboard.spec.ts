@@ -88,6 +88,15 @@ test('two participants keep concurrent drawings, undo only their edits, erase an
   expect(await ink(teacher)).toBeGreaterThan(beforeLine);
   await teacher.getByRole('button',{name:'تراجع',exact:true}).click();
   await expect.poll(() => ink(teacher)).toBe(withLine);
+  // A phone losing network must stop editing and receive missed teacher ink on reconnect.
+  const beforeOffline = await ink(student);
+  await studentContext.setOffline(true);
+  await expect(student.getByText('الاتصال منقطع — الرسم متوقف', { exact: true })).toBeVisible();
+  await shape(teacher, 'مستطيل', .9);
+  await expect.poll(() => ink(teacher)).toBeGreaterThan(withLine);
+  await studentContext.setOffline(false);
+  await expect(student.getByText('متزامنة', { exact: true })).toBeVisible();
+  await expect.poll(() => ink(student)).toBeGreaterThan(beforeOffline);
   const download = teacher.waitForEvent('download'); await teacher.getByRole('button',{name:'حفظ صورة',exact:true}).click();
   expect((await download).suggestedFilename()).toMatch(/midad-board.*\.png/);
   expect(errors).toEqual([]);

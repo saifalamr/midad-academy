@@ -1,4 +1,4 @@
-import { test, before, after } from 'node:test';
+import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import Stripe from 'stripe';
@@ -16,16 +16,22 @@ process.env.STRIPE_WEBHOOK_SECRET = 'whsec_preview';
 process.env.LIVEKIT_URL = 'ws://127.0.0.1:7880';
 // Provider-independent API tests; real media is covered by the separate classroom test.
 let createdRoomCapacity = 0;
-RoomServiceClient.prototype.createRoom = async options => { createdRoomCapacity = options?.maxParticipants ?? 0; return {} as any; };
+let createdRooms: string[] = [];
+let deletedRooms: string[] = [];
+RoomServiceClient.prototype.createRoom = async options => { createdRoomCapacity = options?.maxParticipants ?? 0; createdRooms.push(options?.name ?? ''); return {} as any; };
 RoomServiceClient.prototype.listRooms = async names => (names ?? []).map(name => ({ name } as any));
-RoomServiceClient.prototype.deleteRoom = async () => {};
+RoomServiceClient.prototype.deleteRoom = async name => { deletedRooms.push(name); };
 RoomServiceClient.prototype.updateRoomMetadata = async () => ({} as any);
 process.env.LIVEKIT_API_KEY = 'preview-key';
 process.env.LIVEKIT_API_SECRET = 'preview-secret-at-least-32-characters';
 let app: FastifyInstance; let prisma: any; let local: any; let whiteboard: any;
 const actors: Record<string, { id: string; token: string; email: string }> = {};
 let freeId: string; let paidId: string; let quizId: string; let questionId: string; let writtenId: string; let resultId: string; let sessionId: string;
-const call = (method: any, url: string, role?: string, payload?: any) => app.inject({ method, url, headers: role ? { authorization: `Bearer ${actors[role].token}` } : {}, ...(payload ? { payload } : {}) });
+// Independent scenarios represent different client IPs; keep production rate limiting enabled.
+let scenario = 0;
+let remoteAddress = '10.0.0.1';
+beforeEach(() => { remoteAddress = `10.0.1.${++scenario}`; });
+const call = (method: any, url: string, role?: string, payload?: any) => app.inject({ method, url, remoteAddress, headers: role ? { authorization: `Bearer ${actors[role].token}` } : {}, ...(payload ? { payload } : {}) });
 
 before(async () => {
   local = await import('../scripts/dev-db.mjs');
@@ -151,13 +157,21 @@ test('whiteboard rejects unauthorized viewers, blocks student edits and persists
   };
   student.send(update('blocked'));
   const broadcast = once(teacher, 'message'); teacher.send(update('allowed')); await broadcast;
+  assert.equal((await call('POST', '/api/sessions/drawing-permission', 'teacher', { roomName: freeId, studentId: actors.student.id, canDraw: true })).statusCode, 200);
+  const granted = once(teacher, 'message'); student.send(update('studentAllowed')); await granted;
+  assert.equal((await call('POST', '/api/sessions/drawing-permission', 'teacher', { roomName: freeId, studentId: actors.student.id, canDraw: false })).statusCode, 200);
+  student.send(update('revokedWhileConnected'));
+  const marker = once(teacher, 'message'); teacher.send(update('afterRevocation')); await marker;
   const closedStudent = once(student, 'close'); student.close(); await closedStudent;
   const closedTeacher = once(teacher, 'close'); teacher.close(); await closedTeacher;
   await whiteboard.close(); whiteboard = undefined;
   const saved = await prisma.whiteboardDocument.findUniqueOrThrow({ where: { courseId: freeId } });
   const restored = new Y.Doc(); Y.applyUpdate(restored, saved.state);
   assert.equal(restored.getMap('drawing').get('allowed'), true);
-  assert.equal(restored.getMap('drawing').get('blocked'), undefined); restored.destroy();
+  assert.equal(restored.getMap('drawing').get('blocked'), undefined);
+  assert.equal(restored.getMap('drawing').get('studentAllowed'), true);
+  assert.equal(restored.getMap('drawing').get('revokedWhileConnected'), undefined);
+  assert.equal(restored.getMap('drawing').get('afterRevocation'), true); restored.destroy();
 });
 
 
@@ -328,4 +342,67 @@ test('teachers can set capacity and payment review alerts remain scoped to the c
   assert.equal(reviews.length, 1); assert.equal(reviews[0].providerPaymentId, 'cs_legacy_full');
   assert.deepEqual((await call('GET', '/api/teacher/payment-reviews', 'otherTeacher')).json().data, []);
   assert.equal((await call('GET', '/api/teacher/payment-reviews', 'student')).statusCode, 403);
+});
+
+
+test('room completion clears grants once, keeps the saved board and ignores delayed events', async () => {
+  const course = (await call('POST', '/api/courses', 'teacher', { title: 'Class lifecycle', description: 'Class lifecycle integration', ageGroup: '8-10', price: 0 })).json().data;
+  assert.equal((await call('POST', '/api/enrollments', 'student', { courseId: course.id })).statusCode, 201);
+  const schedule = async () => (await call('POST', '/api/sessions/schedule', 'teacher', { courseId: course.id, title: 'Lifecycle session', scheduledAt: new Date().toISOString() })).json().data;
+  const first = await schedule(); const second = await schedule();
+  const started = await Promise.all([call('PATCH', `/api/sessions/${first.id}/start`, 'teacher', {}), call('PATCH', `/api/sessions/${second.id}/start`, 'teacher', {})]);
+  assert.deepEqual(started.map(r => r.statusCode).sort(), [200, 409]);
+  assert.equal(createdRooms.filter(name => [first.id, second.id].some(id => name === `class-${id}`)).length, 1);
+  const live = started.find(r => r.statusCode === 200)!.json().data;
+  const waiting = live.id === first.id ? second : first;
+  assert.equal((await call('PATCH', `/api/sessions/${live.id}/cancel`, 'teacher', {})).statusCode, 409);
+  assert.equal((await call('PATCH', `/api/sessions/${live.id}/start`, 'teacher', {})).statusCode, 200);
+  assert.equal(createdRooms.filter(name => name === live.liveKitRoomId).length, 1); // Re-entry never recreates a room.
+  await call('POST', '/api/sessions/drawing-permission', 'teacher', { roomName: course.id, studentId: actors.student.id, canDraw: true });
+  await prisma.whiteboardDocument.create({ data: { courseId: course.id, state: Buffer.from([0, 0]) } });
+  const payload = JSON.stringify({ event: 'room_finished', room: { name: live.liveKitRoomId } });
+  const token = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET);
+  token.sha256 = createHash('sha256').update(payload).digest('base64');
+  const authorization = await token.toJwt();
+  const notify = (auth: string) => app.inject({ method: 'POST', url: '/api/sessions/webhook', headers: { 'content-type': 'application/webhook+json', authorization: auth }, payload });
+  assert.equal((await notify('invalid')).statusCode, 401);
+  assert.equal((await prisma.classSession.findUniqueOrThrow({ where: { id: live.id } })).status, 'LIVE');
+  assert.equal((await notify(authorization)).statusCode, 200);
+  assert.equal((await prisma.classSession.findUniqueOrThrow({ where: { id: live.id } })).status, 'COMPLETED');
+  { const res = await call('GET', `/api/sessions/state/${course.id}`, 'student'); assert.equal(res.statusCode, 200, res.body); assert.equal(res.json().data.canDraw, false); }
+  assert.equal(await prisma.whiteboardDocument.count({ where: { courseId: course.id } }), 1);
+  assert.equal((await call('POST', '/api/sessions/join', 'student', { roomName: course.id })).statusCode, 409);
+  assert.equal((await call('PATCH', `/api/sessions/${live.id}/start`, 'teacher', {})).statusCode, 409);
+  assert.equal((await call('PATCH', `/api/sessions/${waiting.id}/start`, 'teacher', {})).statusCode, 200);
+  await call('POST', '/api/sessions/drawing-permission', 'teacher', { roomName: course.id, studentId: actors.student.id, canDraw: true });
+  assert.equal((await notify(authorization)).statusCode, 200);
+  assert.equal((await prisma.classSession.findUniqueOrThrow({ where: { id: waiting.id } })).status, 'LIVE');
+  assert.equal((await call('GET', `/api/sessions/state/${course.id}`, 'student')).json().data.canDraw, true);
+  assert.equal((await call('POST', '/api/sessions/end', 'otherTeacher', { roomName: course.id })).statusCode, 403);
+  assert.equal((await call('POST', '/api/sessions/end', 'teacher', { roomName: course.id })).statusCode, 200);
+  assert.equal(deletedRooms.filter(name => name === `class-${waiting.id}`).length, 1);
+  { const res = await call('GET', `/api/sessions/state/${course.id}`, 'student'); assert.equal(res.statusCode, 200, res.body); assert.equal(res.json().data.canDraw, false); }
+  await call('POST', '/api/sessions/end', 'teacher', { roomName: course.id });
+  assert.equal(deletedRooms.filter(name => name === `class-${waiting.id}`).length, 1);
+});
+
+
+test('provider failures do not mark a scheduled class live or recreate an expired live room', async () => {
+  const course = (await call('POST', '/api/courses', 'teacher', { title: 'Provider failure', description: 'Provider failure integration', ageGroup: '8-10', price: 0 })).json().data;
+  const session = (await call('POST', '/api/sessions/schedule', 'teacher', { courseId: course.id, title: 'Provider test', scheduledAt: new Date().toISOString() })).json().data;
+  const create = RoomServiceClient.prototype.createRoom;
+  try {
+    RoomServiceClient.prototype.createRoom = async () => { throw new Error('Provider unavailable'); };
+    assert.equal((await call('PATCH', `/api/sessions/${session.id}/start`, 'teacher', {})).statusCode, 500);
+    assert.equal((await prisma.classSession.findUniqueOrThrow({ where: { id: session.id } })).status, 'SCHEDULED');
+  } finally { RoomServiceClient.prototype.createRoom = create; }
+  assert.equal((await call('PATCH', `/api/sessions/${session.id}/start`, 'teacher', {})).statusCode, 200);
+  const before = createdRooms.length;
+  const list = RoomServiceClient.prototype.listRooms;
+  try {
+    RoomServiceClient.prototype.listRooms = async () => [];
+    assert.equal((await call('PATCH', `/api/sessions/${session.id}/start`, 'teacher', {})).statusCode, 409);
+    assert.equal(createdRooms.length, before);
+    assert.equal((await call('POST', '/api/sessions/join', 'student', { roomName: course.id })).statusCode, 403);
+  } finally { RoomServiceClient.prototype.listRooms = list; }
 });

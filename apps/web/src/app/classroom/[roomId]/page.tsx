@@ -17,7 +17,7 @@ import {
 } from '@livekit/components-react';
 import '@livekit/components-styles';
 import type { TrackReferenceOrPlaceholder } from '@livekit/components-react';
-import { Track, RoomEvent, type RemoteParticipant } from 'livekit-client';
+import { Track, RoomEvent, DisconnectReason, type RemoteParticipant } from 'livekit-client';
 import Whiteboard, { PALETTE, type Tool, type EraserMode, type WhiteboardHandle } from '@/components/Whiteboard';
 import { API_URL } from '@/lib/config';
 
@@ -906,6 +906,7 @@ export default function ClassroomPage() {
   const [livekitUrl, setLivekitUrl] = useState('');
   const [choices, setChoices] = useState<LocalUserChoices | null>(null);
   const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!choices) return;
@@ -931,6 +932,8 @@ export default function ClassroomPage() {
 
 
 
+    const controller = new AbortController();
+    let active = true;
     fetch(`${API_URL}/api/sessions/${currentRole === 'teacher' ? 'create' : 'join'}`, {
       method: 'POST',
       headers: {
@@ -938,19 +941,21 @@ export default function ClassroomPage() {
         Authorization: `Bearer ${appToken}`,
       },
       body: JSON.stringify({ roomName: roomId }),
+      signal: controller.signal,
     })
       .then(async (res) => {
         const json = await res.json();
-
-        if (!res.ok) { setError(json.error || 'Could not join room'); return; }
+        if (!active) return;
+        if (!res.ok) { setError(res.status === 409 ? 'الحصة غير مباشرة الآن. انتظر بدء المعلم للحصة ثم أعد المحاولة.' : json.error || 'تعذر دخول الحصة'); return; }
         setToken(json.data.token);
         setLivekitUrl(json.data.livekitUrl);
       })
       .catch((err) => {
-        console.error('[Classroom] Fetch failed:', err);
-        setError('Could not connect to server');
+        if (!active || err.name === 'AbortError') return;
+        setError('تعذر الاتصال بالخادم. تحقق من الإنترنت وأعد المحاولة.');
       });
-  }, [roomId, router, choices]);
+    return () => { active = false; controller.abort(); };
+  }, [roomId, router, choices, attempt]);
 
   function handleLeave() {
     const appToken = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
@@ -966,12 +971,26 @@ export default function ClassroomPage() {
     router.push('/login');
   }
 
+  function retryJoin() {
+    setToken(null); setError(''); setAttempt(value => value + 1);
+  }
+
+  function handleDisconnected(reason?: DisconnectReason) {
+    if ([DisconnectReason.CLIENT_INITIATED, DisconnectReason.ROOM_DELETED, DisconnectReason.ROOM_CLOSED, DisconnectReason.PARTICIPANT_REMOVED].includes(reason ?? DisconnectReason.UNKNOWN_REASON)) {
+      handleLeave(); return;
+    }
+    setError(reason === DisconnectReason.DUPLICATE_IDENTITY
+      ? 'تم فتح الحصة بحسابك في جهاز أو نافذة أخرى. أغلقها هناك قبل إعادة الدخول.'
+      : 'انقطع الاتصال بالحصة. تحقق من الإنترنت ثم أعد الدخول.');
+  }
+
   if (error) {
     return (
       <div className="midad room" style={{ alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center', padding: 32 }}>
-          <p style={{ color: '#f87171', fontWeight: 600, marginBottom: 12 }}>{error}</p>
-          <button className="btn btn-ghost btn-sm" onClick={handleLeave}>Go back</button>
+          <p role="alert" dir="rtl" style={{ color: '#f87171', fontWeight: 600, marginBottom: 12 }}>{error}</p>
+          <button className="btn btn-gold btn-sm" onClick={retryJoin}>إعادة دخول الحصة</button>
+          <button className="btn btn-ghost btn-sm" onClick={handleLeave}>الرجوع للوحة التحكم</button>
         </div>
       </div>
     );
@@ -996,13 +1015,14 @@ export default function ClassroomPage() {
 
   return (
     <LiveKitRoom
+      key={attempt}
       serverUrl={livekitUrl}
       token={token}
       connect
       video={choices.videoEnabled ? { deviceId: choices.videoDeviceId } : false}
       audio={choices.audioEnabled ? { deviceId: choices.audioDeviceId } : false}
-      onDisconnected={handleLeave}
-      onError={() => setError("The classroom connection failed. Check your connection and try again.")}
+      onDisconnected={handleDisconnected}
+      onError={() => setError("تعذر الاتصال بالحصة. تحقق من الإنترنت وأعد الدخول.")}
       style={{ height: '100vh' }}
     >
       <ClassroomContent roomId={roomId} isTeacher={role === 'teacher'} onLeave={handleLeave} />
