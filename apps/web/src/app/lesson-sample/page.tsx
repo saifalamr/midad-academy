@@ -1,0 +1,2 @@
+import Link from 'next/link';
+export default function SampleLesson() { return <main className="midad wrap" style={{maxWidth: 650, padding: '48px 24px'}}><Link href="/student">← Student dashboard</Link><h1 className="sec-h2" style={{margin: '24px 0'}}>First Arabic words · كلماتنا الأولى</h1><div className="card pad" dir="rtl"><h2>مرحباً — Hello</h2><p style={{margin: '24px 0'}}>نستخدم «مرحباً» عندما نحيّي أصدقاءنا.</p><h2>شكراً — Thank you</h2><p style={{margin: '24px 0'}}>نستخدم «شكراً» للتعبير عن الامتنان.</p><p>ارجع إلى صفحة الدروس وجرب الاختبار.</p></div></main>; }

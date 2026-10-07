@@ -145,6 +145,9 @@ async function setupConnection(conn: WebSocket, req: IncomingMessage, actor: { i
   // The y-websocket client connects to `<server>/<roomName>` — pull the room
   // name straight out of the path.
   const roomName = decodeURIComponent((req.url ?? '/').slice(1).split('?')[0]) || 'default';
+  const courseId = roomName.replace(/^whiteboard-/, '');
+  const stored = await prisma.drawingPermission.findUnique({ where: { courseId_userId: { courseId, userId: actor.id } } });
+  if (actor.role !== 'TEACHER') setDrawingPermission(courseId, actor.id, !!stored);
   const room = await getRoom(roomName);
   clearTimeout(room.cleanupTimer);
 
@@ -190,6 +193,14 @@ async function setupConnection(conn: WebSocket, req: IncomingMessage, actor: { i
   encoding.writeVarUint(syncEncoder, MESSAGE_SYNC);
   syncProtocol.writeSyncStep1(syncEncoder, room.doc);
   send(room, conn, encoding.toUint8Array(syncEncoder));
+
+  // Loading the persisted board is asynchronous. A browser may send its first
+  // sync request before the connection handler is ready; send a full step 2 as
+  // well so every new participant can complete synchronization immediately.
+  const initialState = encoding.createEncoder();
+  encoding.writeVarUint(initialState, MESSAGE_SYNC);
+  syncProtocol.writeSyncStep2(initialState, room.doc);
+  send(room, conn, encoding.toUint8Array(initialState));
 
   // Also send everyone's current awareness state (who else is in the room).
   const states = room.awareness.getStates();

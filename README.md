@@ -67,3 +67,17 @@ Configure provider callbacks:
 6. Review mobile layout and the parent report with the client, then authorize final hosting and production credentials.
 
 Current purchase model is **one-time course enrollment**, not recurring monthly plans. Classroom recordings, certificates, automated weekly email reports and social login are not offered by this version. Marketing copy does not advertise them.
+
+### Classroom and collaborative board verification
+
+The course lessons page now links to `/courses/<courseId>/board`, an authenticated board that works outside a call. Teacher and authorized students share independent drawing objects, so concurrent additions survive. Undo affects the participant's own edits; erasing removes objects; the board can be exported as PNG. Drawing pauses while disconnected. Legacy saved boards migrate on the teacher's next connection.
+
+`npm run test:e2e` includes a two-browser board test (desktop teacher, mobile student). A separate real-media test is available with an official local LiveKit server:
+
+```bash
+LIVEKIT_SERVER_BINARY=/absolute/path/livekit-server npm run test:classroom
+```
+
+Build the web app first. This starts an isolated database, API, LiveKit and two browser participants, using generated camera/audio tracks. The host must permit normal WebRTC networking and network-interface discovery. In the current execution environment LiveKit stops with `route ip+net: netlinkrib: operation not permitted`, so the real-media test is **not passed**. It remains a handover prerequisite on a suitable staging host and real devices.
+
+LiveKit room names are unique per scheduled class (`class-<sessionId>`). Shared material, PDF page and drawing grants are stored in PostgreSQL; late joiners and reconnecting users retrieve the current state. Apply the new `20261007190000_classroom_state` migration before deploying this code. The owner-private phone preview uses a separate single-user drawing demo and does not verify the production LiveKit/WebSocket integration.

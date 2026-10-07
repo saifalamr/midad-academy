@@ -19,7 +19,8 @@
     "preview:web": "npm run dev -w @arabic-platform/web",
     "test:api": "node --env-file=.env.preview --import tsx --test tests/api.test.ts",
     "test:e2e": "node scripts/preview.mjs --test",
-    "preview": "node scripts/preview.mjs"
+    "preview": "node scripts/preview.mjs",
+    "test:classroom": "node scripts/preview.mjs --classroom"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

@@ -64,12 +64,13 @@ export async function buildApp() {
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         await request.jwtVerify();
-        const user = await prisma.user.findUnique({ where: { id: request.user.id } });
-        if (!user || user.role !== request.user.role || user.tokenVersion !== (request.user.version ?? 0)) {
-          return void reply.status(401).send({ error: 'Your session has expired. Please log in again.' });
-        }
       } catch {
-        reply.status(401).send({ error: 'Unauthorized — invalid or missing token' });
+        return void reply.status(401).send({ error: 'Unauthorized — invalid or missing token' });
+      }
+      // A database outage is a server error, not a reason to invalidate a valid login.
+      const user = await prisma.user.findUnique({ where: { id: request.user.id } });
+      if (!user || user.role !== request.user.role || user.tokenVersion !== (request.user.version ?? 0)) {
+        return void reply.status(401).send({ error: 'Your session has expired. Please log in again.' });
       }
     }
   );

@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   LiveKitRoom,
+  PreJoin,
+  StartAudio,
+  type LocalUserChoices,
   useTracks,
   ParticipantTile,
   useLocalParticipant,
@@ -48,13 +51,18 @@ type CourseContentItem = { id: string; title: string; type: string; contentUrl: 
 type ShareTab = 'content' | 'url' | 'html';
 
 function getYouTubeId(url: string): string | null {
-  const match = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
-  return match ? match[1] : null;
+  try {
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+    const host = parsed.hostname.replace(/^www\./, '');
+    const id = host === 'youtu.be' ? parsed.pathname.slice(1) : ['youtube.com', 'm.youtube.com'].includes(host) ? (parsed.searchParams.get('v') || parsed.pathname.split('/')[2]) : null;
+    return id && /^[\w-]{11}$/.test(id) ? id : null;
+  } catch { return null; }
 }
 
 function detectDocType(url: string): DocType {
   const clean = url.split('?')[0].toLowerCase();
-  if (/youtube\.com|youtu\.be/.test(url)) return 'youtube';
+  if (getYouTubeId(url)) return 'youtube';
   if (/\.(jpe?g|png|gif|webp|svg)$/.test(clean)) return 'image';
   if (/\.(mp4|webm|ogg|mov)$/.test(clean)) return 'video';
   return 'pdf';
@@ -73,16 +81,21 @@ function PdfViewer({ url, page, isTeacher, onPageChange }: {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
+    let cleanup: (() => void) | undefined;
     async function render() {
-      setLoading(true);
+      setLoading(true); setError('');
       const pdfjsLib = await import('pdfjs-dist');
       // pdfjs v4+ ships an ESM worker (.mjs). jsDelivr mirrors npm, so this
       // always resolves to the exact installed version's worker file.
       pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-      const pdf = await pdfjsLib.getDocument({ url }).promise;
+      const task = pdfjsLib.getDocument({ url });
+      cleanup = () => { void task.destroy(); };
+      if (cancelled) { cleanup(); return; }
+      const pdf = await task.promise;
       if (cancelled) return;
       setTotalPages(pdf.numPages);
       const pageObj = await pdf.getPage(Math.min(page, pdf.numPages));
@@ -96,12 +109,13 @@ function PdfViewer({ url, page, isTeacher, onPageChange }: {
       await pageObj.render({ canvas, canvasContext: ctx, viewport }).promise;
       setLoading(false);
     }
-    render().catch(console.error);
-    return () => { cancelled = true; };
+    render().catch(() => { if (!cancelled) { setLoading(false); setError('تعذر فتح الملف. تحقق من الرابط وإمكانية الوصول إليه.'); } });
+    return () => { cancelled = true; cleanup?.(); };
   }, [url, page]);
 
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, overflow: 'auto', padding: 12 }}>
+      {error && <p role="alert" style={{ color: '#f87171' }}>{error}</p>}
       {loading && <p style={{ color: '#8ea0bb', fontSize: 13 }}>Loading page {page}…</p>}
       <canvas ref={canvasRef} style={{ maxWidth: '100%', boxShadow: '0 4px 20px rgba(0,0,0,.3)', borderRadius: 8, display: loading ? 'none' : 'block' }} />
       {isTeacher && totalPages > 0 && (
@@ -137,6 +151,11 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
   const room = useRoomContext();
   const remoteParticipants = useRemoteParticipants();
   const participantCount = cameraTracks.length;
+  const [classError, setClassError] = useState('');
+  const [reconnecting, setReconnecting] = useState(false);
+  const screenTracks = useTracks([Track.Source.ScreenShare]);
+  const screenTrack = screenTracks.find(t => getRole(t) === 'teacher');
+  function publish(payload: Uint8Array) { void localParticipant.publishData(payload, { reliable: true }).catch(() => setClassError('تعذر إرسال التحديث. تحقق من الاتصال.')); }
 
   // ── Raise Hand ───────────────────────────────────────────────────────────
   const [raisedHands, setRaisedHands] = useState<RaisedHand[]>([]);
@@ -180,12 +199,52 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
   const [pdfPage, setPdfPage] = useState(1);
 
   // Reset zoom + PDF page whenever the shared content changes.
-  useEffect(() => { setZoom(1); setPdfPage(1); }, [sharedDoc?.url]);
+  useEffect(() => { setZoom(1); }, [sharedDoc?.url]);
+
+  const refreshSequence = useRef(0);
+  const refreshState = useCallback(async () => {
+    const sequence = ++refreshSequence.current;
+    try {
+      const res = await authFetch(`/api/sessions/state/${roomId}`);
+      if (!res.ok) throw new Error();
+      const { data } = await res.json();
+      if (sequence !== refreshSequence.current) return;
+      setSharedDoc(data.sharedDoc); setPdfPage(data.pdfPage);
+      setDrawPermission(data.canDraw); setPermittedStudents(new Set(data.permittedStudents));
+    } catch { setClassError('تعذر تحديث محتوى الحصة. أعد الاتصال.'); }
+  }, [roomId]);
+  useEffect(() => {
+    void refreshState();
+    const disconnected = (participant: RemoteParticipant) => setRaisedHands(prev => prev.filter(h => h.identity !== participant.identity));
+    const reconnect = () => setReconnecting(true);
+    const connected = () => { setReconnecting(false); void refreshState(); };
+    room.on(RoomEvent.RoomMetadataChanged, refreshState);
+    room.on(RoomEvent.Reconnecting, reconnect);
+    room.on(RoomEvent.Reconnected, connected);
+    room.on(RoomEvent.ParticipantDisconnected, disconnected);
+    return () => {
+      room.off(RoomEvent.RoomMetadataChanged, refreshState); room.off(RoomEvent.Reconnecting, reconnect);
+      room.off(RoomEvent.Reconnected, connected); room.off(RoomEvent.ParticipantDisconnected, disconnected);
+      // Invalidate outstanding requests when this room subscription ends.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      refreshSequence.current++;
+    };
+  }, [room, refreshState]);
+  async function saveState(body: { sharedDoc?: SharedDoc | null; pdfPage?: number }) {
+    try {
+      const res = await authFetch(`/api/sessions/state/${roomId}`, { method: 'PATCH', body: JSON.stringify(body) });
+      if (!res.ok) { const json = await res.json(); throw new Error(json.error || 'تعذر حفظ محتوى الحصة'); }
+      await refreshState();
+      publish(new TextEncoder().encode(JSON.stringify({ type: 'state-changed' })));
+      return true;
+    } catch (error) { setClassError(error instanceof Error ? error.message : 'تعذر حفظ محتوى الحصة'); return false; }
+  }
 
   // ── Data channel: receive raise-hand, draw-permission, reaction, doc-share, pdf-page ───
   useEffect(() => {
     const onData = (payload: Uint8Array, sender?: RemoteParticipant) => {
       try {
+        if (payload.byteLength > 40000) return;
         const msg = JSON.parse(new TextDecoder().decode(payload)) as {
           type: string;
           identity: string;
@@ -200,7 +259,8 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
 
         let senderRole = '';
         try { senderRole = JSON.parse(sender?.metadata ?? '{}').role; } catch {}
-        if (['draw-permission', 'share-doc', 'stop-share', 'pdf-page'].includes(msg.type) && senderRole !== 'teacher') return;
+        if (['draw-permission', 'share-doc', 'stop-share', 'pdf-page', 'state-changed'].includes(msg.type) && senderRole !== 'teacher') return;
+        if (msg.type === 'state-changed' || msg.type === 'draw-permission') { void refreshState(); return; }
         if (msg.type === 'raise-hand') {
           if (!sender || msg.identity !== sender.identity) return;
           setRaisedHands((prev) =>
@@ -208,27 +268,15 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
               ? prev
               : [...prev, { identity: msg.identity, name: msg.name ?? msg.identity }],
           );
-        } else if (msg.type === 'draw-permission' && msg.identity === localParticipant.identity) {
-          setDrawPermission(msg.canDraw ?? false);
         } else if (msg.type === 'reaction') {
-          addReaction(msg.emoji ?? '👍');
-        } else if (msg.type === 'share-doc') {
-          if (msg.docType === 'html') {
-            setSharedDoc({ url: '', name: msg.name ?? 'Interactive Lesson', docType: 'html', htmlContent: msg.htmlContent ?? '' });
-          } else if (msg.url) {
-            setSharedDoc({ url: msg.url, name: msg.name ?? 'Document', docType: msg.docType ?? 'pdf' });
-          }
-        } else if (msg.type === 'stop-share') {
-          setSharedDoc(null);
-        } else if (msg.type === 'pdf-page' && typeof msg.page === 'number') {
-          setPdfPage(msg.page);
+          if (sender && ['👍', '❤️', '👏', '🎉'].includes(msg.emoji ?? '')) addReaction(msg.emoji!);
         }
       } catch { /* malformed message — ignore */ }
     };
 
     room.on(RoomEvent.DataReceived, onData);
     return () => { room.off(RoomEvent.DataReceived, onData); };
-  }, [room, localParticipant.identity, addReaction]);
+  }, [room, localParticipant.identity, addReaction, refreshState]);
 
   // Preload the teacher's course content so the shared-materials dock is populated.
   useEffect(() => {
@@ -259,25 +307,14 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
       .catch(() => {});
   }
 
-  function shareDocument(url: string, name: string, docType: DocType, html = '') {
-    const payload = new TextEncoder().encode(
-      JSON.stringify({
-        type: 'share-doc',
-        identity: localParticipant.identity,
-        url,
-        name,
-        docType,
-        ...(docType === 'html' ? { htmlContent: html } : {}),
-      }),
-    );
-    localParticipant.publishData(payload, { reliable: true });
-    setSharedDoc({ url, name, docType, ...(docType === 'html' ? { htmlContent: html } : {}) });
-    setShowShareModal(false);
+  async function shareDocument(url: string, name: string, docType: DocType, html = '') {
+    const ok = await saveState({ sharedDoc: { url, name, docType, ...(docType === 'html' ? { htmlContent: html } : {}) }, pdfPage: 1 });
+    if (ok) setShowShareModal(false);
   }
 
   function handleShareUrl() {
     const url = manualUrl.trim();
-    if (!url) { setShareError('Enter a document or image URL'); return; }
+    try { if (!['http:', 'https:'].includes(new URL(url).protocol)) throw new Error(); } catch { setShareError('اكتب رابط HTTP أو HTTPS صالحًا'); return; }
     shareDocument(url, manualName.trim() || 'Document', detectDocType(url));
   }
 
@@ -286,30 +323,15 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
     shareDocument('', manualName.trim() || 'Interactive Lesson', 'html', htmlContent);
   }
 
-  function stopSharing() {
-    const payload = new TextEncoder().encode(
-      JSON.stringify({ type: 'stop-share', identity: localParticipant.identity }),
-    );
-    localParticipant.publishData(payload, { reliable: true });
-    setSharedDoc(null);
-  }
-
-  // ── PDF page navigation: teacher changes the page and broadcasts to all ───
-  function goPdfPage(page: number) {
-    const next = Math.max(1, page);
-    setPdfPage(next);
-    const payload = new TextEncoder().encode(
-      JSON.stringify({ type: 'pdf-page', identity: localParticipant.identity, page: next }),
-    );
-    localParticipant.publishData(payload, { reliable: true });
-  }
+  function stopSharing() { void saveState({ sharedDoc: null, pdfPage: 1 }); }
+  function goPdfPage(page: number) { void saveState({ pdfPage: Math.max(1, page) }); }
 
   // ── Emoji reaction: broadcast to all, also show locally ──────────────────
   function handleReaction(emoji: string) {
     const payload = new TextEncoder().encode(
       JSON.stringify({ type: 'reaction', identity: localParticipant.identity, emoji }),
     );
-    localParticipant.publishData(payload, { reliable: true });
+    publish(payload);
     addReaction(emoji); // show on the sender's screen immediately
   }
 
@@ -322,28 +344,27 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
         name: localParticipant.name ?? localParticipant.identity,
       }),
     );
-    localParticipant.publishData(payload, { reliable: true });
+    publish(payload);
   }
 
   // ── Drawing Permission: teacher sends targeted grant / revoke ─────────────
   async function sendDrawPermission(identity: string, grant: boolean) {
     const res = await authFetch('/api/sessions/drawing-permission', { method: 'POST', body: JSON.stringify({ roomName: roomId, studentId: identity, canDraw: grant }) });
-    if (!res.ok) return;
+    if (!res.ok) { setClassError('تعذر تغيير صلاحية الرسم'); return; }
+    await refreshState();
     const payload = new TextEncoder().encode(
       JSON.stringify({ type: 'draw-permission', identity, canDraw: grant }),
     );
-    localParticipant.publishData(payload, { reliable: true });
+    publish(payload);
   }
 
   function grantDraw(identity: string) {
-    setPermittedStudents((prev) => new Set([...prev, identity]));
-    sendDrawPermission(identity, true);
+    void sendDrawPermission(identity, true).catch(() => setClassError('تعذر تغيير صلاحية الرسم'));
     setShowPermPicker(false);
   }
 
   function revokeDraw(identity: string) {
-    setPermittedStudents((prev) => { const s = new Set(prev); s.delete(identity); return s; });
-    sendDrawPermission(identity, false);
+    void sendDrawPermission(identity, false).catch(() => setClassError('تعذر تغيير صلاحية الرسم'));
   }
 
   // ── Derived view helpers ──────────────────────────────────────────────────
@@ -521,7 +542,10 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
             <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M4 4l7.07 16.97 2.51-7.39 7.39-2.51z"/></svg>
           </button>
           <span className="wb-sep"></span>
-          <button className="wb-tool" title="Clear board" onClick={() => whiteboardRef.current?.clear()}>
+          <button className="wb-tool" title="تراجع" aria-label="تراجع" onClick={() => whiteboardRef.current?.undo()}>↶</button>
+          <button className="wb-tool" title="إعادة" aria-label="إعادة" onClick={() => whiteboardRef.current?.redo()}>↷</button>
+          <button className="wb-tool" title="حفظ صورة السبورة" aria-label="حفظ صورة السبورة" onClick={() => whiteboardRef.current?.exportImage()}>⇩</button>
+          <button className="wb-tool" title="Clear board" onClick={() => { if (window.confirm('مسح جميع الرسومات؟ يمكنك التراجع بعد المسح.')) whiteboardRef.current?.clear(); }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
           </button>
         </div>
@@ -692,11 +716,16 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
         </div>
       </div>
 
+      {screenTrack && <div style={{ position: 'fixed', inset: '10% 10% 20%', zIndex: 30, background: '#101e34' }}><ParticipantTile trackRef={screenTrack} style={{ height: '100%' }} /></div>}
+      {reconnecting && <div role="status" style={{ color: '#fbbf24', textAlign: 'center' }}>نعيد الاتصال بالحصة…</div>}
+      {classError && <div role="alert" style={{ color: '#f87171', textAlign: 'center' }}>{classError} <button onClick={() => setClassError('')}>إغلاق</button></div>}
+      <StartAudio label="تشغيل صوت الحصة" />
       {/* ── Room controls ── */}
       <div className="room-controls">
+        {isTeacher && <button className="rc-btn" onClick={() => { void localParticipant.setScreenShareEnabled(!localParticipant.isScreenShareEnabled).catch(() => setClassError('تعذر مشاركة الشاشة. قد لا يدعمها متصفح الجوال.')); }}>🖥 مشاركة الشاشة</button>}
         <button
           className="rc-btn"
-          onClick={() => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
+          onClick={() => { void localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled).catch(() => setClassError('تعذر تشغيل الميكروفون. تحقق من إذن المتصفح والجهاز.')); }}
         >
           <span className="rci">{isMicrophoneEnabled ? '🎤' : '🔇'}</span>
           <span>{isMicrophoneEnabled ? 'Mute' : 'Unmute'}</span>
@@ -704,7 +733,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
 
         <button
           className="rc-btn"
-          onClick={() => localParticipant.setCameraEnabled(!isCameraEnabled)}
+          onClick={() => { void localParticipant.setCameraEnabled(!isCameraEnabled).catch(() => setClassError('تعذر تشغيل الكاميرا. تحقق من إذن المتصفح والجهاز.')); }}
         >
           <span className="rci">{isCameraEnabled ? '📷' : '📵'}</span>
           <span>{isCameraEnabled ? 'Stop Video' : 'Start Video'}</span>
@@ -864,9 +893,11 @@ export default function ClassroomPage() {
   const [token, setToken] = useState<string | null>(null);
   const [role, setRole] = useState<string | null>(null);
   const [livekitUrl, setLivekitUrl] = useState('');
+  const [choices, setChoices] = useState<LocalUserChoices | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (!choices) return;
     const appToken = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
 
 
@@ -908,7 +939,7 @@ export default function ClassroomPage() {
         console.error('[Classroom] Fetch failed:', err);
         setError('Could not connect to server');
       });
-  }, [roomId, router]);
+  }, [roomId, router, choices]);
 
   function handleLeave() {
     const appToken = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
@@ -935,6 +966,12 @@ export default function ClassroomPage() {
     );
   }
 
+  if (!choices) return <div className="midad" style={{ minHeight: '100vh', background: '#101e34', color: '#fff', padding: 24 }}>
+    <h1 dir="rtl" style={{ textAlign: 'center' }}>تجهيز الكاميرا والميكروفون قبل الحصة</h1>
+    <PreJoin onSubmit={setChoices} persistUserChoices={false} joinLabel="دخول الحصة" defaults={{ username: 'مشارك', audioEnabled: false, videoEnabled: false }} />
+    <p dir="rtl" style={{ textAlign: 'center' }}>اختر الأجهزة أو ادخل والصوت والكاميرا مغلقان، ثم شغّلهما داخل الحصة.</p>
+  </div>;
+
   if (!token) {
     return (
       <div className="midad room" style={{ alignItems: 'center', justifyContent: 'center' }}>
@@ -951,8 +988,8 @@ export default function ClassroomPage() {
       serverUrl={livekitUrl}
       token={token}
       connect
-      video={false}
-      audio={false}
+      video={choices.videoEnabled ? { deviceId: choices.videoDeviceId } : false}
+      audio={choices.audioEnabled ? { deviceId: choices.audioDeviceId } : false}
       onDisconnected={handleLeave}
       onError={() => setError("The classroom connection failed. Check your connection and try again.")}
       style={{ height: '100vh' }}

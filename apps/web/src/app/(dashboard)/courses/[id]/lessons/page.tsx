@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import { API_URL } from '@/lib/config';
 
@@ -85,6 +86,7 @@ export default function CourseLessonsPage() {
 
   const [lessons, setLessons] = useState<LessonItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   const [activeQuiz, setActiveQuiz] = useState<Quiz | null>(null);
   const [quizLoading, setQuizLoading] = useState(false);
@@ -98,9 +100,10 @@ export default function CourseLessonsPage() {
       .then(async (res) => {
         if (res.status === 401) { router.push('/login'); return; }
         const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'تعذر تحميل الدروس');
         setLessons(json.data ?? []);
       })
-      .catch(() => {})
+      .catch(() => setLoadError('تعذر تحميل الدروس. تحقق من اتصالك وصلاحية التسجيل في الدورة.'))
       .finally(() => setLoading(false));
   }, [courseId, router]);
 
@@ -156,6 +159,8 @@ export default function CourseLessonsPage() {
           ← Back to dashboard
         </button>
 
+        <Link className="btn btn-sm btn-outline" href={`/courses/${courseId}/board`} style={{ marginBottom: 16 }}>✏️ سبورة الدورة</Link>
+
         <div className="page-head" style={{ marginBottom: 24 }}>
           <div>
             <h1 className="dh-title">Course Lessons</h1>
@@ -163,6 +168,7 @@ export default function CourseLessonsPage() {
           </div>
         </div>
 
+        {loadError && <p role="alert">{loadError}</p>}
         {loading ? (
           <div className="card pad" style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14 }}>
             Loading lessons…

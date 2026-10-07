@@ -2,7 +2,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import Stripe from 'stripe';
-import { AccessToken } from 'livekit-server-sdk';
+import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
 import { WebSocket } from 'ws';
 import * as Y from 'yjs';
 import * as encoding from 'lib0/encoding';
@@ -13,6 +13,12 @@ import type { FastifyInstance } from 'fastify';
 process.env.NODE_ENV = 'test';
 process.env.STRIPE_SECRET_KEY = 'sk_test_preview';
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_preview';
+process.env.LIVEKIT_URL = 'ws://127.0.0.1:7880';
+// Provider-independent API tests; real media is covered by the separate classroom test.
+RoomServiceClient.prototype.createRoom = async () => ({} as any);
+RoomServiceClient.prototype.listRooms = async names => (names ?? []).map(name => ({ name } as any));
+RoomServiceClient.prototype.deleteRoom = async () => {};
+RoomServiceClient.prototype.updateRoomMetadata = async () => ({} as any);
 process.env.LIVEKIT_API_KEY = 'preview-key';
 process.env.LIVEKIT_API_SECRET = 'preview-secret-at-least-32-characters';
 let app: FastifyInstance; let prisma: any; let local: any; let whiteboard: any;
@@ -98,7 +104,7 @@ test('classroom creation is restricted and actual signed attendance is recorded 
   const scheduled = await call('POST', '/api/sessions/schedule', 'teacher', { courseId: freeId, title: 'First live class', scheduledAt: new Date().toISOString(), durationMinutes: 30 });
   assert.equal(scheduled.statusCode, 201, scheduled.body); sessionId = scheduled.json().data.id;
   assert.equal((await call('PATCH', `/api/sessions/${sessionId}/start`, 'teacher', {})).statusCode, 200);
-  const payload = JSON.stringify({ event: 'participant_joined', room: { name: freeId }, participant: { identity: actors.student.id } });
+  const payload = JSON.stringify({ event: 'participant_joined', room: { name: `class-${sessionId}` }, participant: { identity: actors.student.id } });
   const token = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET); token.sha256 = createHash('sha256').update(payload).digest('base64');
   const auth = await token.toJwt();
   const send = () => app.inject({ method: 'POST', url: '/api/sessions/webhook', payload, headers: { 'content-type': 'application/webhook+json', authorization: auth } });
@@ -149,4 +155,30 @@ test('whiteboard rejects unauthorized viewers, blocks student edits and persists
   const restored = new Y.Doc(); Y.applyUpdate(restored, saved.state);
   assert.equal(restored.getMap('drawing').get('allowed'), true);
   assert.equal(restored.getMap('drawing').get('blocked'), undefined); restored.destroy();
+});
+
+
+test('shared material and drawing grants survive re-entry and only the course teacher can change them', async () => {
+  const path = `/api/sessions/state/${freeId}`;
+  assert.equal((await call('GET', path, 'outsider')).statusCode, 401);
+  assert.equal((await call('PATCH', path, 'student', { pdfPage: 2 })).statusCode, 403);
+  assert.equal((await call('PATCH', path, 'otherTeacher', { pdfPage: 2 })).statusCode, 403);
+  assert.equal((await call('PATCH', path, 'teacher', { sharedDoc: { url: 'javascript:alert(1)', name: 'Invalid', docType: 'pdf' } })).statusCode, 400);
+  assert.equal((await call('PATCH', path, 'teacher', { sharedDoc: { url: 'https://example.com/lesson.pdf', name: 'درس', docType: 'pdf' }, pdfPage: 3 })).statusCode, 200);
+  const state = (await call('GET', path, 'student')).json().data;
+  assert.equal(state.pdfPage, 3); assert.equal(state.sharedDoc.name, 'درس'); assert.equal(state.canDraw, false);
+  assert.equal((await call('POST', '/api/sessions/drawing-permission', 'teacher', { roomName: freeId, studentId: actors.student.id, canDraw: true })).statusCode, 200);
+  assert.equal((await call('GET', path, 'student')).json().data.canDraw, true);
+  assert.equal((await call('POST', '/api/sessions/drawing-permission', 'teacher', { roomName: freeId, studentId: actors.student.id, canDraw: false })).statusCode, 200);
+  assert.equal((await call('GET', path, 'student')).json().data.canDraw, false);
+});
+
+test('a delayed room-finished webhook cannot close a later class in the same course', async () => {
+  const teacher = await prisma.teacherProfile.findUnique({ where: { userId: actors.teacher.id } });
+  const later = await prisma.classSession.create({ data: { courseId: freeId, teacherId: teacher.id, title: 'Later class', scheduledAt: new Date(), status: 'LIVE', liveKitRoomId: 'class-later' } });
+  const payload = JSON.stringify({ event: 'room_finished', room: { name: `class-${sessionId}` } });
+  const token = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET);
+  token.sha256 = createHash('sha256').update(payload).digest('base64');
+  assert.equal((await app.inject({ method: 'POST', url: '/api/sessions/webhook', headers: { 'content-type': 'application/webhook+json', authorization: await token.toJwt() }, payload })).statusCode, 200);
+  assert.equal((await prisma.classSession.findUnique({ where: { id: later.id } })).status, 'LIVE');
 });

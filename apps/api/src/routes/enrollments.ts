@@ -95,6 +95,8 @@ export async function enrollmentRoutes(app: FastifyInstance) {
       }
     }
 
+    const liveSessions = await prisma.classSession.findMany({ where: { courseId: { in: enrollments.map(e => e.courseId) }, status: 'LIVE' }, select: { courseId: true, liveKitRoomId: true } });
+    const liveCourses = new Set(liveSessions.filter(s => s.liveKitRoomId && liveRoomNames.has(s.liveKitRoomId)).map(s => s.courseId));
     return reply.send({
       data: enrollments.map((e) => ({
         id: e.id,
@@ -107,7 +109,7 @@ export async function enrollmentRoutes(app: FastifyInstance) {
           currency: e.course.currency,
           teacherName: e.course.teacher.user.name,
         },
-        isLive: liveRoomNames.has(e.course.id),
+        isLive: liveCourses.has(e.course.id),
       })),
     });
   });
