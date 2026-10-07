@@ -160,7 +160,7 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
 
     // ── Yjs sync ────────────────────────────────────────────────────────────
     const ydoc     = new Y.Doc();
-    const provider = new WebsocketProvider(getWhiteboardWsUrl(), `whiteboard-${roomId}`, ydoc);
+    const provider = new WebsocketProvider(getWhiteboardWsUrl(), `whiteboard-${roomId}`, ydoc, { params: { token: (localStorage.getItem('token') ?? sessionStorage.getItem('token')) ?? '' } });
     const state    = ydoc.getMap<string>('state');
 
     provider.on('status', ({ status }: { status: string }) =>

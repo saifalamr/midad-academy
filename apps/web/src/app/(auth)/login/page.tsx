@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -32,7 +33,8 @@ export default function LoginPage() {
         return;
       }
 
-      localStorage.setItem('token', json.data.token);
+      localStorage.removeItem('token'); sessionStorage.removeItem('token');
+      (remember ? localStorage : sessionStorage).setItem('token', json.data.token);
 
       const role: string = json.data.user?.role?.toLowerCase() ?? '';
       if (role === 'teacher') router.push('/teacher');
@@ -58,13 +60,7 @@ export default function LoginPage() {
           <h2 className="auth-head">Welcome back to the academy.</h2>
           <p className="ar auth-head-ar">أهلاً بعودتك إلى مداد</p>
           <p className="auth-side-p">Pick up right where you left off — your classes, progress and badges are waiting.</p>
-          <div className="card-glass auth-quote">
-            <p>&ldquo;My daughter asks to log in every single day. The teachers are wonderful.&rdquo;</p>
-            <div className="aq-by">
-              <span className="avatar" style={{ width: 34, height: 34 }}>ر</span>
-              Rana · Parent of 2
-            </div>
-          </div>
+          <div className="card-glass auth-quote"><p>Learn, practise and follow your progress — one lesson at a time.</p></div>
         </div>
 
         <div className="auth-side-foot">© 2026 Midad Academy</div>
@@ -125,9 +121,9 @@ export default function LoginPage() {
 
             <div className="auth-row">
               <label className="check">
-                <input type="checkbox" defaultChecked /> Remember me
+                <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> Remember me
               </label>
-              <span className="link-gold" style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">Forgot password?</span>
+              <Link className="link-gold" href="/forgot-password">Forgot password?</Link>
             </div>
 
             <button
@@ -140,11 +136,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="auth-or"><span>or continue with</span></div>
-          <div className="auth-social">
-            <button className="social-btn" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">Google</button>
-            <button className="social-btn" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">Apple</button>
-          </div>
+
         </div>
       </div>
 

@@ -2,20 +2,27 @@ import type { FastifyInstance } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
+import nodemailer from 'nodemailer';
+import { config } from '../config';
+
+const emailSchema = z.string().trim().toLowerCase().email();
+const tokenHash = (value: string) => createHash('sha256').update(value).digest('hex');
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Invalid email address'),
+  email: emailSchema,
   // Accept any case, normalise to uppercase to match Prisma enum
   role: z
     .string()
     .transform((r) => r.toUpperCase())
     .pipe(z.enum(['TEACHER', 'STUDENT', 'PARENT'])),
   password: z.string().min(8, 'Password must be at least 8 characters'),
+  inviteCode: z.string().optional(),
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: emailSchema,
   password: z.string().min(1),
 });
 
@@ -34,6 +41,11 @@ export async function authRoutes(app: FastifyInstance) {
   // Creates a User + the matching role profile in one Prisma nested write.
   app.post('/register', async (request, reply) => {
     const body = registerSchema.parse(request.body);
+
+    if (body.role === 'TEACHER' && (!config.TEACHER_INVITE_CODE || !body.inviteCode ||
+      !timingSafeEqual(Buffer.from(tokenHash(body.inviteCode)), Buffer.from(tokenHash(config.TEACHER_INVITE_CODE))))) {
+      return reply.status(403).send({ error: 'A teacher invitation code is required' });
+    }
 
     const existing = await prisma.user.findUnique({ where: { email: body.email } });
     if (existing) {
@@ -83,7 +95,7 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.status(401).send({ error: 'Invalid credentials' });
     }
 
-    const token = app.jwt.sign({ id: user.id, email: user.email, role: user.role });
+    const token = app.jwt.sign({ id: user.id, email: user.email, role: user.role, name: user.name, version: user.tokenVersion });
 
     return reply.send({
       data: {
@@ -118,4 +130,44 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.send({ data: user });
     }
   );
+
+  app.post('/forgot-password', { config: { rateLimit: { max: 5, timeWindow: '15 minutes' } } }, async (request, reply) => {
+    const { email } = z.object({ email: emailSchema }).parse(request.body);
+    if (!config.SMTP_HOST || !config.MAIL_FROM) return reply.status(503).send({ error: 'Email delivery is not configured. Contact the academy for help.' });
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (user) {
+      const token = randomBytes(32).toString('hex');
+      await prisma.$transaction([
+        prisma.passwordReset.deleteMany({ where: { userId: user.id } }),
+        prisma.passwordReset.create({ data: { userId: user.id, tokenHash: tokenHash(token), expiresAt: new Date(Date.now() + 30 * 60_000) } }),
+      ]);
+      const url = `${config.FRONTEND_URL}/reset-password?token=${token}`;
+      try {
+        await nodemailer.createTransport({
+          host: config.SMTP_HOST, port: config.SMTP_PORT, secure: config.SMTP_PORT === 465,
+          ...(config.SMTP_USER ? { auth: { user: config.SMTP_USER, pass: config.SMTP_PASSWORD } } : {}),
+        }).sendMail({ from: config.MAIL_FROM, to: user.email, subject: 'Reset your Midad Academy password',
+          text: `Reset your password using this link (valid for 30 minutes):\n${url}\nIf you did not request this, ignore this email.` });
+      } catch {
+        request.log.error('Password reset email delivery failed');
+      }
+    }
+    return reply.send({ message: 'If this email is registered, a password reset link will be sent.' });
+  });
+
+  app.post('/reset-password', { config: { rateLimit: { max: 10, timeWindow: '15 minutes' } } }, async (request, reply) => {
+    const { token, password } = z.object({ token: z.string().length(64), password: z.string().min(8).max(128) }).parse(request.body);
+    const hash = await bcrypt.hash(password, 10);
+    const changed = await prisma.$transaction(async (tx) => {
+      const reset = await tx.passwordReset.findUnique({ where: { tokenHash: tokenHash(token) } });
+      if (!reset || reset.expiresAt <= new Date()) return false;
+      const claimed = await tx.passwordReset.deleteMany({ where: { id: reset.id, expiresAt: { gt: new Date() } } });
+      if (!claimed.count) return false;
+      await tx.user.update({ where: { id: reset.userId }, data: { passwordHash: hash, tokenVersion: { increment: 1 } } });
+      await tx.passwordReset.deleteMany({ where: { userId: reset.userId } });
+      return true;
+    });
+    if (!changed) return reply.status(400).send({ error: 'This reset link is invalid or expired' });
+    return reply.send({ message: 'Password updated. Log in with your new password.' });
+  });
 }

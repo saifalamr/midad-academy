@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { canAccessCourse } from '../lib/access';
 
 const createCourseSchema = z.object({
   title: z.string().min(2, 'Title must be at least 2 characters'),
@@ -13,7 +14,7 @@ const createContentSchema = z.object({
   title: z.string().min(2, 'Title must be at least 2 characters'),
   description: z.string().min(1, 'Description is required'),
   type: z.enum(['VIDEO', 'PDF', 'EXERCISE']),
-  contentUrl: z.string().min(1, 'Content URL is required'),
+  contentUrl: z.string().url().refine((url) => /^https?:\/\//.test(url), 'Use an HTTP or HTTPS URL'),
   duration: z.number().int().min(0, 'Duration must be 0 or more'),
 });
 
@@ -113,6 +114,8 @@ export async function courseRoutes(app: FastifyInstance) {
   // Returns all content items for a course, ordered for display.
   app.get<{ Params: { id: string } }>('/:id/lessons', { preHandler: [app.authenticate] }, async (request, reply) => {
     const { id: courseId } = request.params;
+
+    if (!await canAccessCourse(request.user, courseId)) return reply.status(403).send({ error: 'Enroll in this course to access its lessons' });
 
     const content = await prisma.courseContent.findMany({
       where: { courseId },

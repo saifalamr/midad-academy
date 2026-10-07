@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { awardQuiz } from '../lib/rewards';
 
 const gradeAnswerSchema = z.object({
   pointsAwarded: z.number().int().min(0),
@@ -8,6 +9,12 @@ const gradeAnswerSchema = z.object({
 });
 
 export async function teacherRoutes(app: FastifyInstance) {
+  app.get('/students', { preHandler: [app.authenticate] }, async (request, reply) => {
+    if (request.user.role !== 'TEACHER') return reply.status(403).send({ error: 'Only teachers can view enrolled students' });
+    const enrollments = await prisma.enrollment.findMany({ where: { course: { teacher: { userId: request.user.id } }, status: 'ACTIVE' },
+      select: { id: true, enrolledAt: true, course: { select: { title: true } }, student: { select: { user: { select: { name: true, email: true } }, level: true, totalPoints: true } } }, orderBy: { enrolledAt: 'desc' } });
+    return { data: enrollments.map((e) => ({ id: e.id, name: e.student.user.name, email: e.student.user.email, courseTitle: e.course.title, level: e.student.level, totalPoints: e.student.totalPoints, enrolledAt: e.enrolledAt })) };
+  });
   // ── GET /api/teacher/pending-reviews ──────────────────────────────────────
   // Lists all written answers awaiting grading across the teacher's courses.
   app.get('/pending-reviews', { preHandler: [app.authenticate] }, async (request, reply) => {
@@ -75,12 +82,16 @@ export async function teacherRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Answer not found' });
     }
 
+    if (answer.question.questionType !== 'WRITTEN') return reply.status(400).send({ error: 'Only written answers can be manually graded' });
     const body = gradeAnswerSchema.parse(request.body);
     if (body.pointsAwarded > answer.question.points) {
       return reply.status(400).send({ error: `pointsAwarded cannot exceed question points (${answer.question.points})` });
     }
 
-    await prisma.studentAnswer.update({
+    const updatedResult = await prisma.$transaction(async (tx) => {
+      // Serialize grading for an attempt so concurrent answers cannot leave stale totals.
+      await tx.$queryRaw`SELECT id FROM "StudentQuizResult" WHERE id = ${answer.resultId} FOR UPDATE`;
+    await tx.studentAnswer.update({
       where: { id: answerId },
       data: {
         status: 'GRADED',
@@ -91,7 +102,7 @@ export async function teacherRoutes(app: FastifyInstance) {
     });
 
     // Recompute the parent result once all answers for this attempt are graded.
-    const allAnswers = await prisma.studentAnswer.findMany({
+    const allAnswers = await tx.studentAnswer.findMany({
       where: { resultId: answer.resultId },
       include: { question: true },
     });
@@ -102,7 +113,7 @@ export async function teacherRoutes(app: FastifyInstance) {
     const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
     const quiz = answer.question.quiz;
 
-    const updatedResult = await prisma.studentQuizResult.update({
+    return await tx.studentQuizResult.update({
       where: { id: answer.resultId },
       data: {
         score,
@@ -110,6 +121,10 @@ export async function teacherRoutes(app: FastifyInstance) {
         passed: !stillPending && score >= quiz.passingScore,
       },
     });
+
+    });
+
+    await awardQuiz(updatedResult.id);
 
     return reply.send({ data: updatedResult });
   });

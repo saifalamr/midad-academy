@@ -1,4 +1,8 @@
 import type { IncomingMessage, Server } from 'http';
+import type { FastifyInstance } from 'fastify';
+import type { Duplex } from 'node:stream';
+import { prisma } from './lib/prisma';
+import { canAccessCourse } from './lib/access';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as Y from 'yjs';
 import * as syncProtocol from 'y-protocols/sync';
@@ -22,24 +26,50 @@ interface Room {
   doc: Y.Doc;
   awareness: awarenessProtocol.Awareness;
   conns: Map<WebSocket, Set<number>>;
+  persist: Promise<unknown>;
+  saveTimer?: ReturnType<typeof setTimeout>;
+  cleanupTimer?: ReturnType<typeof setTimeout>;
 }
 
 const rooms = new Map<string, Room>();
+const loading = new Map<string, Promise<Room>>();
+const permissions = new Map<string, Set<string>>();
+export function setDrawingPermission(courseId: string, userId: string, allowed: boolean) {
+  const grants = permissions.get(courseId) ?? new Set<string>();
+  if (allowed) grants.add(userId); else grants.delete(userId);
+  permissions.set(courseId, grants);
+}
 
-function getRoom(roomName: string): Room {
+function saveRoom(roomName: string, room: Room) {
+  const state = Buffer.from(Y.encodeStateAsUpdate(room.doc));
+  room.persist = room.persist.then(() => prisma.whiteboardDocument.upsert({ where: { courseId: roomName.replace(/^whiteboard-/, '') }, create: { courseId: roomName.replace(/^whiteboard-/, ''), state }, update: { state } })).catch((err) => { console.error('Whiteboard save failed:', err.message); });
+}
+
+async function getRoom(roomName: string): Promise<Room> {
+  if (loading.has(roomName)) return loading.get(roomName)!;
+  const promise = loadRoom(roomName);
+  loading.set(roomName, promise);
+  try { return await promise; } finally { loading.delete(roomName); }
+}
+
+async function loadRoom(roomName: string): Promise<Room> {
   let room = rooms.get(roomName);
   if (room) return room;
 
   const doc = new Y.Doc();
+  const saved = await prisma.whiteboardDocument.findUnique({ where: { courseId: roomName.replace(/^whiteboard-/, '') } });
+  if (saved) Y.applyUpdate(doc, saved.state);
   const awareness = new awarenessProtocol.Awareness(doc);
   awareness.setLocalState(null);
   const conns = new Map<WebSocket, Set<number>>();
-  room = { doc, awareness, conns };
+  room = { doc, awareness, conns, persist: Promise.resolve() };
   rooms.set(roomName, room);
 
   // Whenever the shared document changes (a teacher draws something), encode
   // it as a sync update and broadcast it to every connected participant.
   doc.on('update', (update: Uint8Array) => {
+    clearTimeout(room!.saveTimer);
+    room!.saveTimer = setTimeout(() => saveRoom(roomName, room!), 500);
     const encoder = encoding.createEncoder();
     encoding.writeVarUint(encoder, MESSAGE_SYNC);
     syncProtocol.writeUpdate(encoder, update);
@@ -111,17 +141,32 @@ function handleMessage(room: Room, conn: WebSocket, message: Uint8Array) {
   }
 }
 
-function setupConnection(conn: WebSocket, req: IncomingMessage) {
+async function setupConnection(conn: WebSocket, req: IncomingMessage, actor: { id: string; role: string }) {
   // The y-websocket client connects to `<server>/<roomName>` — pull the room
   // name straight out of the path.
   const roomName = decodeURIComponent((req.url ?? '/').slice(1).split('?')[0]) || 'default';
-  const room = getRoom(roomName);
+  const room = await getRoom(roomName);
+  clearTimeout(room.cleanupTimer);
 
   conn.binaryType = 'arraybuffer';
   room.conns.set(conn, new Set());
 
-  conn.on('message', (data: ArrayBuffer) => handleMessage(room, conn, new Uint8Array(data)));
-  conn.on('close', () => closeConn(room, conn));
+  conn.on('message', (data: ArrayBuffer) => {
+    try {
+      const bytes = new Uint8Array(data);
+      const decoder = decoding.createDecoder(bytes);
+      const kind = decoding.readVarUint(decoder);
+      if (kind === MESSAGE_SYNC && decoding.readVarUint(decoder) !== syncProtocol.messageYjsSyncStep1 && actor.role !== 'TEACHER' && !permissions.get(roomName.replace(/^whiteboard-/, ''))?.has(actor.id)) return;
+      handleMessage(room, conn, bytes);
+    } catch { conn.close(1003, 'Invalid message'); }
+  });
+  conn.on('close', () => {
+    closeConn(room, conn);
+    if (!room.conns.size) {
+      clearTimeout(room.saveTimer); saveRoom(roomName, room);
+      room.cleanupTimer = setTimeout(() => { if (!room.conns.size) { room.doc.destroy(); room.awareness.destroy(); rooms.delete(roomName); permissions.delete(roomName.replace(/^whiteboard-/, '')); } }, 60_000);
+    }
+  });
 
   // Heartbeat — drop connections that stop responding to pings so `room.conns`
   // doesn't accumulate dead sockets.
@@ -164,9 +209,32 @@ function setupConnection(conn: WebSocket, req: IncomingMessage) {
 // library handles the HTTP `upgrade` handshake on this server for us. WebSocket
 // upgrade requests on any path are routed here; the room name is parsed from the
 // path inside `setupConnection`.
-export function startWhiteboardWebSocketServer(server: Server) {
-  const wss = new WebSocketServer({ server });
-  wss.on('connection', setupConnection);
-  console.log('[whiteboard] Yjs sync server attached to the HTTP server');
-  return wss;
+export function startWhiteboardWebSocketServer(server: Server, app: FastifyInstance) {
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
+  const upgrade = async (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+    try {
+      const url = new URL(req.url ?? '/', 'http://localhost');
+      const roomName = url.pathname.slice(1);
+      if (!/^whiteboard-[a-zA-Z0-9_-]+$/.test(roomName)) throw new Error('Invalid room');
+      const actor = app.jwt.verify<{ id: string; role: string; version?: number }>(url.searchParams.get('token') ?? '');
+      const user = await prisma.user.findUnique({ where: { id: actor.id } });
+      if (!user || user.role !== actor.role || user.tokenVersion !== (actor.version ?? 0) || !await canAccessCourse(actor, roomName.replace(/^whiteboard-/, ''))) throw new Error('Forbidden');
+      wss.handleUpgrade(req, socket, head, (conn) => {
+        void setupConnection(conn, req, actor).catch(() => conn.close(1011, 'Unable to load whiteboard'));
+        const expiry = setTimeout(() => conn.close(1008, 'Please reconnect'), 60 * 60_000);
+        conn.on('close', () => clearTimeout(expiry));
+      });
+    } catch { socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n'); socket.destroy(); }
+  };
+  server.on('upgrade', upgrade);
+  return { async close() {
+    server.off('upgrade', upgrade);
+    for (const [name, room] of rooms) {
+      clearTimeout(room.saveTimer); clearTimeout(room.cleanupTimer); saveRoom(name, room);
+      for (const conn of room.conns.keys()) conn.terminate();
+      await room.persist; clearTimeout(room.cleanupTimer); room.awareness.destroy(); room.doc.destroy();
+    }
+    rooms.clear(); permissions.clear();
+    await new Promise<void>((resolve) => wss.close(() => resolve()));
+  } };
 }

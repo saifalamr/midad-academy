@@ -1,7 +1,8 @@
 'use client';
+import Link from 'next/link';
 
 export default function Error({
-  error,
+  error: _error,
   reset,
 }: {
   error: Error & { digest?: string };
@@ -15,7 +16,7 @@ export default function Error({
       </p>
       <div style={{ display: 'flex', gap: 12 }}>
         <button onClick={() => reset()} className="btn btn-gold">Try again</button>
-        <a href="/" className="btn btn-outline">Go home</a>
+        <Link href="/" className="btn btn-outline">Go home</Link>
       </div>
     </div>
   );

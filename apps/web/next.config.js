@@ -8,9 +8,6 @@ const contentSecurityPolicy =
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   transpilePackages: ['@arabic-platform/ui', '@arabic-platform/shared-types'],
   async headers() {
     return [

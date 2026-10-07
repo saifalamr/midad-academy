@@ -1,172 +1,76 @@
 import type { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
+type CheckoutSession = Awaited<ReturnType<InstanceType<typeof Stripe>['checkout']['sessions']['retrieve']>>;
+type StripeEvent = ReturnType<InstanceType<typeof Stripe>['webhooks']['constructEvent']>;
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { httpError } from '../lib/access';
 import { config } from '../config';
 
-const stripe = new Stripe(config.STRIPE_SECRET_KEY);
+const stripe = config.STRIPE_SECRET_KEY ? new Stripe(config.STRIPE_SECRET_KEY) : null;
 
-const createCheckoutSchema = z.object({
-  courseId: z.string().min(1, 'Course id is required'),
-});
-
-const confirmSchema = z.object({
-  sessionId: z.string().min(1, 'Session id is required'),
-});
-
-// Creates the enrollment row, tolerating the case where the student is
-// already enrolled (e.g. they refresh /payment/success after confirming once).
-async function enrollStudent(courseId: string, studentId: string) {
-  try {
-    return await prisma.enrollment.create({ data: { courseId, studentId } });
-  } catch (err) {
-    if (err && typeof err === 'object' && 'code' in err && err.code === 'P2002') {
-      return prisma.enrollment.findUniqueOrThrow({
-        where: { courseId_studentId: { courseId, studentId } },
-      });
-    }
-    throw err;
-  }
+// Unique checkout ID + one transaction make browser/webhook retries atomic.
+export async function fulfillCheckout(session: CheckoutSession) {
+  if (session.payment_status !== 'paid') throw httpError(402, 'Payment has not completed yet');
+  const { courseId, userId, studentId } = session.metadata ?? {};
+  if (!courseId || !userId || !studentId || session.client_reference_id !== userId) throw httpError(400, 'Checkout information is invalid');
+  return prisma.$transaction(async (tx) => {
+    const student = await tx.studentProfile.findUnique({ where: { id: studentId } });
+    const course = await tx.course.findUnique({ where: { id: courseId } });
+    if (!student || student.userId !== userId || !course) throw httpError(400, 'Purchase information is invalid');
+    await tx.payment.upsert({ where: { providerPaymentId: session.id }, update: {},
+      create: { userId, courseId, amount: (session.amount_total ?? 0) / 100,
+        currency: (session.currency ?? course.currency).toUpperCase(), status: 'COMPLETED', provider: 'stripe', providerPaymentId: session.id } });
+    const enrollment = await tx.enrollment.upsert({ where: { courseId_studentId: { courseId, studentId } },
+      create: { courseId, studentId }, update: { status: 'ACTIVE' } });
+    return { enrollment, course: { id: course.id, title: course.title, price: course.price, currency: course.currency } };
+  });
 }
 
 export async function paymentRoutes(app: FastifyInstance) {
-  // ── POST /api/payments/create-checkout ────────────────────────────────────
-  // Starts the purchase flow for a course. Free courses skip Stripe entirely
-  // and enroll the student immediately; paid courses get a Stripe-hosted
-  // Checkout session to redirect the browser to.
   app.post('/create-checkout', { preHandler: [app.authenticate] }, async (request, reply) => {
-    const { id: userId, role } = request.user;
-
-    if (role !== 'STUDENT') {
-      return reply.status(403).send({ error: 'Only students can enroll in courses' });
-    }
-
-    const { courseId } = createCheckoutSchema.parse(request.body);
-
-    const studentProfile = await prisma.studentProfile.findUnique({ where: { userId } });
-    if (!studentProfile) {
-      return reply.status(404).send({ error: 'Student profile not found' });
-    }
-
+    if (request.user.role !== 'STUDENT') return reply.status(403).send({ error: 'Only students can enroll in courses' });
+    const { courseId } = z.object({ courseId: z.string().min(1) }).parse(request.body);
+    const student = await prisma.studentProfile.findUnique({ where: { userId: request.user.id } });
     const course = await prisma.course.findUnique({ where: { id: courseId } });
-    if (!course) {
-      return reply.status(404).send({ error: 'Course not found' });
+    if (!student || !course) return reply.status(404).send({ error: 'Student or course not found' });
+    const existing = await prisma.enrollment.findUnique({ where: { courseId_studentId: { courseId, studentId: student.id } } });
+    if (existing?.status === 'ACTIVE') return reply.status(409).send({ error: 'You are already enrolled in this course' });
+    if (course.price === 0) {
+      const enrollment = await prisma.enrollment.upsert({ where: { courseId_studentId: { courseId, studentId: student.id } },
+        create: { courseId, studentId: student.id }, update: { status: 'ACTIVE' } });
+      return reply.send({ data: { type: 'enrolled', enrollment } });
     }
-
-    const existing = await prisma.enrollment.findUnique({
-      where: { courseId_studentId: { courseId, studentId: studentProfile.id } },
-    });
-    if (existing) {
-      return reply.status(409).send({ error: 'You are already enrolled in this course' });
-    }
-
-    // Stripe Checkout requires a positive charge amount — free courses just
-    // enroll directly with no payment step.
-    if (course.price <= 0) {
-      const enrollment = await enrollStudent(courseId, studentProfile.id);
-      return reply.send({ data: { type: 'enrolled' as const, enrollment } });
-    }
-
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
-    if (!user) return reply.status(404).send({ error: 'User not found' });
-
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      payment_method_types: ['card'],
-      customer_email: user.email,
-      client_reference_id: userId,
-      line_items: [
-        {
-          quantity: 1,
-          price_data: {
-            currency: course.currency.toLowerCase(),
-            unit_amount: Math.round(course.price * 100),
-            product_data: {
-              name: course.title,
-              description: `Enrollment — ${course.title} (ages ${course.ageGroup})`,
-            },
-          },
-        },
-      ],
-      metadata: { courseId, userId, studentId: studentProfile.id },
+    if (!stripe) return reply.status(503).send({ error: 'Paid enrollment is not configured. Please contact the academy.' });
+    const session = await stripe.checkout.sessions.create({ mode: 'payment', payment_method_types: ['card'], customer_email: request.user.email,
+      client_reference_id: request.user.id,
+      line_items: [{ quantity: 1, price_data: { currency: course.currency.toLowerCase(), unit_amount: Math.round(course.price * 100), product_data: { name: course.title } } }],
+      metadata: { courseId, userId: request.user.id, studentId: student.id },
       success_url: `${config.FRONTEND_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${config.FRONTEND_URL}/payment/cancel`,
-    });
-
-    if (!session.url) {
-      return reply.status(502).send({ error: 'Stripe did not return a checkout URL' });
-    }
-
-    return reply.send({ data: { type: 'checkout' as const, url: session.url } });
+      cancel_url: `${config.FRONTEND_URL}/payment/cancel` });
+    return reply.send({ data: { type: 'checkout', url: session.url } });
   });
-
-  // ── POST /api/payments/confirm ─────────────────────────────────────────────
-  // Called from /payment/success once Stripe redirects back. Verifies the
-  // checkout session actually completed, records the payment, and enrolls
-  // the student. (No webhook yet — this confirm step is the source of truth.)
   app.post('/confirm', { preHandler: [app.authenticate] }, async (request, reply) => {
-    const { id: userId, role } = request.user;
-
-    if (role !== 'STUDENT') {
-      return reply.status(403).send({ error: 'Only students can confirm enrollments' });
-    }
-
-    const { sessionId } = confirmSchema.parse(request.body);
-
+    if (request.user.role !== 'STUDENT') return reply.status(403).send({ error: 'Only students can confirm purchases' });
+    if (!stripe) return reply.status(503).send({ error: 'Payment service is not configured' });
+    const { sessionId } = z.object({ sessionId: z.string().min(1) }).parse(request.body);
     const session = await stripe.checkout.sessions.retrieve(sessionId);
-
-    // The session must belong to the user who's confirming it — otherwise
-    // anyone could enroll themselves by guessing/reusing a session id.
-    if (session.client_reference_id !== userId) {
-      return reply.status(403).send({ error: 'This checkout session does not belong to you' });
-    }
-
-    if (session.payment_status !== 'paid') {
-      return reply.status(402).send({ error: 'Payment has not completed yet' });
-    }
-
-    const courseId = session.metadata?.courseId;
-    if (!courseId) {
-      return reply.status(400).send({ error: 'Checkout session is missing course information' });
-    }
-
-    const studentProfile = await prisma.studentProfile.findUnique({ where: { userId } });
-    if (!studentProfile) {
-      return reply.status(404).send({ error: 'Student profile not found' });
-    }
-
-    const course = await prisma.course.findUnique({ where: { id: courseId } });
-    if (!course) {
-      return reply.status(404).send({ error: 'Course not found' });
-    }
-
-    const providerPaymentId =
-      typeof session.payment_intent === 'string' ? session.payment_intent : session.id;
-
-    // Idempotent: re-visiting /payment/success (refresh, back button) must
-    // not create duplicate payment rows for the same Stripe session.
-    const existingPayment = await prisma.payment.findFirst({ where: { providerPaymentId } });
-    if (!existingPayment) {
-      await prisma.payment.create({
-        data: {
-          userId,
-          courseId,
-          amount: (session.amount_total ?? Math.round(course.price * 100)) / 100,
-          currency: (session.currency ?? course.currency).toUpperCase(),
-          status: 'COMPLETED',
-          provider: 'stripe',
-          providerPaymentId,
-        },
-      });
-    }
-
-    const enrollment = await enrollStudent(courseId, studentProfile.id);
-
-    return reply.send({
-      data: {
-        enrollment,
-        course: { id: course.id, title: course.title, price: course.price, currency: course.currency },
-      },
+    if (session.client_reference_id !== request.user.id) return reply.status(403).send({ error: 'This checkout session does not belong to you' });
+    return reply.send({ data: await fulfillCheckout(session) });
+  });
+  await app.register(async (webhooks) => {
+    webhooks.removeContentTypeParser('application/json');
+    webhooks.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => done(null, body));
+    webhooks.post('/webhook', { config: { rateLimit: false } }, async (request, reply) => {
+      if (!stripe || !config.STRIPE_WEBHOOK_SECRET) return reply.status(503).send({ error: 'Webhook is not configured' });
+      let event: StripeEvent;
+      try { event = stripe.webhooks.constructEvent(request.body as string, request.headers['stripe-signature'] as string, config.STRIPE_WEBHOOK_SECRET); }
+      catch { return reply.status(400).send({ error: 'Invalid webhook signature' }); }
+      if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
+        const session = event.data.object as CheckoutSession;
+        if (session.payment_status === 'paid') await fulfillCheckout(session);
+      }
+      return reply.send({ received: true });
     });
   });
 }

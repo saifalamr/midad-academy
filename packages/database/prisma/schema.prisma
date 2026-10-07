@@ -74,6 +74,7 @@ model User {
   id           String   @id @default(cuid())
   email        String   @unique
   passwordHash String
+  tokenVersion Int      @default(0)
   name         String
   role         UserRole
   avatarUrl    String?
@@ -84,6 +85,7 @@ model User {
   studentProfile StudentProfile?
   parentProfile  ParentProfile?
   payments       Payment[]
+  passwordResets PasswordReset[]
 
   @@index([email])
 }
@@ -110,6 +112,8 @@ model StudentProfile {
   level       String  @default("beginner")
   totalPoints Int     @default(0)
   parentId    String?
+  parentLinkHash String? @unique
+  parentLinkExpiresAt DateTime?
 
   user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   parent       ParentProfile?    @relation(fields: [parentId], references: [id])
@@ -117,6 +121,7 @@ model StudentProfile {
   achievements Achievement[]
   pointEvents  PointTransaction[]
   quizResults  StudentQuizResult[]
+  attendance SessionAttendance[]
 }
 
 model ParentProfile {
@@ -149,6 +154,7 @@ model Course {
   enrollments  Enrollment[]
   payments     Payment[]
   classSessions ClassSession[]
+  whiteboard WhiteboardDocument?
 }
 
 model CourseContent {
@@ -263,6 +269,7 @@ model ClassSession {
 
   course  Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
   teacher TeacherProfile @relation(fields: [teacherId], references: [id])
+  attendance SessionAttendance[]
 
   @@index([courseId, scheduledAt])
   @@index([teacherId, scheduledAt])
@@ -292,7 +299,7 @@ model Payment {
   currency          String        @default("USD")
   status            PaymentStatus @default(PENDING)
   provider          String
-  providerPaymentId String?
+  providerPaymentId String?       @unique
   createdAt         DateTime      @default(now())
 
   user   User   @relation(fields: [userId], references: [id])
@@ -330,9 +337,37 @@ model PointTransaction {
   studentId String
   points    Int
   event     String
+  eventKey  String? @unique
   createdAt DateTime @default(now())
 
   student StudentProfile @relation(fields: [studentId], references: [id])
 
   @@index([studentId, createdAt])
+}
+
+model PasswordReset {
+  id String @id @default(cuid())
+  tokenHash String @unique
+  userId String
+  expiresAt DateTime
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+model SessionAttendance {
+  id String @id @default(cuid())
+  sessionId String
+  studentId String
+  joinedAt DateTime @default(now())
+  session ClassSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  @@unique([sessionId, studentId])
+  @@index([studentId])
+}
+
+model WhiteboardDocument {
+  courseId String @id
+  state Bytes
+  updatedAt DateTime @updatedAt
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 }

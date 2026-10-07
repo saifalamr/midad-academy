@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma';
+import { studentProgress } from '../lib/progress';
 
 // Counts consecutive days ending today/yesterday that have at least one point
 // event. Copied from parent.ts so the student's own dashboard computes streaks
@@ -115,6 +116,7 @@ export async function studentRoutes(app: FastifyInstance) {
           include: { quiz: { select: { title: true } } },
           orderBy: { completedAt: 'desc' },
         },
+        achievements: { include: { badge: true } },
       },
     });
 
@@ -122,22 +124,9 @@ export async function studentRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Student profile not found' });
     }
 
-    const now = new Date();
     const streak = computeStreak(profile.pointEvents);
 
-    const allLessons = profile.enrollments.flatMap((e) =>
-      e.course.lessons.map((l) => ({ ...l, courseTitle: e.course.title }))
-    );
-
-    const totalLessons = allLessons.length;
-    const lessonsCompleted = allLessons.filter((l) => l.status === 'COMPLETED').length;
-
-    const courseProgress = profile.enrollments.map((e) => ({
-      courseId: e.course.id,
-      title: e.course.title,
-      total: e.course.lessons.length,
-      completed: e.course.lessons.filter((l) => l.status === 'COMPLETED').length,
-    }));
+    const { totalLessons, lessonsCompleted, courseProgress, recentSessions } = await studentProgress(profile.id);
 
     const quizResults = profile.quizResults.map((r) => ({
       quizTitle: r.quiz.title,
@@ -145,17 +134,6 @@ export async function studentRoutes(app: FastifyInstance) {
       passed: r.passed,
       createdAt: r.completedAt,
     }));
-
-    // Last 8 past lessons across all enrolled courses (most recent first)
-    const recentSessions = allLessons
-      .filter((l) => new Date(l.scheduledAt) < now)
-      .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime())
-      .slice(0, 8)
-      .map((l) => ({
-        title: l.title,
-        scheduledAt: l.scheduledAt,
-        attended: l.status === 'COMPLETED',
-      }));
 
     return reply.send({
       data: {
@@ -167,6 +145,7 @@ export async function studentRoutes(app: FastifyInstance) {
         courseProgress,
         quizResults,
         recentSessions,
+        badges: profile.achievements.map((a) => ({ name: a.badge.name, description: a.badge.description, iconUrl: a.badge.iconUrl })),
       },
     });
   });

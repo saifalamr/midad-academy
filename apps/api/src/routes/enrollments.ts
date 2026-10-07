@@ -34,6 +34,7 @@ export async function enrollmentRoutes(app: FastifyInstance) {
     if (!course) {
       return reply.status(404).send({ error: 'Course not found' });
     }
+    if (course.price > 0) return reply.status(402).send({ error: 'Purchase this course through checkout first' });
 
     try {
       const enrollment = await prisma.enrollment.create({
@@ -66,7 +67,7 @@ export async function enrollmentRoutes(app: FastifyInstance) {
     }
 
     const enrollments = await prisma.enrollment.findMany({
-      where: { studentId: studentProfile.id },
+      where: { studentId: studentProfile.id, status: 'ACTIVE' },
       include: {
         course: {
           include: { teacher: { include: { user: { select: { name: true } } } } },

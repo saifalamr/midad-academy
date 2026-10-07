@@ -67,7 +67,7 @@ const TYPE_ICON: Record<ContentType, string> = {
 };
 
 function authFetch(path: string, options: RequestInit = {}) {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const token = typeof window !== 'undefined' ? (localStorage.getItem('token') ?? sessionStorage.getItem('token')) : null;
   return fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
@@ -178,6 +178,7 @@ export default function CourseLessonsPage() {
                 key={lesson.id}
                 style={{
                   display: 'flex',
+                  flexWrap: 'wrap',
                   alignItems: 'center',
                   gap: 16,
                   padding: '16px 20px',
@@ -186,7 +187,7 @@ export default function CourseLessonsPage() {
               >
                 <div style={{ fontSize: 24 }}>{TYPE_ICON[lesson.type]}</div>
 
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ flex: '1 1 180px', minWidth: 0 }}>
                   <div style={{ fontWeight: 700 }}>{lesson.title}</div>
                   <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>{lesson.description}</div>
                 </div>

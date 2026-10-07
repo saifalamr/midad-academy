@@ -11,6 +11,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('student');
+  const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -23,13 +24,13 @@ export default function RegisterPage() {
       const res = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, role }),
+        body: JSON.stringify({ name, email, password, role, inviteCode: role === "teacher" ? inviteCode : undefined }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.message || 'Registration failed');
+        setError(data.error || data.message || 'Registration failed');
         return;
       }
 
@@ -54,10 +55,10 @@ export default function RegisterPage() {
           <h2 className="auth-head">Begin the journey today.</h2>
           <p className="ar auth-head-ar">ابدأ رحلة التعلّم اليوم</p>
           <ul className="auth-perks">
-            <li>First week completely free</li>
-            <li>Certified native-speaking teachers</li>
-            <li>Cancel anytime — no contracts</li>
-            <li>Parent dashboard included on every plan</li>
+            <li>Browse available courses before enrolling</li>
+            <li>Live lessons with your course teacher</li>
+            <li>Free and paid courses clearly labelled</li>
+            <li>Parent dashboard for linked children</li>
           </ul>
         </div>
 
@@ -141,9 +142,10 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            {role === 'teacher' && <label className="field">Teacher invitation code<input className="input" required value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} autoComplete="off" /></label>}
             <label className="check check-block">
               <input type="checkbox" required />
-              I agree to the <span className="link-gold" style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">Terms</span> &amp; <span className="link-gold" style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">Privacy Policy</span>
+              I agree to the <Link href="/terms" className="link-gold">Terms</Link> &amp; <Link href="/privacy" className="link-gold">Privacy Policy</Link>
             </label>
 
             <button

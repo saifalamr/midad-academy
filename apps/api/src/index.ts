@@ -4,11 +4,9 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import fastifyJwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
-import fastifyStatic from '@fastify/static';
-import path from 'node:path';
-import fs from 'node:fs/promises';
 import { ZodError } from 'zod';
-import { config } from './config';
+import { config, validateConfig } from './config';
+import { prisma } from './lib/prisma';
 import { healthRoutes } from './routes/health';
 import { authRoutes } from './routes/auth';
 import { courseRoutes } from './routes/courses';
@@ -22,25 +20,22 @@ import { enrollmentRoutes } from './routes/enrollments';
 import { parentRoutes } from './routes/parent';
 import { paymentRoutes } from './routes/payments';
 import { sessionRoutes } from './routes/sessions';
+import { accountRoutes } from './routes/account';
 import { startWhiteboardWebSocketServer } from './ws-server';
 
-const app = Fastify({ logger: config.NODE_ENV !== 'test' });
-
-async function bootstrap() {
+export async function buildApp() {
+  validateConfig();
+  const app = Fastify({ logger: config.NODE_ENV !== 'test', bodyLimit: 1024 * 1024 });
   // ── Security middleware ──────────────────────────────────────────────────
   await app.register(helmet);
   await app.register(cors, {
     origin: (origin, callback) => {
-      const allowed = [
-        'https://arabic-platformweb-production.up.railway.app',
-        'http://localhost:3000',
-        'http://localhost:3001',
-      ];
+      const allowed = config.CORS_ORIGIN;
       // No origin header → same-origin / non-browser clients (curl, health checks).
       if (!origin || allowed.includes(origin)) {
         callback(null, true);
       } else {
-        callback(new Error('Not allowed by CORS'), false);
+        callback(null, false);
       }
     },
     credentials: true,
@@ -56,13 +51,6 @@ async function bootstrap() {
   await app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
   await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024 } });
 
-  const uploadDir = path.join(process.cwd(), 'uploads');
-  await fs.mkdir(uploadDir, { recursive: true });
-  await app.register(fastifyStatic, {
-    root: uploadDir,
-    prefix: '/uploads/',
-  });
-
   // ── JWT ─────────────────────────────────────────────────────────────────
   // Registered at root level so app.authenticate is visible to all routes.
   await app.register(fastifyJwt, {
@@ -76,6 +64,10 @@ async function bootstrap() {
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         await request.jwtVerify();
+        const user = await prisma.user.findUnique({ where: { id: request.user.id } });
+        if (!user || user.role !== request.user.role || user.tokenVersion !== (request.user.version ?? 0)) {
+          return void reply.status(401).send({ error: 'Your session has expired. Please log in again.' });
+        }
       } catch {
         reply.status(401).send({ error: 'Unauthorized — invalid or missing token' });
       }
@@ -95,12 +87,16 @@ async function bootstrap() {
       });
     }
     app.log.error(error);
-    reply.send(error);
+    const failure = error as { statusCode?: number; message?: string; code?: string };
+    if (failure.code === 'P2002') return void reply.status(409).send({ error: 'This record already exists' });
+    const statusCode = failure.statusCode ?? 500;
+    reply.status(statusCode).send({ error: statusCode >= 500 ? 'An unexpected server error occurred' : failure.message ?? 'Invalid request' });
   });
 
   // ── Routes ───────────────────────────────────────────────────────────────
   await app.register(healthRoutes, { prefix: '/api' });
   await app.register(authRoutes, { prefix: '/api/auth' });
+  await app.register(accountRoutes, { prefix: '/api/account' });
   await app.register(courseRoutes, { prefix: '/api/courses' });
   await app.register(lessonRoutes, { prefix: '/api/lessons' });
   await app.register(contentRoutes, { prefix: '/api/content' });
@@ -113,17 +109,16 @@ async function bootstrap() {
   await app.register(sessionRoutes, { prefix: '/api/sessions' });
   await app.register(paymentRoutes, { prefix: '/api/payments' });
 
-  await app.listen({ port: config.PORT, host: '0.0.0.0' });
-  app.log.info(`API running on http://localhost:${config.PORT}`);
-
-  // Raw WebSocket server (not Fastify) — the whiteboard's Yjs CRDT sync speaks a
-  // small binary protocol that doesn't fit into REST routing. It's attached to
-  // Fastify's underlying HTTP server so it shares the same port, which keeps it
-  // reachable behind a single-port host like Railway (and over the same wss://).
-  startWhiteboardWebSocketServer(app.server);
+  return app;
 }
 
-bootstrap().catch((err) => {
-  app.log.error(err);
-  process.exit(1);
-});
+async function bootstrap() {
+  const app = await buildApp();
+  await app.listen({ port: config.PORT, host: config.HOST });
+  const whiteboard = startWhiteboardWebSocketServer(app.server, app);
+  const shutdown = async () => { await whiteboard.close(); await app.close(); await prisma.$disconnect(); };
+  process.once('SIGTERM', () => { void shutdown(); });
+  process.once('SIGINT', () => { void shutdown(); });
+}
+
+if (require.main === module) bootstrap().catch((err) => { console.error(err.message); process.exit(1); });

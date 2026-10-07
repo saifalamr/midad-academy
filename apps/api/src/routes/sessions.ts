@@ -1,8 +1,10 @@
 import type { FastifyInstance } from 'fastify';
-import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
+import { AccessToken, RoomServiceClient, WebhookReceiver } from 'livekit-server-sdk';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { config } from '../config';
+import { canAccessCourse } from '../lib/access';
+import { setDrawingPermission } from '../ws-server';
 
 const createSessionSchema = z.object({
   roomName: z.string().min(1, 'Room name is required'),
@@ -17,7 +19,7 @@ const scheduleSessionSchema = z.object({
   title: z.string().min(2, 'Title must be at least 2 characters'),
   description: z.string().optional(),
   scheduledAt: z.coerce.date(),
-  durationMinutes: z.number().int().min(1).optional(),
+  durationMinutes: z.number().int().min(5).max(240).optional(),
 });
 
 // LiveKit's RoomServiceClient needs an HTTP(S) URL, not WSS.
@@ -33,6 +35,10 @@ export async function sessionRoutes(app: FastifyInstance) {
   app.post('/create', { preHandler: [app.authenticate] }, async (request, reply) => {
     const { id: userId, role } = request.user;
     const { roomName } = createSessionSchema.parse(request.body);
+    if (role !== 'TEACHER' || !await canAccessCourse(request.user, roomName)) return reply.status(403).send({ error: 'Only the course teacher can start this classroom' });
+    if (!config.LIVEKIT_URL || !config.LIVEKIT_API_KEY || !config.LIVEKIT_API_SECRET) return reply.status(503).send({ error: 'Live classroom service is not configured' });
+    const live = await prisma.classSession.findFirst({ where: { courseId: roomName, status: 'LIVE' } });
+    if (!live) return reply.status(409).send({ error: 'Start a scheduled session from your dashboard first' });
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -56,7 +62,7 @@ export async function sessionRoutes(app: FastifyInstance) {
     // Mint a participant token. Role metadata is read by the classroom UI to
     // decide which video feed goes in the large "teacher" slot.
     const at = new AccessToken(config.LIVEKIT_API_KEY, config.LIVEKIT_API_SECRET, {
-      identity: userId,
+      identity: userId, ttl: '15m',
       name: user.name,
       metadata: JSON.stringify({ role: role.toLowerCase() }),
     });
@@ -95,7 +101,7 @@ export async function sessionRoutes(app: FastifyInstance) {
     const enrollment = await prisma.enrollment.findUnique({
       where: { courseId_studentId: { courseId: roomName, studentId: studentProfile.id } },
     });
-    if (!enrollment) {
+    if (!enrollment || enrollment.status !== 'ACTIVE') {
       return reply.status(403).send({ error: 'You are not enrolled in this course' });
     }
 
@@ -110,13 +116,14 @@ export async function sessionRoutes(app: FastifyInstance) {
       config.LIVEKIT_API_KEY,
       config.LIVEKIT_API_SECRET,
     );
+    if (!await prisma.classSession.findFirst({ where: { courseId: roomName, status: 'LIVE' } })) return reply.status(409).send({ error: 'This class is not live' });
     const rooms = await roomService.listRooms([roomName]);
     if (rooms.length === 0) {
       return reply.status(409).send({ error: 'This class is not live yet — please wait for your teacher to start it' });
     }
 
     const at = new AccessToken(config.LIVEKIT_API_KEY, config.LIVEKIT_API_SECRET, {
-      identity: userId,
+      identity: userId, ttl: '15m',
       name: user.name,
       metadata: JSON.stringify({ role: role.toLowerCase() }),
     });
@@ -182,8 +189,7 @@ export async function sessionRoutes(app: FastifyInstance) {
       const sessions = await prisma.classSession.findMany({
         where: {
           teacherId: teacherProfile.id,
-          scheduledAt: { gte: new Date() },
-          status: { not: 'CANCELLED' },
+          OR: [{ status: 'LIVE' }, { status: 'SCHEDULED', scheduledAt: { gte: new Date(Date.now() - 24 * 60 * 60_000) } }],
         },
         include: { course: { select: { id: true, title: true } } },
         orderBy: { scheduledAt: 'asc' },
@@ -199,7 +205,7 @@ export async function sessionRoutes(app: FastifyInstance) {
       }
 
       const enrollments = await prisma.enrollment.findMany({
-        where: { studentId: studentProfile.id },
+        where: { studentId: studentProfile.id, status: 'ACTIVE' },
         select: { courseId: true },
       });
       const courseIds = enrollments.map((e) => e.courseId);
@@ -207,8 +213,7 @@ export async function sessionRoutes(app: FastifyInstance) {
       const sessions = await prisma.classSession.findMany({
         where: {
           courseId: { in: courseIds },
-          scheduledAt: { gte: new Date() },
-          status: { not: 'CANCELLED' },
+          OR: [{ status: 'LIVE' }, { status: 'SCHEDULED', scheduledAt: { gte: new Date(Date.now() - 24 * 60 * 60_000) } }],
         },
         include: {
           course: { select: { id: true, title: true } },
@@ -249,6 +254,7 @@ export async function sessionRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Session not found' });
     }
 
+    if (session.status !== 'SCHEDULED') return reply.status(409).send({ error: 'Only scheduled sessions can be cancelled' });
     const updated = await prisma.classSession.update({
       where: { id: sessionId },
       data: { status: 'CANCELLED' },
@@ -279,6 +285,9 @@ export async function sessionRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Session not found' });
     }
 
+    if (session.status !== 'SCHEDULED' && session.status !== 'LIVE') return reply.status(409).send({ error: 'This session cannot be started' });
+    const otherLive = await prisma.classSession.findFirst({ where: { courseId: session.courseId, status: 'LIVE', id: { not: sessionId } } });
+    if (otherLive) return reply.status(409).send({ error: 'End the current live session first' });
     const updated = await prisma.classSession.update({
       where: { id: sessionId },
       data: { status: 'LIVE', liveKitRoomId: session.courseId },
@@ -286,4 +295,48 @@ export async function sessionRoutes(app: FastifyInstance) {
 
     return reply.send({ data: updated });
   });
+  app.post('/end', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const { roomName } = createSessionSchema.parse(request.body);
+    if (request.user.role !== 'TEACHER' || !await canAccessCourse(request.user, roomName)) return reply.status(403).send({ error: 'Only the course teacher can end this class' });
+    if (config.LIVEKIT_URL) {
+      const service = new RoomServiceClient(toHttpUrl(config.LIVEKIT_URL), config.LIVEKIT_API_KEY, config.LIVEKIT_API_SECRET);
+      const rooms = await service.listRooms([roomName]);
+      if (rooms.length) await service.deleteRoom(roomName);
+    }
+    await prisma.classSession.updateMany({ where: { courseId: roomName, status: 'LIVE' }, data: { status: 'COMPLETED' } });
+    return { message: 'Class ended' };
+  });
+  app.post('/drawing-permission', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const { roomName, studentId, canDraw } = z.object({ roomName: z.string(), studentId: z.string(), canDraw: z.boolean() }).parse(request.body);
+    if (request.user.role !== 'TEACHER' || !await canAccessCourse(request.user, roomName)) return reply.status(403).send({ error: 'Only the course teacher can manage drawing access' });
+    if (!await canAccessCourse({ id: studentId, role: 'STUDENT' }, roomName)) return reply.status(404).send({ error: 'Student not enrolled' });
+    setDrawingPermission(roomName, studentId, canDraw);
+    return { message: 'Drawing permission updated' };
+  });
+  await app.register(async (webhooks) => {
+    webhooks.addContentTypeParser('application/webhook+json', { parseAs: 'string' }, (_req, body, done) => done(null, body));
+    webhooks.post('/webhook', { config: { rateLimit: false } }, async (request, reply) => {
+      if (!config.LIVEKIT_API_KEY || !config.LIVEKIT_API_SECRET) return reply.status(503).send({ error: 'LiveKit webhook is not configured' });
+      let event;
+      try { event = await new WebhookReceiver(config.LIVEKIT_API_KEY, config.LIVEKIT_API_SECRET).receive(request.body as string, request.headers.authorization); }
+      catch { return reply.status(401).send({ error: 'Invalid webhook signature' }); }
+      const roomName = event.room?.name;
+      if (!roomName) return { received: true };
+      if (event.event === 'participant_joined' && event.participant?.identity) {
+        const student = await prisma.studentProfile.findUnique({ where: { userId: event.participant.identity } });
+        const session = await prisma.classSession.findFirst({ where: { courseId: roomName, status: 'LIVE' } });
+        if (student && session && await canAccessCourse({ id: student.userId, role: 'STUDENT' }, roomName)) {
+          await prisma.$transaction(async (tx) => {
+            await tx.sessionAttendance.upsert({ where: { sessionId_studentId: { sessionId: session.id, studentId: student.id } },
+              create: { sessionId: session.id, studentId: student.id }, update: {} });
+            const award = await tx.pointTransaction.createMany({ data: { studentId: student.id, points: 10, event: 'Class attendance', eventKey: `attendance:${session.id}:${student.id}` }, skipDuplicates: true });
+            if (award.count) await tx.studentProfile.update({ where: { id: student.id }, data: { totalPoints: { increment: 10 } } });
+          });
+        }
+      }
+      if (event.event === 'room_finished') await prisma.classSession.updateMany({ where: { courseId: roomName, status: 'LIVE' }, data: { status: 'COMPLETED' } });
+      return { received: true };
+    });
+  });
+
 }

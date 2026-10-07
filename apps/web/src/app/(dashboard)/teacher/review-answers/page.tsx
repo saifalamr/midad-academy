@@ -18,7 +18,7 @@ type PendingAnswer = {
 };
 
 function authFetch(path: string, options: RequestInit = {}) {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const token = typeof window !== 'undefined' ? (localStorage.getItem('token') ?? sessionStorage.getItem('token')) : null;
   return fetch(`${API_URL}${path}`, {
     ...options,
     headers: {

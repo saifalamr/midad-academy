@@ -14,14 +14,14 @@ import {
 } from '@livekit/components-react';
 import '@livekit/components-styles';
 import type { TrackReferenceOrPlaceholder } from '@livekit/components-react';
-import { Track, RoomEvent } from 'livekit-client';
+import { Track, RoomEvent, type RemoteParticipant } from 'livekit-client';
 import Whiteboard, { PALETTE, type Tool, type WhiteboardHandle } from '@/components/Whiteboard';
 import { API_URL } from '@/lib/config';
 
-const LIVEKIT_URL = process.env.NEXT_PUBLIC_LIVEKIT_URL!;
+
 
 function authFetch(path: string, options: RequestInit = {}) {
-  const token = localStorage.getItem('token');
+  const token = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
   return fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
@@ -184,7 +184,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
 
   // ── Data channel: receive raise-hand, draw-permission, reaction, doc-share, pdf-page ───
   useEffect(() => {
-    const onData = (payload: Uint8Array) => {
+    const onData = (payload: Uint8Array, sender?: RemoteParticipant) => {
       try {
         const msg = JSON.parse(new TextDecoder().decode(payload)) as {
           type: string;
@@ -198,7 +198,11 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
           page?: number;
         };
 
+        let senderRole = '';
+        try { senderRole = JSON.parse(sender?.metadata ?? '{}').role; } catch {}
+        if (['draw-permission', 'share-doc', 'stop-share', 'pdf-page'].includes(msg.type) && senderRole !== 'teacher') return;
         if (msg.type === 'raise-hand') {
+          if (!sender || msg.identity !== sender.identity) return;
           setRaisedHands((prev) =>
             prev.some((h) => h.identity === msg.identity)
               ? prev
@@ -322,7 +326,9 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
   }
 
   // ── Drawing Permission: teacher sends targeted grant / revoke ─────────────
-  function sendDrawPermission(identity: string, grant: boolean) {
+  async function sendDrawPermission(identity: string, grant: boolean) {
+    const res = await authFetch('/api/sessions/drawing-permission', { method: 'POST', body: JSON.stringify({ roomName: roomId, studentId: identity, canDraw: grant }) });
+    if (!res.ok) return;
     const payload = new TextEncoder().encode(
       JSON.stringify({ type: 'draw-permission', identity, canDraw: grant }),
     );
@@ -444,6 +450,12 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M6 6l12 12M18 6 6 18"/></svg>
             </button>
           )}
+          {isTeacher && <button className="rt-leave btn btn-sm" onClick={async () => {
+            if (!window.confirm('End this class for everyone?')) return;
+            const res = await authFetch('/api/sessions/end', { method: 'POST', body: JSON.stringify({ roomName: roomId }) });
+            if (!res.ok) { window.alert('Could not end the class. Please try again.'); return; }
+            onLeave();
+          }}>End class</button>}
           <button className="rt-leave btn btn-sm" onClick={onLeave}>Leave</button>
         </div>
       </header>
@@ -851,30 +863,33 @@ export default function ClassroomPage() {
 
   const [token, setToken] = useState<string | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [livekitUrl, setLivekitUrl] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const appToken = localStorage.getItem('token');
+    const appToken = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
 
-    console.log('[Classroom] localStorage token:', appToken ? `${appToken.slice(0, 30)}…` : 'NULL — not found');
-    console.log('[Classroom] roomId:', roomId);
+
+
 
     if (!appToken) {
-      console.log('[Classroom] No token — redirecting to /login');
+
       router.push('/login');
       return;
     }
 
+    let currentRole = '';
     try {
       const payload = JSON.parse(atob(appToken.split('.')[1]));
-      setRole(payload.role?.toLowerCase() ?? null);
+      currentRole = payload.role?.toLowerCase() ?? '';
+      setRole(currentRole);
     } catch {
       setRole(null);
     }
 
-    console.log('[Classroom] Sending POST /api/sessions/create');
 
-    fetch(`${API_URL}/api/sessions/create`, {
+
+    fetch(`${API_URL}/api/sessions/${currentRole === 'teacher' ? 'create' : 'join'}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -884,9 +899,10 @@ export default function ClassroomPage() {
     })
       .then(async (res) => {
         const json = await res.json();
-        console.log('[Classroom] API response →', res.status, json);
+
         if (!res.ok) { setError(json.error || 'Could not join room'); return; }
         setToken(json.data.token);
+        setLivekitUrl(json.data.livekitUrl);
       })
       .catch((err) => {
         console.error('[Classroom] Fetch failed:', err);
@@ -895,7 +911,7 @@ export default function ClassroomPage() {
   }, [roomId, router]);
 
   function handleLeave() {
-    const appToken = localStorage.getItem('token');
+    const appToken = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
     if (appToken) {
       try {
         const payload = JSON.parse(atob(appToken.split('.')[1]));
@@ -932,12 +948,13 @@ export default function ClassroomPage() {
 
   return (
     <LiveKitRoom
-      serverUrl={LIVEKIT_URL}
+      serverUrl={livekitUrl}
       token={token}
       connect
       video={false}
       audio={false}
       onDisconnected={handleLeave}
+      onError={() => setError("The classroom connection failed. Check your connection and try again.")}
       style={{ height: '100vh' }}
     >
       <ClassroomContent roomId={roomId} isTeacher={role === 'teacher'} onLeave={handleLeave} />

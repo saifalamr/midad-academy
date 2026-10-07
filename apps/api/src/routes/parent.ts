@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { createHash } from 'node:crypto';
+import { studentProgress } from '../lib/progress';
 
 const childEmailSchema = z.object({
   childEmail: z.string().email('Invalid email address'),
@@ -76,37 +78,11 @@ export async function parentRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Parent profile not found' });
     }
 
-    const now = new Date();
 
-    const children = parentProfile.children.map((child) => {
+    const children = await Promise.all(parentProfile.children.map(async (child) => {
       const streak = computeStreak(child.pointEvents);
 
-      const allLessons = child.enrollments.flatMap((e) =>
-        e.course.lessons.map((l) => ({ ...l, courseTitle: e.course.title }))
-      );
-
-      const totalLessons = allLessons.length;
-      const lessonsCompleted = allLessons.filter((l) => l.status === 'COMPLETED').length;
-
-      // Per-course progress for the progress bars
-      const courseProgress = child.enrollments.map((e) => ({
-        courseTitle: e.course.title,
-        total: e.course.lessons.length,
-        completed: e.course.lessons.filter((l) => l.status === 'COMPLETED').length,
-      }));
-
-      // Last 8 past lessons across all enrolled courses
-      const recentSessions = allLessons
-        .filter((l) => new Date(l.scheduledAt) < now)
-        .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime())
-        .slice(0, 8)
-        .map((l) => ({
-          id: l.id,
-          courseTitle: l.courseTitle,
-          lessonTitle: l.title,
-          scheduledAt: l.scheduledAt,
-          attended: l.status === 'COMPLETED',
-        }));
+      const { totalLessons, lessonsCompleted, courseProgress, recentSessions } = await studentProgress(child.id);
 
       return {
         id: child.id,
@@ -120,7 +96,7 @@ export async function parentRoutes(app: FastifyInstance) {
         courseProgress,
         recentSessions,
       };
-    });
+    }));
 
     return reply.send({ data: { children } });
   });
@@ -134,7 +110,7 @@ export async function parentRoutes(app: FastifyInstance) {
       return reply.status(403).send({ error: 'Only parents can link children' });
     }
 
-    const { childEmail } = childEmailSchema.parse(request.body);
+    const { childEmail, linkCode } = childEmailSchema.extend({ linkCode: z.string().min(1) }).parse(request.body);
 
     const parentProfile = await prisma.parentProfile.findUnique({ where: { userId } });
     if (!parentProfile) {
@@ -145,10 +121,6 @@ export async function parentRoutes(app: FastifyInstance) {
       where: { email: { equals: childEmail, mode: 'insensitive' }, role: 'STUDENT' },
       include: { studentProfile: true },
     });
-
-    // TODO: temporary debug logging — remove once linking is verified.
-    console.log('[link-child] childEmail:', childEmail);
-    console.log('[link-child] found user:', childUser?.email, childUser?.role, 'studentProfile:', childUser?.studentProfile?.id);
 
     if (!childUser) {
       return reply.status(404).send({ error: 'No student found with that email' });
@@ -162,10 +134,12 @@ export async function parentRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: 'This student is already linked to a parent' });
     }
 
-    await prisma.studentProfile.update({
-      where: { id: childUser.studentProfile.id },
-      data: { parentId: parentProfile.id },
+    const linked = await prisma.studentProfile.updateMany({
+      where: { id: childUser.studentProfile.id, parentId: null,
+        parentLinkHash: createHash('sha256').update(linkCode).digest('hex'), parentLinkExpiresAt: { gt: new Date() } },
+      data: { parentId: parentProfile.id, parentLinkHash: null, parentLinkExpiresAt: null },
     });
+    if (!linked.count) return reply.status(400).send({ error: 'The linking code is invalid or expired. Generate a new code from the student account.' });
 
     return reply.send({
       message: 'Child linked successfully',

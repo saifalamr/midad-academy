@@ -40,7 +40,7 @@ type Overview = {
 };
 
 function authFetch(path: string) {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const token = typeof window !== 'undefined' ? (localStorage.getItem('token') ?? sessionStorage.getItem('token')) : null;
   return fetch(`${API_URL}${path}`, {
     headers: {
       'Content-Type': 'application/json',
@@ -51,7 +51,7 @@ function authFetch(path: string) {
 
 function getTokenPayload(): { name?: string } {
   try {
-    const token = localStorage.getItem('token');
+    const token = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
     if (!token) return {};
     return JSON.parse(atob(token.split('.')[1]));
   } catch {
@@ -70,9 +70,11 @@ export default function ParentDashboard() {
   const router = useRouter();
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [userName, setUserName] = useState('Parent');
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [childEmail, setChildEmail] = useState('');
+  const [linkCode, setLinkCode] = useState('');
   const [linkError, setLinkError] = useState('');
   const [linkLoading, setLinkLoading] = useState(false);
 
@@ -83,10 +85,11 @@ export default function ParentDashboard() {
     authFetch('/api/parent/overview')
       .then(async (res) => {
         if (res.status === 401) { router.push('/login'); return; }
+        if (!res.ok) throw new Error();
         const json = await res.json();
         setOverview(json.data ?? { children: [] });
       })
-      .catch(() => {})
+      .catch(() => setLoadError('Could not load your family report. Please refresh to retry.'))
       .finally(() => setLoading(false));
   }, [router]);
 
@@ -99,6 +102,14 @@ export default function ParentDashboard() {
     .flatMap((c) => c.recentSessions.map((s) => ({ ...s, childName: c.name })))
     .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime())
     .slice(0, 5);
+
+  function downloadReport() {
+    const cell = (value: string | number | boolean) => '"' + String(value).replace(/^[=+@-]/, "'").replace(/"/g, '""') + '"';
+    const rows: (string | number | boolean)[][] = [['Child', 'Course', 'Session', 'Date', 'Attended']];
+    children.forEach((child) => child.recentSessions.forEach((session) => rows.push([child.name, session.courseTitle, session.lessonTitle, new Date(session.scheduledAt).toLocaleDateString(), session.attended])));
+    const url = URL.createObjectURL(new Blob(['\ufeff' + rows.map((row) => row.map(cell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a'); a.href = url; a.download = 'midad-learning-report.csv'; a.click(); URL.revokeObjectURL(url);
+  }
 
   const initial = userName.charAt(0).toUpperCase();
 
@@ -114,8 +125,8 @@ export default function ParentDashboard() {
           </Link>
           <nav className="ab-nav">
             <a className="on">Overview</a>
-            <span className="nav-disabled" style={{ opacity: 0.4, cursor: 'not-allowed' }} title="Coming soon">Children</span>
-            <span className="nav-disabled" style={{ opacity: 0.4, cursor: 'not-allowed' }} title="Coming soon">Reports</span>
+            <a href="#children">Children</a>
+            <a href="#reports">Reports</a>
           </nav>
           <div className="ab-right">
             <span className="role-tag">Parent · وليّ أمر</span>
@@ -127,6 +138,7 @@ export default function ParentDashboard() {
       </header>
 
       <main className="dash">
+        {loadError && <div className="auth-error" role="alert">{loadError}</div>}
 
         {/* ── Page head ── */}
         <div className="page-head">
@@ -136,12 +148,12 @@ export default function ParentDashboard() {
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn btn-gold" onClick={() => setShowLinkModal(true)}>+ Add Child</button>
-            <button className="btn btn-outline" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">Download weekly report</button>
+            <button className="btn btn-outline" onClick={downloadReport} disabled={!children.length}>Download learning report</button>
           </div>
         </div>
 
         {/* ── Stats row ── */}
-        <div className="stat-row">
+        <div className="stat-row" id="children">
           <div className="stat card"><div className="st-ic st-navy">👨‍👩‍👧</div><div><b>{loading ? '—' : children.length}</b><span>Children enrolled</span></div></div>
           <div className="stat card"><div className="st-ic st-fire">🗓️</div><div><b>{loading ? '—' : totalEnrolled}</b><span>Active classes</span></div></div>
           <div className="stat card"><div className="st-ic st-gold">⭐</div><div><b>{loading ? '—' : familyXP}</b><span>Family XP</span></div></div>
@@ -184,7 +196,7 @@ export default function ParentDashboard() {
                         style={{ fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}
                         onClick={async () => {
                           if (!window.confirm('Unlink this child?')) return;
-                          const token = localStorage.getItem('token');
+                          const token = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
                           await fetch(`${API_URL}/api/parent/unlink-child`, {
                             method: 'DELETE',
                             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -291,8 +303,8 @@ export default function ParentDashboard() {
               </div>
 
               <div className="dash-col">
-                <div className="card pad report-card">
-                  <div className="col-head sm"><h3>This week</h3></div>
+                <div className="card pad report-card" id="reports">
+                  <div className="col-head sm"><h3>Learning summary</h3></div>
                   <div className="rep-big">
                     <b>{totalCompleted}</b>
                     <span>lessons attended</span>
@@ -308,7 +320,7 @@ export default function ParentDashboard() {
                 <div className="card pad">
                   <div className="col-head sm"><h3>Plan</h3></div>
                   <div className="pay-row">
-                    <div><b>Scholar plan</b><span>Manage your subscription</span></div>
+                    <div><b>Course enrollment</b><span>Browse available courses</span></div>
                     <Link href="/courses" className="link-gold">Manage</Link>
                   </div>
                 </div>
@@ -327,13 +339,14 @@ export default function ParentDashboard() {
               </div>
               <div className="modal-body">
                 <p style={{ fontSize: 14, color: 'var(--ink-2)', marginBottom: 16 }}>
-                  Enter your child&apos;s registered email address to link them to your account.
+                  Enter your child&apos;s email and the one-time code generated from their Account page.
                 </p>
                 <div className="field">
                   <label>Child&apos;s email address</label>
                   <input className="input" type="email" placeholder="child@example.com"
                     value={childEmail} onChange={(e) => setChildEmail(e.target.value)} />
                 </div>
+                <label className="field">Linking code<input className="input" value={linkCode} onChange={(e) => setLinkCode(e.target.value)} placeholder="Code from the student account" /></label>
                 {linkError && <div className="auth-error">{linkError}</div>}
               </div>
               <div className="modal-foot">
@@ -343,16 +356,16 @@ export default function ParentDashboard() {
                     setLinkError('');
                     setLinkLoading(true);
                     try {
-                      const token = localStorage.getItem('token');
+                      const token = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
                       const res = await fetch(`${API_URL}/api/parent/link-child`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                        body: JSON.stringify({ childEmail }),
+                        body: JSON.stringify({ childEmail, linkCode }),
                       });
                       const data = await res.json();
                       if (!res.ok) { setLinkError(data.error || 'Failed to link child'); return; }
                       setShowLinkModal(false);
-                      setChildEmail('');
+                      setChildEmail(''); setLinkCode('');
                       window.location.reload(); // refresh to show new child
                     } catch { setLinkError('Could not connect to server'); }
                     finally { setLinkLoading(false); }

@@ -22,11 +22,10 @@ type Enrollment = {
 };
 
 const THUMBS = ['th-1', 'th-2', 'th-3', 'th-4', 'th-5', 'th-6'];
-const AGE_FILTERS = ['All', '5–7', '8–11', '12–15'];
-const CATEGORY_FILTERS = ['All courses', 'Reading & Writing', 'Conversation', 'Grammar', "Qur'an"];
+const AGE_FILTERS = ['All', '5–7', '8–10', '11–13', '14–15'];
 
 function authFetch(path: string, options: RequestInit = {}) {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const token = typeof window !== 'undefined' ? (localStorage.getItem('token') ?? sessionStorage.getItem('token')) : null;
   return fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
@@ -46,7 +45,6 @@ export default function BrowseCoursesPage() {
   const [message, setMessage] = useState('');
   const [search, setSearch] = useState('');
   const [ageFilter, setAgeFilter] = useState('All');
-  const [categoryFilter, setCategoryFilter] = useState('All courses');
 
   useEffect(() => {
     Promise.all([
@@ -65,7 +63,7 @@ export default function BrowseCoursesPage() {
           setEnrolledIds(new Set((enrollmentsJson.data as Enrollment[]).map((e) => e.course.id)));
         }
       })
-      .catch(() => {})
+      .catch(() => setMessage('Could not load courses. Please refresh to retry.'))
       .finally(() => setLoading(false));
   }, [router]);
 
@@ -130,17 +128,6 @@ export default function BrowseCoursesPage() {
 
       {/* ── Filter bar ── */}
       <div className="wrap courses-bar">
-        <div className="filters">
-          {CATEGORY_FILTERS.map((cat) => (
-            <button
-              key={cat}
-              className={`filter${categoryFilter === cat ? ' on' : ''}`}
-              onClick={() => setCategoryFilter(cat)}
-            >
-              {cat === 'Grammar' ? 'Grammar — النحو' : cat === "Qur'an" ? "Qur'an" : cat}
-            </button>
-          ))}
-        </div>
         <div className="age-filter">
           <span>Age:</span>
           {AGE_FILTERS.map((a) => (
@@ -187,7 +174,7 @@ export default function BrowseCoursesPage() {
                   <div className="cv-body">
                     <div className="cv-tags">
                       <span className="pill pill-navy">Course</span>
-                      <span className="cv-rate">★ —</span>
+
                     </div>
                     <h3 className="cv-title">{course.title}</h3>
                     <p className="cv-desc">{course.description}</p>
@@ -203,7 +190,7 @@ export default function BrowseCoursesPage() {
                       {course.price === 0 ? (
                         <b>Free</b>
                       ) : (
-                        <><b>${course.price}</b><span>/mo</span></>
+                        <><b>${course.price}</b><span>one-time</span></>
                       )}
                     </div>
                     <button
@@ -225,9 +212,9 @@ export default function BrowseCoursesPage() {
         <div className="cta-band geo-navy courses-cta">
           <div>
             <h2 className="cta-h">Not sure which course fits?</h2>
-            <p>Book a free placement chat and we&apos;ll match your child to the right level.</p>
+            <p>Read the course age group and description, or contact the academy for help.</p>
           </div>
-          <button className="btn btn-lg btn-gold" onClick={() => router.push('/register')}>
+          <button className="btn btn-lg btn-gold" onClick={() => router.push('/contact')}>
             Get a free placement
           </button>
         </div>

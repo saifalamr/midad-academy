@@ -2,16 +2,30 @@
   "name": "arabic-learning-platform",
   "version": "0.0.1",
   "private": true,
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore",
     "type-check": "turbo run type-check",
-    "clean": "turbo run clean"
+    "clean": "turbo run clean",
+    "preview:db": "node scripts/dev-db.mjs",
+    "preview:seed": "node --env-file=.env.preview --import tsx scripts/seed-preview.ts",
+    "preview:api": "node --env-file=.env.preview --import tsx apps/api/src/index.ts",
+    "preview:web": "npm run dev -w @arabic-platform/web",
+    "test:api": "node --env-file=.env.preview --import tsx --test tests/api.test.ts",
+    "test:e2e": "node scripts/preview.mjs --test",
+    "preview": "node scripts/preview.mjs"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite-socket": "^0.2.11",
+    "@playwright/test": "^1.63.0",
+    "@sparticuz/chromium": "^153.0.0",
     "@typescript-eslint/eslint-plugin": "^7.13.0",
     "@typescript-eslint/parser": "^7.13.0",
     "eslint": "^8.57.0",
@@ -21,7 +35,13 @@
     "typescript": "^5.5.2"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.9.0"
   },
-  "packageManager": "npm@11.12.1"
+  "packageManager": "npm@11.12.1",
+  "overrides": {
+    "postcss": "8.5.29",
+    "next": {
+      "postcss": "8.5.29"
+    }
+  }
 }

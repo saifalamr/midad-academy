@@ -57,6 +57,7 @@ type QuizResult = {
 };
 
 type StudentStats = {
+  badges?: { name: string; description: string; iconUrl: string }[];
   totalPoints: number;
   level: string;
   streak: number;
@@ -68,7 +69,7 @@ type StudentStats = {
 };
 
 function authFetch(path: string, options: RequestInit = {}) {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const token = typeof window !== 'undefined' ? (localStorage.getItem('token') ?? sessionStorage.getItem('token')) : null;
   return fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
@@ -81,7 +82,7 @@ function authFetch(path: string, options: RequestInit = {}) {
 
 function getTokenPayload(): { name?: string } {
   try {
-    const token = localStorage.getItem('token');
+    const token = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
     if (!token) return {};
     return JSON.parse(atob(token.split('.')[1]));
   } catch {
@@ -90,7 +91,6 @@ function getTokenPayload(): { name?: string } {
 }
 
 const THUMBS = ['th-1', 'th-2', 'th-3', 'th-4', 'th-5', 'th-6'];
-const BADGES: [string, string][] = [['📖','First Word'],['🔥','7-Day'],['✍️','Neat Hand'],['⭐','2k XP'],['🗣️','Speaker'],['🔒','Level 10']];
 
 export default function StudentDashboard() {
   const router = useRouter();
@@ -113,7 +113,7 @@ export default function StudentDashboard() {
         const json = await res.json();
         setStats(json.data ?? null);
       })
-      .catch(() => {});
+      .catch(() => setError('Could not load your learning data. Please refresh to retry.'));
 
     authFetch('/api/enrollments')
       .then(async (res) => {
@@ -121,7 +121,7 @@ export default function StudentDashboard() {
         const json = await res.json();
         setEnrollments(json.data ?? []);
       })
-      .catch(() => {})
+      .catch(() => setError('Could not load your courses. Please refresh to retry.'))
       .finally(() => setLoading(false));
 
     authFetch('/api/students/results')
@@ -130,7 +130,7 @@ export default function StudentDashboard() {
         const json = await res.json();
         setQuizResults(json.data ?? []);
       })
-      .catch(() => {});
+      .catch(() => setError('Could not load your learning data. Please refresh to retry.'));
 
     authFetch('/api/sessions/upcoming')
       .then(async (res) => {
@@ -138,7 +138,7 @@ export default function StudentDashboard() {
         const json = await res.json();
         setUpcomingSessions(json.data ?? []);
       })
-      .catch(() => {});
+      .catch(() => setError('Could not load your learning data. Please refresh to retry.'));
   }, [router]);
 
   async function handleJoinClass(courseId: string) {
@@ -381,12 +381,7 @@ export default function StudentDashboard() {
                 <h3>My Badges <span className="ar muted">أوسمتي</span></h3>
               </div>
               <div className="badge-grid">
-                {BADGES.map(([ic, label]) => (
-                  <div key={label} className="bg-item">
-                    <div className="bg-ic locked">{ic}</div>
-                    <span>{label}</span>
-                  </div>
-                ))}
+                {stats?.badges?.length ? stats.badges.map((badge) => <div key={badge.name} className="bg-item"><div className="bg-ic">⭐</div><span title={badge.description}>{badge.name}</span></div>) : <p className="muted">Pass a quiz with a perfect score to earn your first badge.</p>}
               </div>
             </div>
 

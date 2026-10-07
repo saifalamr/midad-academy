@@ -73,7 +73,7 @@ const TYPE_ICON: Record<ContentType, string> = {
 };
 
 function authFetch(path: string, options: RequestInit = {}) {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const token = typeof window !== 'undefined' ? (localStorage.getItem('token') ?? sessionStorage.getItem('token')) : null;
   return fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
@@ -170,7 +170,7 @@ export default function CourseContentPage() {
     setUploadError('');
     setUploading(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
       const formData = new FormData();
       formData.append('file', file);
 

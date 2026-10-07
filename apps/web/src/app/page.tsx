@@ -13,23 +13,15 @@ export default function HomePage() {
             <span className="pill">🕌 Trusted Arabic learning for ages 5–15</span>
             <h1 className="hero-h1">Where children fall in<br />love with <span className="u-gold">Arabic</span>.</h1>
             <p className="ar hero-ar">حيث يتعلّم الأطفال العربية بشغفٍ ومتعة</p>
-            <p className="hero-sub">Live classes with certified teachers, an interactive whiteboard built for kids, and a parent dashboard that keeps you in the loop — all in one warm, beautifully crafted academy.</p>
+            <p className="hero-sub">Live classes with your course teacher, an interactive whiteboard built for kids, and a parent dashboard that keeps you in the loop — all in one warm, beautifully crafted academy.</p>
             <div className="hero-actions">
               <Link className="btn btn-lg btn-gold" href="/register">
-                Get Started Free
+                Create an account
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4}><path d="M5 12h14M13 6l6 6-6 6" /></svg>
               </Link>
               <Link className="btn btn-lg btn-outline" href="/courses">Browse Courses</Link>
             </div>
-            <div className="hero-trust">
-              <div className="stack">
-                <span className="av" style={{ background: '#dce6f4' }}>ن</span>
-                <span className="av" style={{ background: '#f3e3c2' }}>س</span>
-                <span className="av" style={{ background: '#e3efe6' }}>م</span>
-                <span className="av" style={{ background: '#f4dede' }}>ر</span>
-              </div>
-              <div><b>12,000+</b> families learning together · <span className="stars">★★★★★</span> 4.9</div>
-            </div>
+            <div className="hero-trust"><b>Learn together.</b> Live lessons, practice and family progress in one place.</div>
           </div>
 
           <div className="hero-visual">
@@ -60,7 +52,7 @@ export default function HomePage() {
           </div>
         </div>
         <div className="hero-logos wrap">
-          <span>Aligned with national curricula</span>
+          <span>Practice core Arabic skills</span>
           <div className="lg-row"><b>القرآن</b><b>النحو</b><b>القراءة</b><b>الكتابة</b><b>المحادثة</b></div>
         </div>
       </div>
@@ -78,8 +70,8 @@ export default function HomePage() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><rect x="2" y="4" width="15" height="16" rx="2.5" /><path d="M17 9l5-3v12l-5-3" /></svg>
             </div>
             <h3>Live Classes</h3>
-            <p>Small-group sessions with certified native teachers. Cameras, audio, hand-raising and instant feedback — face to face, every week.</p>
-            <ul className="feat-list"><li>Max 6 students per class</li><li>Recorded for replay</li></ul>
+            <p>Scheduled sessions with your course teacher. Cameras, audio, hand-raising and instant feedback — face to face, every week.</p>
+            <ul className="feat-list"><li>Scheduled live sessions</li><li>Teacher-led materials</li></ul>
           </div>
           <div className="feat card feat-feature">
             <div className="feat-ic ic-gold">
@@ -94,8 +86,8 @@ export default function HomePage() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M3 13h4l2 5 4-12 2 7h6" /></svg>
             </div>
             <h3>Parent Dashboard</h3>
-            <p>Follow every child&apos;s attendance, XP, streaks and badges. Get weekly progress reports and never miss a class or milestone.</p>
-            <ul className="feat-list"><li>Multi-child overview</li><li>Weekly email reports</li></ul>
+            <p>Follow every child&apos;s attendance, XP and learning activity. Download learning reports and never miss a class or milestone.</p>
+            <ul className="feat-list"><li>Multi-child overview</li><li>Downloadable learning reports</li></ul>
           </div>
         </div>
       </div>
@@ -103,7 +95,7 @@ export default function HomePage() {
       {/* how it works strip */}
       <div className="howstrip geo-navy">
         <div className="wrap how-grid">
-          <div className="how"><span className="hn">1</span><b>Create an account</b><p>Pick a plan and add your children in minutes.</p></div>
+          <div className="how"><span className="hn">1</span><b>Create an account</b><p>Create a student or parent account in minutes.</p></div>
           <div className="how"><span className="hn">2</span><b>Choose courses</b><p>Match each child to the right level and teacher.</p></div>
           <div className="how"><span className="hn">3</span><b>Join live &amp; grow</b><p>Learn weekly, earn XP and watch progress soar.</p></div>
         </div>
@@ -113,48 +105,13 @@ export default function HomePage() {
       <div className="section" id="pricing-anchor">
         <div className="wrap center">
           <span className="eyebrow">Simple, family-friendly pricing</span>
-          <h2 className="sec-h2">Plans that grow with your child</h2>
-          <p className="sec-sub">No contracts. Cancel anytime. Every plan includes the parent dashboard.</p>
+          <h2 className="sec-h2">Choose the right course for your child</h2>
+          <p className="sec-sub">Course prices are shown before enrollment. Paid courses use a one-time checkout.</p>
         </div>
         <div className="wrap price-grid">
-          <div className="price card">
-            <div className="pr-name">Explorer</div>
-            <div className="pr-amt"><b>$19</b><span>/ month</span></div>
-            <p className="pr-desc">A gentle start for one young learner.</p>
-            <ul className="pr-list">
-              <li>1 live class / week</li>
-              <li>Whiteboard access</li>
-              <li>Parent dashboard</li>
-              <li>XP, badges &amp; streaks</li>
-            </ul>
-            <Link className="btn btn-block btn-outline" href="/register">Choose Explorer</Link>
-          </div>
-          <div className="price card price-best">
-            <span className="pr-tag">Most popular</span>
-            <div className="pr-name">Scholar</div>
-            <div className="pr-amt"><b>$39</b><span>/ month</span></div>
-            <p className="pr-desc">Steady weekly progress with extras.</p>
-            <ul className="pr-list">
-              <li>3 live classes / week</li>
-              <li>Recorded class replays</li>
-              <li>Homework &amp; quizzes</li>
-              <li>Priority teacher matching</li>
-              <li>Up to 2 children</li>
-            </ul>
-            <Link className="btn btn-block btn-gold" href="/register">Choose Scholar</Link>
-          </div>
-          <div className="price card">
-            <div className="pr-name">Family</div>
-            <div className="pr-amt"><b>$69</b><span>/ month</span></div>
-            <p className="pr-desc">The whole family, one simple plan.</p>
-            <ul className="pr-list">
-              <li>Unlimited live classes</li>
-              <li>Up to 4 children</li>
-              <li>1-on-1 monthly review</li>
-              <li>Certificates of completion</li>
-            </ul>
-            <Link className="btn btn-block btn-outline" href="/register">Choose Family</Link>
-          </div>
+          <div className="price card"><div className="pr-name">Start learning</div><h3>Choose a course</h3><p className="pr-desc">Browse courses by age group and teacher. Each course shows its own enrollment price.</p><Link className="btn btn-block btn-outline" href="/courses">Browse courses</Link></div>
+          <div className="price card price-best"><div className="pr-name">Live & interactive</div><h3>Learn with your teacher</h3><p className="pr-desc">Join scheduled video classes, follow shared materials and practise on the collaborative whiteboard.</p><Link className="btn btn-block btn-gold" href="/curriculum">Explore learning</Link></div>
+          <div className="price card"><div className="pr-name">For families</div><h3>Follow your child</h3><p className="pr-desc">Securely link a student account, follow attendance and download learning reports.</p><Link className="btn btn-block btn-outline" href="/register">Create an account</Link></div>
         </div>
       </div>
 
@@ -162,9 +119,9 @@ export default function HomePage() {
       <div className="wrap"><div className="cta-band geo-navy">
         <div>
           <h2 className="cta-h">Start your child&apos;s Arabic journey today</h2>
-          <p>Join 12,000+ families. Your first week is on us.</p>
+          <p>Create an account and explore the available courses.</p>
         </div>
-        <Link className="btn btn-lg btn-gold" href="/register">Get Started Free</Link>
+        <Link className="btn btn-lg btn-gold" href="/register">Create an account</Link>
       </div></div>
 
       {/* footer */}
@@ -178,9 +135,9 @@ export default function HomePage() {
               </div>
               <p className="foot-about">A premium online academy helping children aged 5–15 read, write and speak Arabic with confidence and joy.</p>
             </div>
-            <div><h5>Learn</h5><Link href="/courses">Browse Courses</Link><a href="#pricing-anchor">Pricing</a><Link href="/register">Free Trial</Link><span style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">Curriculum</span></div>
+            <div><h5>Learn</h5><Link href="/courses">Browse Courses</Link><a href="#pricing-anchor">Pricing</a><Link href="/register">Get Started</Link><Link href="/curriculum">Curriculum</Link></div>
             <div><h5>Platform</h5><Link href="/student">Student</Link><Link href="/teacher">Teacher</Link><Link href="/parent">Parent</Link><Link href="/courses">Classroom</Link></div>
-            <div><h5>Company</h5><span style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">About</span><span style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">Our Teachers</span><span style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">Contact</span><span style={{ opacity: 0.5, cursor: 'not-allowed' }} title="Coming soon">Help Center</span></div>
+            <div><h5>Company</h5><Link href="/about">About</Link><Link href="/teachers">Our Teachers</Link><Link href="/contact">Contact</Link><Link href="/help">Help Center</Link></div>
           </div>
           <div className="foot-bottom">
             <span>© 2026 Midad Academy · مداد. All rights reserved.</span>

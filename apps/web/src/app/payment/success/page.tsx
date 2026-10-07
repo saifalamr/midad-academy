@@ -10,7 +10,7 @@ type ConfirmResult = {
 };
 
 function authFetch(path: string, options: RequestInit = {}) {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const token = typeof window !== 'undefined' ? (localStorage.getItem('token') ?? sessionStorage.getItem('token')) : null;
   return fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
@@ -37,7 +37,7 @@ function PaymentSuccessContent() {
       return;
     }
 
-    const token = localStorage.getItem('token');
+    const token = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
     if (!token) {
       router.push('/login');
       return;

@@ -37,7 +37,7 @@ const AGE_GROUPS = ['5–7', '8–10', '11–13', '14–15'];
 const THUMBS = ['th-1', 'th-2', 'th-3', 'th-4', 'th-5', 'th-6'];
 
 function authFetch(path: string, options: RequestInit = {}) {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const token = typeof window !== 'undefined' ? (localStorage.getItem('token') ?? sessionStorage.getItem('token')) : null;
   return fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
@@ -50,7 +50,7 @@ function authFetch(path: string, options: RequestInit = {}) {
 
 function getTokenPayload(): { name?: string } {
   try {
-    const token = localStorage.getItem('token');
+    const token = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
     if (!token) return {};
     return JSON.parse(atob(token.split('.')[1]));
   } catch {
@@ -62,6 +62,7 @@ export default function TeacherDashboard() {
   const router = useRouter();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reviewCount, setReviewCount] = useState<number | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [userName, setUserName] = useState('Teacher');
   const formRef = useRef<HTMLFormElement>(null);
@@ -97,16 +98,18 @@ export default function TeacherDashboard() {
         const json = await res.json();
         setCourses(json.data ?? []);
       })
-      .catch(() => {})
+      .catch(() => setFormError('Could not load your courses. Please refresh to retry.'))
       .finally(() => setLoading(false));
+
+    authFetch('/api/teacher/pending-reviews').then(async (res) => { if (!res.ok) throw new Error(); const json = await res.json(); setReviewCount(json.data.length); }).catch(() => setFormError('Could not load pending reviews. Please refresh to retry.'));
 
     authFetch('/api/sessions/upcoming')
       .then(async (res) => {
-        if (!res.ok) return;
+        if (!res.ok) { const data = await res.json(); setFormError(data.error || 'Could not update session'); return; }
         const json = await res.json();
         setSessions(json.data ?? []);
       })
-      .catch(() => {});
+      .catch(() => setFormError('Could not load your classes. Please refresh to retry.'));
   }, [router]);
 
   function openScheduleModal(course: Course) {
@@ -151,7 +154,7 @@ export default function TeacherDashboard() {
     setCancellingId(sessionId);
     try {
       const res = await authFetch(`/api/sessions/${sessionId}/cancel`, { method: 'PATCH', body: '{}' });
-      if (!res.ok) return;
+      if (!res.ok) { const data = await res.json(); setFormError(data.error || 'Could not update session'); return; }
       setSessions((prev) => prev.filter((s) => s.id !== sessionId));
     } catch {
       // ignore
@@ -164,7 +167,7 @@ export default function TeacherDashboard() {
     setStartingId(session.id);
     try {
       const res = await authFetch(`/api/sessions/${session.id}/start`, { method: 'PATCH', body: '{}' });
-      if (!res.ok) return;
+      if (!res.ok) { const data = await res.json(); setFormError(data.error || 'Could not update session'); return; }
       router.push(`/classroom/${session.courseId}`);
     } catch {
       // ignore
@@ -209,8 +212,8 @@ export default function TeacherDashboard() {
           </Link>
           <nav className="ab-nav">
             <a className="on">Dashboard</a>
-            <span className="nav-disabled" style={{ opacity: 0.4, cursor: 'not-allowed' }} title="Coming soon">My Courses</span>
-            <span className="nav-disabled" style={{ opacity: 0.4, cursor: 'not-allowed' }} title="Coming soon">Students</span>
+            <a href="#teacher-courses">My Courses</a>
+            <Link href="/teacher/students">Students</Link>
           </nav>
           <div className="ab-right">
             <span className="role-tag">Teacher · معلّم</span>
@@ -240,18 +243,19 @@ export default function TeacherDashboard() {
           </div>
         </div>
 
+        {formError && <p className="auth-error" role="alert">{formError}</p>}
         {/* ── Stats row ── */}
         <div className="stat-row">
           <div className="stat card"><div className="st-ic st-navy">📚</div><div><b>{courses.length}</b><span>Active courses</span></div></div>
           <div className="stat card"><div className="st-ic st-gold">👨‍🎓</div><div><b>{totalStudents}</b><span>Students</span></div></div>
-          <div className="stat card"><div className="st-ic st-fire">🗓️</div><div><b>{courses.reduce((s, c) => s + c.lessons.length, 0)}</b><span>Lessons scheduled</span></div></div>
-          <div className="stat card"><div className="st-ic st-green">★</div><div><b>—</b><span>Avg. rating</span></div></div>
+          <div className="stat card"><div className="st-ic st-fire">🗓️</div><div><b>{sessions.length}</b><span>Lessons scheduled</span></div></div>
+          <div className="stat card"><div className="st-ic st-green">★</div><div><b>{reviewCount ?? '…'}</b><span>Reviews to grade</span></div></div>
         </div>
 
         <div className="dash-grid t-grid">
 
           {/* ── Courses column ── */}
-          <div className="dash-col">
+          <div className="dash-col" id="teacher-courses">
             <div className="col-head">
               <h2>My Classes <span className="ar muted">صفوفي</span></h2>
             </div>
@@ -295,7 +299,7 @@ export default function TeacherDashboard() {
                         </button>
                         <button
                           className="btn btn-sm btn-gold"
-                          onClick={() => router.push(`/classroom/${course.id}`)}
+                          onClick={() => { const session = sessions.find((s) => s.courseId === course.id && ['SCHEDULED', 'LIVE'].includes(s.status)); if (session) void handleStartSession(session); else openScheduleModal(course); }}
                         >
                           Start Class
                         </button>
@@ -361,34 +365,15 @@ export default function TeacherDashboard() {
             </div>
 
             <div className="card pad">
-              <div className="col-head sm"><h3>Up next today</h3></div>
-              {courses.length === 0 ? (
-                <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No sessions scheduled yet.</p>
+              <div className="col-head sm"><h3>Today’s sessions</h3></div>
+              {sessions.filter((session) => new Date(session.scheduledAt).toDateString() === new Date().toDateString()).length === 0 ? (
+                <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No sessions scheduled today.</p>
               ) : (
                 <ul className="agenda">
-                  {courses.slice(0, 3).map((course, i) => (
-                    <li key={course.id} className={i === 2 ? 'dim' : ''}>
-                      <span className="ag-time">—</span>
-                      <div>
-                        <b className="ar">{course.title}</b>
-                        <span>{course._count.enrollments} student{course._count.enrollments !== 1 ? 's' : ''}</span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <div className="card pad">
-              <div className="col-head sm"><h3>Recent activity</h3></div>
-              {courses.length === 0 ? (
-                <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No activity yet.</p>
-              ) : (
-                <ul className="feed">
-                  {courses.slice(0, 3).map((course) => (
-                    <li key={course.id}>
-                      <span className="fd-dot ok"></span>
-                      <div>New enrolment in <b>{course.title}</b></div>
+                  {sessions.filter((session) => new Date(session.scheduledAt).toDateString() === new Date().toDateString()).map((session) => (
+                    <li key={session.id}>
+                      <span className="ag-time">{new Date(session.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      <div><b>{session.title}</b><span>{session.course.title}</span></div>
                     </li>
                   ))}
                 </ul>
@@ -419,8 +404,8 @@ export default function TeacherDashboard() {
               </div>
 
               <div className="field">
-                <label htmlFor="c-desc">Description <span className="muted" style={{ fontSize: 12 }}>(optional)</span></label>
-                <textarea id="c-desc" className="input" rows={3}
+                <label htmlFor="c-desc">Description</label>
+                <textarea id="c-desc" className="input" rows={3} required minLength={10}
                   placeholder="What will students learn in this class?"
                   value={description} onChange={(e) => setDescription(e.target.value)}
                   style={{ height: 78, padding: '12px 16px' }} />
@@ -475,7 +460,7 @@ export default function TeacherDashboard() {
               </div>
 
               <div className="field">
-                <label htmlFor="s-desc">Description <span className="muted" style={{ fontSize: 12 }}>(optional)</span></label>
+                <label htmlFor="s-desc">Description</label>
                 <textarea id="s-desc" className="input" rows={3}
                   placeholder="What will this session cover?"
                   value={sessionDescription} onChange={(e) => setSessionDescription(e.target.value)}

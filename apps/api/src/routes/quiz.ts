@@ -2,6 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { canAccessCourse } from '../lib/access';
+import { awardQuiz } from '../lib/rewards';
 
 const createQuestionSchema = z.object({
   text: z.string().min(1, 'Question text is required'),
@@ -130,7 +132,7 @@ export async function quizRoutes(app: FastifyInstance) {
         ...(body.title !== undefined ? { title: body.title } : {}),
         ...(body.passingScore !== undefined ? { passingScore: body.passingScore } : {}),
       },
-      include: { questions: true },
+      include: { questions: true, content: { select: { courseId: true } } },
     });
 
     return reply.send({ data: updated });
@@ -151,6 +153,7 @@ export async function quizRoutes(app: FastifyInstance) {
     if (!quiz) {
       return reply.status(404).send({ error: 'Quiz not found' });
     }
+
 
     const existing = await prisma.question.findUnique({ where: { id: questionId } });
     if (!existing || existing.quizId !== quizId) {
@@ -213,11 +216,13 @@ export async function quizRoutes(app: FastifyInstance) {
 
     const quiz = await prisma.quiz.findUnique({
       where: { id: quizId },
-      include: { questions: true },
+      include: { questions: true, content: { select: { courseId: true } } },
     });
     if (!quiz) {
       return reply.status(404).send({ error: 'Quiz not found' });
     }
+
+    if (!await canAccessCourse(request.user, quiz.content.courseId)) return reply.status(403).send({ error: 'You cannot submit this quiz' });
 
     if (role === 'TEACHER') {
       return reply.send({ data: quiz });
@@ -249,12 +254,14 @@ export async function quizRoutes(app: FastifyInstance) {
 
     const quiz = await prisma.quiz.findUnique({
       where: { id: quizId },
-      include: { questions: true },
+      include: { questions: true, content: { select: { courseId: true } } },
     });
     if (!quiz) {
       return reply.status(404).send({ error: 'Quiz not found' });
     }
 
+    if (!await canAccessCourse(request.user, quiz.content.courseId)) return reply.status(403).send({ error: 'You cannot submit this quiz' });
+    if (!quiz.questions.length) return reply.status(400).send({ error: 'This quiz has no questions yet' });
     const body = submitQuizSchema.parse(request.body);
 
     let totalPoints = 0;
@@ -319,6 +326,8 @@ export async function quizRoutes(app: FastifyInstance) {
         },
       },
     });
+
+    await awardQuiz(result.id);
 
     return reply.status(201).send({
       data: {

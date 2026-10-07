@@ -43,3 +43,9 @@ apps/api/uploads/
 # Personal/test files
 photo_6019500595422629289_y.jpg
 *.mp4
+
+.dev-db/
+.env.preview
+playwright-report/
+test-results/
+*.tsbuildinfo
