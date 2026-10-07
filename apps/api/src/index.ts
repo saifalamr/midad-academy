@@ -11,6 +11,7 @@ import { healthRoutes } from './routes/health';
 import { authRoutes } from './routes/auth';
 import { courseRoutes } from './routes/courses';
 import { lessonRoutes } from './routes/lessons';
+import { learningRoutes } from './routes/learning';
 import { contentRoutes } from './routes/content';
 import { quizRoutes } from './routes/quiz';
 import { studentRoutes } from './routes/students';
@@ -100,6 +101,7 @@ export async function buildApp() {
   await app.register(accountRoutes, { prefix: '/api/account' });
   await app.register(courseRoutes, { prefix: '/api/courses' });
   await app.register(lessonRoutes, { prefix: '/api/lessons' });
+  await app.register(learningRoutes, { prefix: '/api/learning' });
   await app.register(contentRoutes, { prefix: '/api/content' });
   await app.register(quizRoutes, { prefix: '/api/quiz' });
   await app.register(studentRoutes, { prefix: '/api/students' });

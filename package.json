@@ -26,7 +26,8 @@
     "start:api": "node apps/api/dist/index.js",
     "db:migrate:deploy": "prisma migrate deploy --schema packages/database/prisma/schema.prisma",
     "check:deploy": "node scripts/check-deploy.mjs",
-    "test:deploy": "node --test tests/deploy.test.mjs"
+    "test:deploy": "node --test tests/deploy.test.mjs",
+    "test:calendar": "node --import tsx --test tests/calendar.test.ts"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

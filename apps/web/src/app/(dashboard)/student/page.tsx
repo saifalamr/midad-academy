@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import AddToCalendar from '@/components/AddToCalendar';
 import {
   LineChart, Line, BarChart, Bar, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -63,6 +64,7 @@ type StudentStats = {
   streak: number;
   lessonsCompleted: number;
   totalLessons: number;
+  materialProgress: { courseId: string; title: string; total: number; completed: number; nextLesson: { id: string; title: string } | null }[];
   courseProgress: { courseId: string; title: string; completed: number; total: number }[];
   quizResults: { quizTitle: string; score: number; passed: boolean; createdAt: string }[];
   recentSessions: { title: string; scheduledAt: string; attended: boolean }[];
@@ -279,6 +281,15 @@ export default function StudentDashboard() {
 
         <div className="dash-grid">
 
+          {stats?.materialProgress?.some(course => course.total > 0) && <section className="card pad" style={{ gridColumn: '1 / -1' }} dir="rtl" aria-label="تابع التعلم">
+            <h2 style={{ fontSize: 22, marginBottom: 12 }}>تابع من حيث توقفت</h2>
+            <div className="learning-actions">{stats.materialProgress.filter(course => course.total > 0).map(course => <div key={course.courseId} style={{ flex: '1 1 220px', minWidth: 0 }}>
+              <h3 style={{ fontSize: 16 }}>{course.title}</h3><p className="muted">{course.completed}/{course.total} مواد مكتملة</p>
+              <progress aria-label={`إنجاز مواد ${course.title}`} max={course.total} value={course.completed} style={{ width: '100%', accentColor: 'var(--gold)', marginBottom: 12 }} />
+              <Link className="btn btn-gold btn-sm" href={`/courses/${course.courseId}/lessons${course.nextLesson ? `#lesson-${course.nextLesson.id}` : ''}`}>{course.nextLesson ? `تابع: ${course.nextLesson.title}` : '✓ اكتملت المواد · مراجعة الدورة'}</Link>
+            </div>)}</div>
+          </section>}
+
           {/* ── My Classes column ── */}
           <div className="dash-col">
             <div className="col-head">
@@ -368,6 +379,7 @@ export default function StudentDashboard() {
                         <div>
                           <b>{session.title}</b>
                           <span>{session.course.title} · {session.teacherName} · {session.durationMinutes} min</span>
+                          <AddToCalendar session={session} />
                         </div>
                       </li>
                     );

@@ -123,6 +123,7 @@ model StudentProfile {
   pointEvents  PointTransaction[]
   quizResults  StudentQuizResult[]
   attendance SessionAttendance[]
+  learningStates LearningState[]
 }
 
 model ParentProfile {
@@ -172,6 +173,7 @@ model CourseContent {
 
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
   quiz   Quiz?
+  learningStates LearningState[]
 
   @@index([courseId, order])
 }
@@ -390,4 +392,18 @@ model DrawingPermission {
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@id([courseId, userId])
+}
+
+// Self-reported material completion, separate from graded results/attendance.
+// Notes are private to the student and excluded from teacher/parent reports.
+model LearningState {
+  studentId String
+  contentId String
+  completedAt DateTime?
+  note String @default("")
+  updatedAt DateTime @updatedAt
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  content CourseContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  @@id([studentId, contentId])
+  @@index([contentId])
 }

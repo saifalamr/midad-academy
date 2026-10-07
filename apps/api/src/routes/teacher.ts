@@ -12,8 +12,17 @@ export async function teacherRoutes(app: FastifyInstance) {
   app.get('/students', { preHandler: [app.authenticate] }, async (request, reply) => {
     if (request.user.role !== 'TEACHER') return reply.status(403).send({ error: 'Only teachers can view enrolled students' });
     const enrollments = await prisma.enrollment.findMany({ where: { course: { teacher: { userId: request.user.id } }, status: 'ACTIVE' },
-      select: { id: true, enrolledAt: true, course: { select: { title: true } }, student: { select: { user: { select: { name: true, email: true } }, level: true, totalPoints: true } } }, orderBy: { enrolledAt: 'desc' } });
-    return { data: enrollments.map((e) => ({ id: e.id, name: e.student.user.name, email: e.student.user.email, courseTitle: e.course.title, level: e.student.level, totalPoints: e.student.totalPoints, enrolledAt: e.enrolledAt })) };
+      select: { id: true, courseId: true, enrolledAt: true, course: { select: { title: true, _count: { select: { content: true } } } }, student: { select: {
+        user: { select: { name: true, email: true } }, level: true, totalPoints: true,
+        learningStates: { where: { completedAt: { not: null }, content: { course: { teacher: { userId: request.user.id } } } }, select: { content: { select: { courseId: true } }, updatedAt: true } },
+      } } }, orderBy: { enrolledAt: 'desc' } });
+    return { data: enrollments.map(e => {
+      const completed = e.student.learningStates.filter(state => state.content.courseId === e.courseId);
+      return { id: e.id, courseId: e.courseId, name: e.student.user.name, email: e.student.user.email, courseTitle: e.course.title,
+        level: e.student.level, totalPoints: e.student.totalPoints, enrolledAt: e.enrolledAt,
+        materialsTotal: e.course._count.content, materialsCompleted: completed.length };
+    }) };
+
   });
   // ── GET /api/teacher/pending-reviews ──────────────────────────────────────
   // Lists all written answers awaiting grading across the teacher's courses.

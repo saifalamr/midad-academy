@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
+import LearningWorkspace from '@/components/LearningWorkspace';
 import { API_URL } from '@/lib/config';
 
 type ContentType = 'VIDEO' | 'PDF' | 'EXERCISE';
@@ -59,12 +60,6 @@ type SubmitResult = {
     pointsAwarded: number | null;
     status: 'GRADED' | 'PENDING';
   }[];
-};
-
-const TYPE_ICON: Record<ContentType, string> = {
-  VIDEO: '🎬',
-  PDF: '📄',
-  EXERCISE: '📝',
 };
 
 function authFetch(path: string, options: RequestInit = {}) {
@@ -164,7 +159,7 @@ export default function CourseLessonsPage() {
         <div className="page-head" style={{ marginBottom: 24 }}>
           <div>
             <h1 className="dh-title">Course Lessons</h1>
-            <p className="dh-hi">Watch, read, and take quizzes to track your progress.</p>
+            <p className="dh-hi">تعلم على راحتك، احفظ ملاحظاتك، وتابع إنجازك درسًا بعد درس.</p>
           </div>
         </div>
 
@@ -178,45 +173,7 @@ export default function CourseLessonsPage() {
             No lessons have been added to this course yet.
           </div>
         ) : (
-          <div className="card" style={{ overflow: 'hidden' }}>
-            {lessons.map((lesson, idx) => (
-              <div
-                key={lesson.id}
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
-                  gap: 16,
-                  padding: '16px 20px',
-                  borderBottom: idx < lessons.length - 1 ? '1px solid var(--line, #e5e7eb)' : 'none',
-                }}
-              >
-                <div style={{ fontSize: 24 }}>{TYPE_ICON[lesson.type]}</div>
-
-                <div style={{ flex: '1 1 180px', minWidth: 0 }}>
-                  <div style={{ fontWeight: 700 }}>{lesson.title}</div>
-                  <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>{lesson.description}</div>
-                </div>
-
-                <span className="pill pill-navy">{lesson.type}</span>
-                <span style={{ fontSize: 13, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{lesson.duration} min</span>
-
-                <a className="btn btn-sm btn-outline" href={lesson.contentUrl} target="_blank" rel="noreferrer">
-                  Open
-                </a>
-
-                {lesson.quiz && (
-                  <button
-                    className="btn btn-sm btn-gold"
-                    onClick={() => openQuiz(lesson.quiz!.id)}
-                    disabled={quizLoading}
-                  >
-                    Take Quiz
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
+          <LearningWorkspace courseId={courseId} lessons={lessons} onQuiz={openQuiz} quizLoading={quizLoading} />
         )}
       </div>
 

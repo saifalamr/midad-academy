@@ -82,7 +82,7 @@ export async function parentRoutes(app: FastifyInstance) {
     const children = await Promise.all(parentProfile.children.map(async (child) => {
       const streak = computeStreak(child.pointEvents);
 
-      const { totalLessons, lessonsCompleted, courseProgress, recentSessions } = await studentProgress(child.id);
+      const { totalLessons, lessonsCompleted, courseProgress, recentSessions, materialProgress } = await studentProgress(child.id);
 
       return {
         id: child.id,
@@ -95,6 +95,7 @@ export async function parentRoutes(app: FastifyInstance) {
         totalLessons,
         courseProgress,
         recentSessions,
+        materialProgress,
       };
     }));
 

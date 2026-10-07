@@ -32,6 +32,7 @@ type Child = {
   lessonsCompleted: number;
   totalLessons: number;
   courseProgress: CourseProgress[];
+  materialProgress: { courseId: string; title: string; total: number; completed: number }[];
   recentSessions: Session[];
 };
 
@@ -236,6 +237,11 @@ export default function ParentDashboard() {
                         </ResponsiveContainer>
                       )}
                     </div>
+
+                    {child.materialProgress?.some(course => course.total > 0) && <div style={{ marginTop: 16 }} dir="rtl">
+                      <h3 style={{ fontSize: 14 }}>إنجاز مواد التعلم</h3><p className="muted" style={{ fontSize: 12 }}>إنجاز يسجله الطالب، مستقل عن الحضور والاختبارات.</p>
+                      {child.materialProgress.filter(course => course.total > 0).map(course => <div key={course.courseId} style={{ marginTop: 10 }}><small>{course.title} · {course.completed}/{course.total}</small><progress aria-label={`إنجاز مواد ${course.title} للطالب ${child.name}`} value={course.completed} max={course.total} style={{ display: 'block', width: '100%', accentColor: 'var(--gold)' }} /></div>)}
+                    </div>}
 
                     <div className="ch-next">
                       <span className="nx-dot"></span>

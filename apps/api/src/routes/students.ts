@@ -126,7 +126,7 @@ export async function studentRoutes(app: FastifyInstance) {
 
     const streak = computeStreak(profile.pointEvents);
 
-    const { totalLessons, lessonsCompleted, courseProgress, recentSessions } = await studentProgress(profile.id);
+    const { totalLessons, lessonsCompleted, courseProgress, recentSessions, materialProgress } = await studentProgress(profile.id);
 
     const quizResults = profile.quizResults.map((r) => ({
       quizTitle: r.quiz.title,
@@ -145,6 +145,7 @@ export async function studentRoutes(app: FastifyInstance) {
         courseProgress,
         quizResults,
         recentSessions,
+        materialProgress,
         badges: profile.achievements.map((a) => ({ name: a.badge.name, description: a.badge.description, iconUrl: a.badge.iconUrl })),
       },
     });

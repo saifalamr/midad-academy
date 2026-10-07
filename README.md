@@ -85,3 +85,13 @@ LiveKit room names are unique per scheduled class (`class-<sessionId>`). Shared 
 ### Vercel + Railway staging
 
 See [the staging runbook](docs/staging-deployment.md) for exact monorepo settings, separate environment templates, readiness checks and release limitations. Run `npm run test:deploy` to verify configuration safeguards. Production remains a separate release.
+
+### Learning workspace
+
+Students can search/filter course materials, mark materials completed or undo completion, and save a private note of up to 5,000 characters per material. Notes are saved explicitly to the account and remain after reload. An unsuccessful save preserves the typed note and displays an error. Completion is self-reported and awards no XP; attendance and graded quiz results remain separate.
+
+The student dashboard links to the next unfinished material. Teachers can search their roster by name/email, filter by course and completion, and see material counts. Linked parents see the same material summary. Neither teachers nor parents receive students' private notes. Active enrollment is required for both reading and editing notes.
+
+Students can download upcoming classes as `.ics` calendar events; timestamps use UTC and preserve the actual session duration. Adding a calendar event does not send an email or push reminder from the academy.
+
+Apply migration `20261007221500_learning_state` before running the updated API against a hosted database. The local preview/test database applies tracked migrations automatically. Run `npm run test:calendar` alongside API and browser checks. These changes have not been deployed to the phone preview while deployment work is paused.
