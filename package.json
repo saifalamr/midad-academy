@@ -20,7 +20,13 @@
     "test:api": "node --env-file=.env.preview --import tsx --test tests/api.test.ts",
     "test:e2e": "node scripts/preview.mjs --test",
     "preview": "node scripts/preview.mjs",
-    "test:classroom": "node scripts/preview.mjs --classroom"
+    "test:classroom": "node scripts/preview.mjs --classroom",
+    "build:web": "turbo run build --filter=@arabic-platform/web",
+    "build:api": "prisma generate --schema packages/database/prisma/schema.prisma && turbo run build --filter=@arabic-platform/api",
+    "start:api": "node apps/api/dist/index.js",
+    "db:migrate:deploy": "prisma migrate deploy --schema packages/database/prisma/schema.prisma",
+    "check:deploy": "node scripts/check-deploy.mjs",
+    "test:deploy": "node --test tests/deploy.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

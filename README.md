@@ -45,9 +45,9 @@ API tests start their own in-memory local database, apply tracked migrations and
 
 Final launch remains a separate step. Use a **separate PostgreSQL database** and test provider keys for hosted preview. Do not point preview at the old production database. Set explicit API/web URLs and exact comma-separated `CORS_ORIGIN` values; do not use a wildcard. The browser receives only `NEXT_PUBLIC_` config.
 
-Copy the variable names from `apps/api/.env.example` and `apps/web/.env.example` into the chosen hosting provider. Use a strong JWT secret (32+ characters), a private teacher invitation code, and set `NODE_ENV=production` for the API. The web URL is `FRONTEND_URL`; the API must remain available for WebSockets. Run a **single API instance** until shared whiteboard synchronization and drawing permissions are moved to shared infrastructure. Whiteboard snapshots survive restart, but drawing permissions reset on restart.
+Copy the variable names from `apps/api/.env.example` and `apps/web/.env.example` into the chosen hosting provider. Use a strong JWT secret (32+ characters), a private teacher invitation code, and set `NODE_ENV=production` for the API. The web URL is `FRONTEND_URL`; the API must remain available for WebSockets. Run a **single API instance** until shared whiteboard synchronization and drawing permissions are moved to shared infrastructure. Whiteboard snapshots and drawing permissions survive restart. Live synchronization still requires a single API instance.
 
-Build API: `npm run build -w @arabic-platform/api`; start: `npm run start -w @arabic-platform/api`. Build web: `npm run build -w @arabic-platform/web`; start: `npm run start -w @arabic-platform/web`. Generate Prisma and apply migrations with `npx prisma migrate deploy --schema packages/database/prisma/schema.prisma` against the intended database **after backup and migration review**.
+Build API from the repository root: `npm run build:api`; start: `npm run start:api`. Build web: `npm run build:web`; local start: `npm run start -w @arabic-platform/web`. Generate Prisma and apply migrations with `npx prisma migrate deploy --schema packages/database/prisma/schema.prisma` against the intended database **after backup and migration review**.
 
 The new migration adds password reset, parent invitation, attendance, whiteboard persistence and idempotency indexes. Before applying it to an existing database, check for duplicate non-null `Payment.providerPaymentId` values; reconcile them deliberately, rather than automatically deleting payments.
 
@@ -70,7 +70,7 @@ Current purchase model is **one-time course enrollment**, not recurring monthly 
 
 ### Classroom and collaborative board verification
 
-The course lessons page now links to `/courses/<courseId>/board`, an authenticated board that works outside a call. Teacher and authorized students share independent drawing objects, so concurrent additions survive. Undo affects the participant's own edits; erasing removes objects; the board can be exported as PNG. Drawing pauses while disconnected. Legacy saved boards migrate on the teacher's next connection.
+The course lessons page now links to `/courses/<courseId>/board`, an authenticated board that works outside a call. Teacher and authorized students share independent drawing objects, so concurrent additions survive. Undo affects the participant's own edits; erasing supports whole objects and transparent partial erasure; the board can be exported as PNG. Drawing pauses while disconnected. Legacy saved boards migrate on the teacher's next connection.
 
 `npm run test:e2e` includes a two-browser board test (desktop teacher, mobile student). A separate real-media test is available with an official local LiveKit server:
 
@@ -81,3 +81,7 @@ LIVEKIT_SERVER_BINARY=/absolute/path/livekit-server npm run test:classroom
 Build the web app first. This starts an isolated database, API, LiveKit and two browser participants, using generated camera/audio tracks. The host must permit normal WebRTC networking and network-interface discovery. In the current execution environment LiveKit stops with `route ip+net: netlinkrib: operation not permitted`, so the real-media test is **not passed**. It remains a handover prerequisite on a suitable staging host and real devices.
 
 LiveKit room names are unique per scheduled class (`class-<sessionId>`). Shared material, PDF page and drawing grants are stored in PostgreSQL; late joiners and reconnecting users retrieve the current state. Apply the new `20261007190000_classroom_state` migration before deploying this code. The owner-private phone preview uses a separate single-user drawing demo and does not verify the production LiveKit/WebSocket integration.
+
+### Vercel + Railway staging
+
+See [the staging runbook](docs/staging-deployment.md) for exact monorepo settings, separate environment templates, readiness checks and release limitations. Run `npm run test:deploy` to verify configuration safeguards. Production remains a separate release.
