@@ -124,6 +124,7 @@ model StudentProfile {
   quizResults  StudentQuizResult[]
   attendance SessionAttendance[]
   learningStates LearningState[]
+  seatReservations SeatReservation[]
 }
 
 model ParentProfile {
@@ -159,6 +160,7 @@ model Course {
   whiteboard WhiteboardDocument?
   classroomState ClassroomState?
   drawingPermissions DrawingPermission[]
+  seatReservations SeatReservation[]
 }
 
 model CourseContent {
@@ -303,6 +305,7 @@ model Payment {
   amount            Float
   currency          String        @default("USD")
   status            PaymentStatus @default(PENDING)
+  requiresReview    Boolean       @default(false)
   provider          String
   providerPaymentId String?       @unique
   createdAt         DateTime      @default(now())
@@ -311,6 +314,18 @@ model Payment {
   course Course @relation(fields: [courseId], references: [id])
 
   @@index([userId, createdAt])
+}
+
+model SeatReservation {
+  id String @id @default(cuid())
+  courseId String
+  studentId String
+  checkoutSessionId String? @unique
+  expiresAt DateTime
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  @@unique([courseId, studentId])
+  @@index([courseId])
 }
 
 // ─── Gamification ─────────────────────────────────────────────────────────────

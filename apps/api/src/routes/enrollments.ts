@@ -3,6 +3,7 @@ import { RoomServiceClient } from 'livekit-server-sdk';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { config } from '../config';
+import { enrollFree } from '../lib/enrollment';
 
 const createEnrollmentSchema = z.object({
   courseId: z.string().min(1, 'Course id is required'),
@@ -30,25 +31,9 @@ export async function enrollmentRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Student profile not found' });
     }
 
-    const course = await prisma.course.findUnique({ where: { id: courseId } });
-    if (!course) {
-      return reply.status(404).send({ error: 'Course not found' });
-    }
-    if (course.price > 0) return reply.status(402).send({ error: 'Purchase this course through checkout first' });
+    const enrollment = await enrollFree(courseId, studentProfile.id);
+    return reply.status(201).send({ data: enrollment });
 
-    try {
-      const enrollment = await prisma.enrollment.create({
-        data: { courseId, studentId: studentProfile.id },
-      });
-      return reply.status(201).send({ data: enrollment });
-    } catch (err) {
-      // Prisma's unique-constraint violation code — thrown by the
-      // @@unique([courseId, studentId]) guard on the Enrollment model.
-      if (err && typeof err === 'object' && 'code' in err && err.code === 'P2002') {
-        return reply.status(409).send({ error: 'You are already enrolled in this course' });
-      }
-      throw err;
-    }
   });
 
   // ── GET /api/enrollments ──────────────────────────────────────────────────

@@ -5,7 +5,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { API_URL } from '@/lib/config';
 
 type ConfirmResult = {
-  enrollment: { id: string };
+  enrollment: { id: string } | null;
+  requiresReview: boolean;
+  payment: { amount: number; currency: string };
   course: { id: string; title: string; price: number; currency: string };
 };
 
@@ -26,7 +28,7 @@ function PaymentSuccessContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('session_id');
 
-  const [status, setStatus] = useState<'confirming' | 'done' | 'error'>('confirming');
+  const [status, setStatus] = useState<'confirming' | 'done' | 'error' | 'review'>('confirming');
   const [result, setResult] = useState<ConfirmResult | null>(null);
   const [error, setError] = useState('');
 
@@ -52,6 +54,11 @@ function PaymentSuccessContent() {
         if (!res.ok) {
           setStatus('error');
           setError(json.error || 'Could not confirm your payment');
+          return;
+        }
+        if (json.data.requiresReview || json.data.enrollment?.status !== 'ACTIVE') {
+          setStatus('review');
+          setError('تم تسجيل دفعتك، لكن التسجيل يحتاج مراجعة الأكاديمية. لا تدفع مرة أخرى؛ تواصل مع الدعم مع رقم الطلب: ' + sessionId);
           return;
         }
         setResult(json.data);
@@ -81,7 +88,7 @@ function PaymentSuccessContent() {
             <p className="text-sm text-gray-500 mb-6">
               You&apos;re enrolled in <span className="font-medium text-gray-700">{result.course.title}</span>.
               {result.course.price > 0 && (
-                <> We charged <span className="font-medium text-gray-700">${result.course.price.toFixed(2)} {result.course.currency}</span>.</>
+                <> We charged <span className="font-medium text-gray-700">{result.payment.amount.toFixed(2)} {result.payment.currency}</span>.</>
               )}
             </p>
             <button
@@ -93,10 +100,10 @@ function PaymentSuccessContent() {
           </>
         )}
 
-        {status === 'error' && (
+        {(status === 'error' || status === 'review') && (
           <>
             <div className="text-5xl mb-3">⚠️</div>
-            <h1 className="text-lg font-bold text-gray-900 mb-1">We couldn&apos;t confirm your payment</h1>
+            <h1 className="text-lg font-bold text-gray-900 mb-1">{status === 'review' ? 'تم تسجيل الدفع · التسجيل يحتاج مراجعة' : 'We could not confirm your payment'}</h1>
             <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-6">{error}</p>
             <button
               onClick={() => router.push('/courses')}

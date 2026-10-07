@@ -64,6 +64,7 @@ test('teacher creates a course and sees students; logout protects the dashboard'
   await page.getByRole('button', { name: /Create.*Class|Create.*Course|New.*Course|New.*Class/ }).first().click();
   await page.locator('#c-title').fill('Browser test Arabic course');
   await page.locator('#c-desc').fill('A course created through the browser test.');
+  await page.getByLabel('الحد الأقصى للطلاب', { exact: true }).fill('1');
   await page.getByRole('button', { name: /Create/ }).last().click();
   await expect(page.locator('#teacher-courses').getByText('Browser test Arabic course', { exact: true }).first()).toBeVisible();
   await page.goto('/teacher/students');
@@ -113,4 +114,24 @@ test('student downloads a real scheduled class as a calendar event', async ({ pa
   let text = ''; for await (const chunk of stream!) text += chunk.toString();
   expect(text).toContain('BEGIN:VEVENT'); expect(text).toContain('SUMMARY:حصة التقويم التجريبية');
   expect(text).toContain('DTSTART:'); expect(text).toContain('/courses/preview-arabic/lessons');
+});
+
+
+test('a full course shows its active count and blocks enrollment on mobile', async ({ page, request }) => {
+  const login = async (email: string) => (await (await request.post('http://127.0.0.1:4000/api/auth/login', { data: { email, password: 'MidadPreview2026!' } })).json()).data;
+  const teacher = await login('teacher@preview.midad.test');
+  const student = await login('student@preview.midad.test');
+  const created = await request.post('http://127.0.0.1:4000/api/courses', { headers: { Authorization: `Bearer ${teacher.token}` }, data: { title: 'Full course browser fixture', description: 'A full course for a real UI test.', ageGroup: '8-10', price: 0, maxStudents: 1 } });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  const course = (await created.json()).data;
+  const registered = await request.post('http://127.0.0.1:4000/api/auth/register', { data: { email: 'capacity-browser@midad.test', name: 'Capacity student', role: 'STUDENT', age: 10, password: 'MidadPreview2026!' } });
+  expect(registered.ok()).toBeTruthy();
+  const other = await login('capacity-browser@midad.test');
+  expect((await request.post('http://127.0.0.1:4000/api/enrollments', { headers: { Authorization: `Bearer ${other.token}` }, data: { courseId: course.id } })).ok()).toBeTruthy();
+  await page.addInitScript(token => localStorage.setItem('token', token), student.token);
+  await page.goto('/courses');
+  const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name: course.title, exact: true }) });
+  await expect(card.getByRole('button', { name: 'اكتملت المقاعد', exact: true })).toBeDisabled();
+  await expect(card).toContainText('1 student');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
 });

@@ -8,6 +8,7 @@ const createCourseSchema = z.object({
   description: z.string().min(10, 'Description must be at least 10 characters'),
   ageGroup: z.string().min(1, 'Age group is required'),
   price: z.number().min(0, 'Price must be 0 or more'),
+  maxStudents: z.number().int().min(1).max(100).default(10),
 });
 
 const createContentSchema = z.object({
@@ -26,7 +27,7 @@ export async function courseRoutes(app: FastifyInstance) {
     const courses = await prisma.course.findMany({
       include: {
         teacher: { include: { user: { select: { name: true } } } },
-        _count: { select: { enrollments: true } },
+        _count: { select: { enrollments: { where: { status: 'ACTIVE' } }, seatReservations: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -41,6 +42,8 @@ export async function courseRoutes(app: FastifyInstance) {
         currency: c.currency,
         teacherName: c.teacher.user.name,
         studentCount: c._count.enrollments,
+        maxStudents: c.maxStudents,
+        availableSeats: Math.max(0, c.maxStudents - c._count.enrollments - c._count.seatReservations),
       })),
     });
   });
@@ -63,7 +66,7 @@ export async function courseRoutes(app: FastifyInstance) {
     const courses = await prisma.course.findMany({
       where: { teacherId: teacherProfile.id },
       include: {
-        _count: { select: { enrollments: true } },
+        _count: { select: { enrollments: { where: { status: 'ACTIVE' } }, seatReservations: true } },
         lessons: {
           where: { scheduledAt: { gt: new Date() }, status: 'SCHEDULED' },
           orderBy: { scheduledAt: 'asc' },
@@ -98,11 +101,12 @@ export async function courseRoutes(app: FastifyInstance) {
         description: body.description,
         ageGroup: body.ageGroup,
         price: body.price,
+        maxStudents: body.maxStudents,
         teacherId: teacherProfile.id,
         level: 'beginner',
       },
       include: {
-        _count: { select: { enrollments: true } },
+        _count: { select: { enrollments: { where: { status: 'ACTIVE' } }, seatReservations: true } },
         lessons: true,
       },
     });

@@ -53,7 +53,7 @@ The new migration adds password reset, parent invitation, attendance, whiteboard
 
 Configure provider callbacks:
 
-- Stripe: `POST /api/payments/webhook`, events `checkout.session.completed` and `checkout.session.async_payment_succeeded`, with `STRIPE_WEBHOOK_SECRET`.
+- Stripe: `POST /api/payments/webhook`, events `checkout.session.completed`, `checkout.session.async_payment_succeeded` and `checkout.session.expired`, with `STRIPE_WEBHOOK_SECRET`.
 - LiveKit: `POST /api/sessions/webhook`, content type `application/webhook+json`, signed by the configured LiveKit key.
 - Health: `/api/health` (process) and `/api/ready` (database).
 
@@ -95,3 +95,13 @@ The student dashboard links to the next unfinished material. Teachers can search
 Students can download upcoming classes as `.ics` calendar events; timestamps use UTC and preserve the actual session duration. Adding a calendar event does not send an email or push reminder from the academy.
 
 Apply migration `20261007221500_learning_state` before running the updated API against a hosted database. The local preview/test database applies tracked migrations automatically. Run `npm run test:calendar` alongside API and browser checks. These changes have not been deployed to the phone preview while deployment work is paused.
+
+### Capacity and attendance corrections
+
+Course capacity is configurable on creation (1–100, default 10). Both free-enrollment endpoints serialize seat allocation using a PostgreSQL course-row lock. Counts in course lists include ACTIVE enrollments only; PAUSED/COMPLETED/CANCELLED enrollments do not consume seats. Re-enrollment reuses the original enrollment row and still checks capacity.
+
+Paid checkout reserves a seat before contacting Stripe, with a 35-minute Checkout expiration. An authenticated `checkout.session.expired` webhook releases the reservation; successful fulfillment atomically swaps it for an ACTIVE enrollment. A local clock timeout alone never releases a payable checkout seat: delayed webhooks must not cause overselling. Configure all three Stripe webhook events before enabling paid enrollment. Failed Stripe session creation releases its reservation. Reservations left unbound by a process crash, or expired sessions whose webhooks never arrive, require verified operational reconciliation; do not delete reservations solely because their local timestamp passed.
+
+Replayed paid events cannot reactivate paused/cancelled enrollments. A legacy/late paid checkout without an available seat is recorded as COMPLETED with `requiresReview=true`; it does not create active access. The buyer sees a review message and the owning teacher sees a payment-review notice. Refunds and manual resolution remain outside this batch and are not automatic. Existing over-capacity courses are not automatically unenrolled.
+
+Attendance totals and absence charts include only COMPLETED class sessions after enrollment (plus actual attendance if scheduling changed). SCHEDULED, LIVE and CANCELLED sessions are excluded, preventing premature absences. Material completion remains independent. Apply migration `20261007234500_seat_reservations` before starting the updated hosted API. Deployment remains paused.

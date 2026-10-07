@@ -9,6 +9,12 @@ const gradeAnswerSchema = z.object({
 });
 
 export async function teacherRoutes(app: FastifyInstance) {
+  app.get('/payment-reviews', { preHandler: [app.authenticate] }, async (request, reply) => {
+    if (request.user.role !== 'TEACHER') return reply.status(403).send({ error: 'Only course teachers can review payments' });
+    const payments = await prisma.payment.findMany({ where: { requiresReview: true, course: { teacher: { userId: request.user.id } } },
+      select: { id: true, amount: true, currency: true, providerPaymentId: true, createdAt: true, course: { select: { title: true } }, user: { select: { name: true, email: true } } }, orderBy: { createdAt: 'desc' } });
+    return { data: payments };
+  });
   app.get('/students', { preHandler: [app.authenticate] }, async (request, reply) => {
     if (request.user.role !== 'TEACHER') return reply.status(403).send({ error: 'Only teachers can view enrolled students' });
     const enrollments = await prisma.enrollment.findMany({ where: { course: { teacher: { userId: request.user.id } }, status: 'ACTIVE' },

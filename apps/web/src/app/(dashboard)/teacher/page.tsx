@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import PaymentReviewNotice from '@/components/PaymentReviewNotice';
 import { API_URL } from '@/lib/config';
 
 type Lesson = {
@@ -68,200 +69,7 @@ export default function TeacherDashboard() {
   const formRef = useRef<HTMLFormElement>(null);
 
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [ageGroup, setAgeGroup] = useState(AGE_GROUPS[0]);
-  const [price, setPrice] = useState('');
-  const [formError, setFormError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  // ── Scheduling state ──
-  const [sessions, setSessions] = useState<ClassSession[]>([]);
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [scheduleCourse, setScheduleCourse] = useState<Course | null>(null);
-  const [sessionTitle, setSessionTitle] = useState('');
-  const [sessionDescription, setSessionDescription] = useState('');
-  const [scheduledAt, setScheduledAt] = useState('');
-  const [durationMinutes, setDurationMinutes] = useState('60');
-  const [scheduleError, setScheduleError] = useState('');
-  const [scheduling, setScheduling] = useState(false);
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
-  const [startingId, setStartingId] = useState<string | null>(null);
-  const scheduleFormRef = useRef<HTMLFormElement>(null);
-
-  useEffect(() => {
-    const payload = getTokenPayload();
-    setUserName(payload.name ?? 'Teacher');
-
-    authFetch('/api/courses')
-      .then(async (res) => {
-        if (res.status === 401) { router.push('/login'); return; }
-        const json = await res.json();
-        setCourses(json.data ?? []);
-      })
-      .catch(() => setFormError('Could not load your courses. Please refresh to retry.'))
-      .finally(() => setLoading(false));
-
-    authFetch('/api/teacher/pending-reviews').then(async (res) => { if (!res.ok) throw new Error(); const json = await res.json(); setReviewCount(json.data.length); }).catch(() => setFormError('Could not load pending reviews. Please refresh to retry.'));
-
-    authFetch('/api/sessions/upcoming')
-      .then(async (res) => {
-        if (!res.ok) { const data = await res.json(); setFormError(data.error || 'Could not update session'); return; }
-        const json = await res.json();
-        setSessions(json.data ?? []);
-      })
-      .catch(() => setFormError('Could not load your classes. Please refresh to retry.'));
-  }, [router]);
-
-  function openScheduleModal(course: Course) {
-    setScheduleCourse(course);
-    setSessionTitle('');
-    setSessionDescription('');
-    setScheduledAt('');
-    setDurationMinutes('60');
-    setScheduleError('');
-    setShowScheduleModal(true);
-  }
-
-  async function handleScheduleSession(e: React.FormEvent) {
-    e.preventDefault();
-    if (!scheduleCourse) return;
-    setScheduleError('');
-    setScheduling(true);
-    try {
-      const res = await authFetch('/api/sessions/schedule', {
-        method: 'POST',
-        body: JSON.stringify({
-          courseId: scheduleCourse.id,
-          title: sessionTitle,
-          description: sessionDescription || undefined,
-          scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
-          durationMinutes: parseInt(durationMinutes, 10) || 60,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) { setScheduleError(json.error || 'Failed to schedule class'); return; }
-      setSessions((prev) => [...prev, { ...json.data, course: { id: scheduleCourse.id, title: scheduleCourse.title } }]
-        .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()));
-      setShowScheduleModal(false);
-    } catch {
-      setScheduleError('Could not connect to server');
-    } finally {
-      setScheduling(false);
-    }
-  }
-
-  async function handleCancelSession(sessionId: string) {
-    setCancellingId(sessionId);
-    try {
-      const res = await authFetch(`/api/sessions/${sessionId}/cancel`, { method: 'PATCH', body: '{}' });
-      if (!res.ok) { const data = await res.json(); setFormError(data.error || 'Could not update session'); return; }
-      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-    } catch {
-      // ignore
-    } finally {
-      setCancellingId(null);
-    }
-  }
-
-  async function handleStartSession(session: ClassSession) {
-    setStartingId(session.id);
-    try {
-      const res = await authFetch(`/api/sessions/${session.id}/start`, { method: 'PATCH', body: '{}' });
-      if (!res.ok) { const data = await res.json(); setFormError(data.error || 'Could not update session'); return; }
-      router.push(`/classroom/${session.courseId}`);
-    } catch {
-      // ignore
-    } finally {
-      setStartingId(null);
-    }
-  }
-
-  async function handleCreateCourse(e: React.FormEvent) {
-    e.preventDefault();
-    setFormError('');
-    setSubmitting(true);
-    try {
-      const res = await authFetch('/api/courses', {
-        method: 'POST',
-        body: JSON.stringify({ title, description, ageGroup, price: parseFloat(price) || 0 }),
-      });
-      const json = await res.json();
-      if (!res.ok) { setFormError(json.error || 'Failed to create course'); return; }
-      setCourses((prev) => [json.data, ...prev]);
-      setShowModal(false);
-      setTitle(''); setDescription(''); setAgeGroup(AGE_GROUPS[0]); setPrice('');
-    } catch {
-      setFormError('Could not connect to server');
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  const totalStudents = courses.reduce((sum, c) => sum + c._count.enrollments, 0);
-  const initial = userName.charAt(0).toUpperCase();
-
-  return (
-    <div className="midad" style={{ minHeight: '100vh', background: 'var(--cream)' }}>
-
-      {/* ── App bar ── */}
-      <header className="appbar">
-        <div className="ab-inner">
-          <Link className="brand" href="/">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/midad-logo-transparent.png" alt="Midad Academy" className="logo-full" />
-          </Link>
-          <nav className="ab-nav">
-            <a className="on">Dashboard</a>
-            <a href="#teacher-courses">My Courses</a>
-            <Link href="/teacher/students">Students</Link>
-          </nav>
-          <div className="ab-right">
-            <span className="role-tag">Teacher · معلّم</span>
-            <div className="ab-user">
-              <span className="avatar" style={{ width: 38, height: 38, background: 'rgba(27,58,107,.12)', color: 'var(--navy)' }}>{initial}</span>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="dash">
-
-        {/* ── Page head ── */}
-        <div className="page-head">
-          <div>
-            <p className="dh-hi">Welcome back, <b>{userName}</b> <span className="ar dh-ar">أهلاً</span></p>
-            <h1 className="dh-title">Your teaching, at a glance</h1>
-          </div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Link href="/teacher/review-answers" className="btn btn-outline btn-lg">
-              📝 Review Answers
-            </Link>
-            <button className="btn btn-gold btn-lg" onClick={() => setShowModal(true)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M12 5v14M5 12h14"/></svg>
-              Create New Class
-            </button>
-          </div>
-        </div>
-
-        {formError && <p className="auth-error" role="alert">{formError}</p>}
-        {/* ── Stats row ── */}
-        <div className="stat-row">
-          <div className="stat card"><div className="st-ic st-navy">📚</div><div><b>{courses.length}</b><span>Active courses</span></div></div>
-          <div className="stat card"><div className="st-ic st-gold">👨‍🎓</div><div><b>{totalStudents}</b><span>Students</span></div></div>
-          <div className="stat card"><div className="st-ic st-fire">🗓️</div><div><b>{sessions.length}</b><span>Lessons scheduled</span></div></div>
-          <div className="stat card"><div className="st-ic st-green">★</div><div><b>{reviewCount ?? '…'}</b><span>Reviews to grade</span></div></div>
-        </div>
-
-        <div className="dash-grid t-grid">
-
-          {/* ── Courses column ── */}
-          <div className="dash-col" id="teacher-courses">
-            <div className="col-head">
-              <h2>My Classes <span className="ar muted">صفوفي</span></h2>
-            </div>
-
-            {loading ? (
-              <div className="card pad" style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14 }}>
+  const [desc…2222 tokens truncated…: 14 }}>
                 Loading courses…
               </div>
             ) : (
@@ -425,6 +233,7 @@ export default function TeacherDashboard() {
                 </div>
               </div>
 
+              <div className="field"><label htmlFor="c-capacity">الحد الأقصى للطلاب</label><input id="c-capacity" className="input" type="number" min="1" max="100" required value={maxStudents} onChange={event => setMaxStudents(event.target.value)} /></div>
               {formError && <div className="auth-error">{formError}</div>}
             </form>
 

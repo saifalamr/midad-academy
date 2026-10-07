@@ -14,6 +14,8 @@ type Course = {
   currency: string;
   teacherName: string;
   studentCount: number;
+  maxStudents: number;
+  availableSeats: number;
 };
 
 type Enrollment = {
@@ -90,6 +92,7 @@ export default function BrowseCoursesPage() {
 
       // Free course — enrolled directly
       setEnrolledIds((prev) => new Set(prev).add(courseId));
+      setCourses(prev => prev.map(course => course.id === courseId ? { ...course, studentCount: course.studentCount + 1, availableSeats: Math.max(0, course.availableSeats - 1) } : course));
       setMessage('Enrolled! Find your class on the dashboard.');
       setEnrollingId(null);
     } catch {
@@ -165,6 +168,7 @@ export default function BrowseCoursesPage() {
           <div className="course-grid">
             {filtered.map((course, idx) => {
               const enrolled = enrolledIds.has(course.id);
+              const full = course.availableSeats === 0;
               return (
                 <article key={course.id} className="course card">
                   <div className={`cv-thumb ${THUMBS[idx % THUMBS.length]}`}>
@@ -196,10 +200,10 @@ export default function BrowseCoursesPage() {
                     <button
                       className={`btn btn-sm${enrolled ? ' btn-outline' : ' btn-gold'}`}
                       onClick={() => { if (!enrolled) handleEnroll(course.id); }}
-                      disabled={enrolled || enrollingId === course.id}
+                      disabled={enrolled || full || enrollingId === course.id}
                       style={{ opacity: enrollingId === course.id ? 0.65 : 1 }}
                     >
-                      {enrolled ? '✓ Enrolled' : enrollingId === course.id ? 'Enrolling…' : 'Enroll'}
+                      {enrolled ? '✓ Enrolled' : enrollingId === course.id ? 'Enrolling…' : full ? 'اكتملت المقاعد' : 'Enroll'}
                     </button>
                   </div>
                 </article>

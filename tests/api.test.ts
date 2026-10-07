@@ -15,7 +15,8 @@ process.env.STRIPE_SECRET_KEY = 'sk_test_preview';
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_preview';
 process.env.LIVEKIT_URL = 'ws://127.0.0.1:7880';
 // Provider-independent API tests; real media is covered by the separate classroom test.
-RoomServiceClient.prototype.createRoom = async () => ({} as any);
+let createdRoomCapacity = 0;
+RoomServiceClient.prototype.createRoom = async options => { createdRoomCapacity = options?.maxParticipants ?? 0; return {} as any; };
 RoomServiceClient.prototype.listRooms = async names => (names ?? []).map(name => ({ name } as any));
 RoomServiceClient.prototype.deleteRoom = async () => {};
 RoomServiceClient.prototype.updateRoomMetadata = async () => ({} as any);
@@ -104,11 +105,13 @@ test('classroom creation is restricted and actual signed attendance is recorded 
   const scheduled = await call('POST', '/api/sessions/schedule', 'teacher', { courseId: freeId, title: 'First live class', scheduledAt: new Date().toISOString(), durationMinutes: 30 });
   assert.equal(scheduled.statusCode, 201, scheduled.body); sessionId = scheduled.json().data.id;
   assert.equal((await call('PATCH', `/api/sessions/${sessionId}/start`, 'teacher', {})).statusCode, 200);
+  assert.equal(createdRoomCapacity, 11); // Ten students plus the teacher.
   const payload = JSON.stringify({ event: 'participant_joined', room: { name: `class-${sessionId}` }, participant: { identity: actors.student.id } });
   const token = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET); token.sha256 = createHash('sha256').update(payload).digest('base64');
   const auth = await token.toJwt();
   const send = () => app.inject({ method: 'POST', url: '/api/sessions/webhook', payload, headers: { 'content-type': 'application/webhook+json', authorization: auth } });
   for (let i = 0; i < 2; i++) { const res = await send(); assert.equal(res.statusCode, 200, res.body); }
+  await prisma.classSession.update({ where: { id: sessionId }, data: { status: 'COMPLETED' } });
   const me = (await call('GET', '/api/students/me', 'student')).json().data;
   assert.equal(me.lessonsCompleted, 1); assert.ok(me.totalPoints >= 10);
   assert.equal((await call('GET', '/api/students/me', 'outsider')).json().data.lessonsCompleted, 0);
@@ -228,4 +231,101 @@ test('learning completion and private notes persist without XP, leaking to repor
   assert.deepEqual((await call('GET', list, 'noteStudent')).json().data, []);
   assert.equal((await call('PATCH', path, 'noteStudent', { note: 'other student note' })).statusCode, 200);
   assert.equal((await call('GET', list, 'student')).json().data[0].note, note);
+});
+
+test('the last free seat cannot be oversold across the two enrollment endpoints', async () => {
+  const teacher = await prisma.teacherProfile.findUniqueOrThrow({ where: { userId: actors.teacher.id } });
+  const course = await prisma.course.create({ data: { teacherId: teacher.id, title: 'Single seat', description: 'Concurrency test', ageGroup: '8-10', level: 'beginner', price: 0, maxStudents: 1 } });
+  const [one, two] = await Promise.all([
+    call('POST', '/api/enrollments', 'student', { courseId: course.id }),
+    call('POST', '/api/payments/create-checkout', 'noteStudent', { courseId: course.id }),
+  ]);
+  assert.equal([one, two].filter(r => r.statusCode === 409).length, 1);
+  assert.equal(await prisma.enrollment.count({ where: { courseId: course.id, status: 'ACTIVE' } }), 1);
+  const active = await prisma.enrollment.findFirstOrThrow({ where: { courseId: course.id } });
+  await prisma.enrollment.update({ where: { id: active.id }, data: { status: 'CANCELLED' } });
+  const actor = one.statusCode === 201 ? 'student' : 'noteStudent';
+  assert.equal((await call('POST', '/api/enrollments', actor, { courseId: course.id })).statusCode, 201);
+  assert.equal(await prisma.enrollment.count({ where: { courseId: course.id } }), 1);
+});
+
+test('course counters include active students only and full courses expose zero available seats', async () => {
+  const student = await prisma.studentProfile.findUniqueOrThrow({ where: { userId: actors.student.id } });
+  const other = await prisma.studentProfile.findUniqueOrThrow({ where: { userId: actors.noteStudent.id } });
+  const teacher = await prisma.teacherProfile.findUniqueOrThrow({ where: { userId: actors.teacher.id } });
+  const course = await prisma.course.create({ data: { teacherId: teacher.id, title: 'Counter fixture', description: 'Counts test', ageGroup: '8-10', level: 'beginner', price: 0, maxStudents: 1 } });
+  await prisma.enrollment.createMany({ data: [{ courseId: course.id, studentId: student.id, status: 'ACTIVE' }, { courseId: course.id, studentId: other.id, status: 'PAUSED' }] });
+  const browse = (await call('GET', '/api/courses/browse', 'student')).json().data.find(c => c.id === course.id);
+  assert.equal(browse.studentCount, 1); assert.equal(browse.availableSeats, 0);
+  assert.equal((await call('GET', '/api/courses', 'teacher')).json().data.find(c => c.id === course.id)._count.enrollments, 1);
+  assert.equal((await call('POST', '/api/payments/create-checkout', 'noteStudent', { courseId: course.id })).statusCode, 409);
+  await prisma.enrollment.updateMany({ where: { courseId: course.id, status: 'ACTIVE' }, data: { status: 'COMPLETED' } });
+  assert.equal((await call('GET', '/api/courses/browse', 'student')).json().data.find(c => c.id === course.id).studentCount, 0);
+  assert.equal((await call('POST', '/api/enrollments', 'noteStudent', { courseId: course.id })).statusCode, 201);
+});
+
+test('only completed post-enrollment classes count toward attendance, consistently for student and parent', async () => {
+  const teacher = await prisma.teacherProfile.findUniqueOrThrow({ where: { userId: actors.teacher.id } });
+  const student = await prisma.studentProfile.findUniqueOrThrow({ where: { userId: actors.student.id } });
+  const course = await prisma.course.create({ data: { teacherId: teacher.id, title: 'Attendance fixture', description: 'Attendance test', ageGroup: '8-10', level: 'beginner', price: 0 } });
+  await prisma.enrollment.create({ data: { courseId: course.id, studentId: student.id, enrolledAt: new Date(Date.now() - 86400000) } });
+  for (const status of ['SCHEDULED', 'LIVE', 'CANCELLED', 'COMPLETED'] as const) await prisma.classSession.create({ data: { courseId: course.id, teacherId: teacher.id, title: status, status, scheduledAt: new Date(Date.now() - 60000) } });
+  await prisma.classSession.create({ data: { courseId: course.id, teacherId: teacher.id, title: 'Before enrollment', status: 'COMPLETED', scheduledAt: new Date(Date.now() - 172800000) } });
+  const own = (await call('GET', '/api/students/me', 'student')).json().data;
+  const counts = own.courseProgress.find(c => c.courseId === course.id);
+  assert.equal(counts.total, 1); assert.equal(counts.completed, 0);
+  assert.deepEqual(own.recentSessions.filter(s => s.courseTitle === course.title).map(s => s.title), ['COMPLETED']);
+  const parent = (await call('GET', '/api/parent/overview', 'parent')).json().data.children[0].courseProgress.find(c => c.courseId === course.id);
+  assert.equal(parent.total, 1); assert.equal(parent.completed, 0);
+});
+
+test('paid checkout holds the last seat, releases on signed expiry and never reactivates cancelled access on replay', async () => {
+  const { startPaidCheckout, fulfillCheckout } = await import('../apps/api/src/routes/payments');
+  const teacher = await prisma.teacherProfile.findUniqueOrThrow({ where: { userId: actors.teacher.id } });
+  const student = await prisma.studentProfile.findUniqueOrThrow({ where: { userId: actors.student.id } });
+  const other = await prisma.studentProfile.findUniqueOrThrow({ where: { userId: actors.noteStudent.id } });
+  const course = await prisma.course.create({ data: { teacherId: teacher.id, title: 'Paid last seat', description: 'Paid capacity test', ageGroup: '8-10', level: 'beginner', price: 19, maxStudents: 1 } });
+  let requested: any;
+  await startPaidCheckout(course, student.id, actors.student.id, actors.student.email, async params => { requested = params; return { id: 'cs_seat_expire', url: 'https://checkout.stripe.test/seat' } as any; });
+  assert.ok(requested.expires_at > Date.now() / 1000 + 30 * 60);
+  await assert.rejects(startPaidCheckout(course, other.id, actors.noteStudent.id, actors.noteStudent.email, async () => { throw new Error('Provider must not be called'); }), (e: any) => e.statusCode === 409);
+  const payload = JSON.stringify({ id: 'evt_expired', object: 'event', type: 'checkout.session.expired', data: { object: { id: 'cs_seat_expire', object: 'checkout.session' } } });
+  const signature = new Stripe('sk_test_preview').webhooks.generateTestHeaderString({ payload, secret: process.env.STRIPE_WEBHOOK_SECRET! });
+  assert.equal((await app.inject({ method: 'POST', url: '/api/payments/webhook', payload, headers: { 'content-type': 'application/json', 'stripe-signature': 'invalid' } })).statusCode, 400);
+  assert.equal(await prisma.seatReservation.count({ where: { courseId: course.id } }), 1);
+  assert.equal((await app.inject({ method: 'POST', url: '/api/payments/webhook', payload, headers: { 'content-type': 'application/json', 'stripe-signature': signature } })).statusCode, 200);
+  await assert.rejects(startPaidCheckout(course, other.id, actors.noteStudent.id, actors.noteStudent.email, async () => { throw new Error('Provider unavailable'); }));
+  assert.equal(await prisma.seatReservation.count({ where: { courseId: course.id } }), 0);
+  await startPaidCheckout(course, other.id, actors.noteStudent.id, actors.noteStudent.email, async () => ({ id: 'cs_seat_paid', url: 'https://checkout.stripe.test/seat' } as any));
+  const paid = { id: 'cs_seat_paid', payment_status: 'paid', amount_total: 1900, currency: 'usd', client_reference_id: actors.noteStudent.id, metadata: { courseId: course.id, userId: actors.noteStudent.id, studentId: other.id } } as any;
+  const result = await fulfillCheckout(paid); assert.equal(result.requiresReview, false);
+  assert.equal(await prisma.seatReservation.count({ where: { courseId: course.id } }), 0);
+  await prisma.enrollment.update({ where: { id: result.enrollment!.id }, data: { status: 'CANCELLED' } });
+  await fulfillCheckout(paid);
+  assert.equal((await prisma.enrollment.findUniqueOrThrow({ where: { id: result.enrollment!.id } })).status, 'CANCELLED');
+  assert.equal(await prisma.payment.count({ where: { providerPaymentId: paid.id } }), 1);
+});
+
+test('a legacy paid checkout without a seat is recorded for review instead of overselling', async () => {
+  const { fulfillCheckout } = await import('../apps/api/src/routes/payments');
+  const teacher = await prisma.teacherProfile.findUniqueOrThrow({ where: { userId: actors.teacher.id } });
+  const student = await prisma.studentProfile.findUniqueOrThrow({ where: { userId: actors.student.id } });
+  const other = await prisma.studentProfile.findUniqueOrThrow({ where: { userId: actors.noteStudent.id } });
+  const course = await prisma.course.create({ data: { teacherId: teacher.id, title: 'Legacy paid full', description: 'Legacy checkout test', ageGroup: '8-10', level: 'beginner', price: 19, maxStudents: 1 } });
+  await prisma.enrollment.create({ data: { courseId: course.id, studentId: student.id } });
+  const result = await fulfillCheckout({ id: 'cs_legacy_full', payment_status: 'paid', amount_total: 1900, currency: 'usd', client_reference_id: actors.noteStudent.id, metadata: { courseId: course.id, userId: actors.noteStudent.id, studentId: other.id } } as any);
+  assert.equal(result.requiresReview, true); assert.equal(result.enrollment, null);
+  assert.equal(await prisma.enrollment.count({ where: { courseId: course.id, status: 'ACTIVE' } }), 1);
+  assert.equal((await prisma.payment.findUniqueOrThrow({ where: { providerPaymentId: 'cs_legacy_full' } })).requiresReview, true);
+});
+
+test('teachers can set capacity and payment review alerts remain scoped to the course owner', async () => {
+  const body = { title: 'Configured capacity', description: 'Capacity through API', ageGroup: '8-10', price: 0, maxStudents: 2 };
+  const created = await call('POST', '/api/courses', 'teacher', body);
+  assert.equal(created.statusCode, 201); assert.equal(created.json().data.maxStudents, 2);
+  assert.equal((await call('POST', '/api/courses', 'teacher', { ...body, maxStudents: 0 })).statusCode, 400);
+  const reviews = (await call('GET', '/api/teacher/payment-reviews', 'teacher')).json().data;
+  assert.equal(reviews.length, 1); assert.equal(reviews[0].providerPaymentId, 'cs_legacy_full');
+  assert.deepEqual((await call('GET', '/api/teacher/payment-reviews', 'otherTeacher')).json().data, []);
+  assert.equal((await call('GET', '/api/teacher/payment-reviews', 'student')).statusCode, 403);
 });

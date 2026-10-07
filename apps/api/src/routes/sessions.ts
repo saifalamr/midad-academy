@@ -291,7 +291,8 @@ export async function sessionRoutes(app: FastifyInstance) {
     if (!config.LIVEKIT_URL || !config.LIVEKIT_API_KEY || !config.LIVEKIT_API_SECRET) return reply.status(503).send({ error: 'Live classroom service is not configured' });
     const liveKitRoomId = `class-${session.id}`;
     const service = new RoomServiceClient(toHttpUrl(config.LIVEKIT_URL), config.LIVEKIT_API_KEY, config.LIVEKIT_API_SECRET);
-    await service.createRoom({ name: liveKitRoomId, emptyTimeout: 600, maxParticipants: 30 });
+    const course = await prisma.course.findUniqueOrThrow({ where: { id: session.courseId }, select: { maxStudents: true } });
+    await service.createRoom({ name: liveKitRoomId, emptyTimeout: 600, maxParticipants: course.maxStudents + 1 });
     // Serialize starts for this course so two scheduled sessions cannot become live together.
     const updated = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "Course" WHERE id = ${session.courseId} FOR UPDATE`;
