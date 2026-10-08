@@ -34,6 +34,7 @@ type Child = {
   courseProgress: CourseProgress[];
   materialProgress: { courseId: string; title: string; total: number; completed: number }[];
   recentSessions: Session[];
+  quizResults: { id: string; quizTitle: string; score: number; passed: boolean; status: 'PENDING_REVIEW' | 'COMPLETE'; completedAt: string }[];
 };
 
 type Overview = {
@@ -309,6 +310,14 @@ export default function ParentDashboard() {
               </div>
 
               <div className="dash-col">
+                {children.filter(child => child.quizResults?.length > 0).map(child => <section key={child.id} className="card pad" dir="rtl" aria-label="نتائج اختبارات الطالب">
+                  <h3>نتائج اختبارات {child.name}</h3>
+                  <p className="muted">آخر 20 محاولة. النتيجة نهائية بعد اكتمال تصحيح الإجابات الكتابية.</p>
+                  <ul style={{ paddingInlineStart: 20 }}>{child.quizResults.map(result => <li key={result.id} style={{ marginBottom: 10 }}>
+                    <b>{result.quizTitle}</b> · {result.status === 'PENDING_REVIEW' ? 'بانتظار تصحيح المعلم' : `${result.score}% · ${result.passed ? 'ناجح' : 'لم يجتز'}`}
+                  </li>)}</ul>
+                </section>)}
+
                 <div className="card pad report-card" id="reports">
                   <div className="col-head sm"><h3>Learning summary</h3></div>
                   <div className="rep-big">

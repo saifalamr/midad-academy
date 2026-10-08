@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 const raw = await readFile('.env.preview', 'utf8');
 for (const line of raw.split('\n')) { if (!line || line.startsWith('#')) continue; const i = line.indexOf('='); if (i > 0) process.env[line.slice(0, i)] ??= line.slice(i + 1); }
 const children = [];
@@ -30,6 +30,9 @@ try {
   }
   await finished(run(['--import', 'tsx', 'scripts/seed-preview.ts']));
   run(['--import', 'tsx', 'apps/api/src/index.ts'], { HOST: '127.0.0.1', NODE_ENV: 'test' });
+  // A new isolated test database must also use the current generated UI. Next's
+  // local runtime route cache can retain HTML/chunk references from older builds.
+  if (process.argv.includes('--test') || classroom) await rm('apps/web/.next/server/route-cache', { recursive: true, force: true });
   run(['node_modules/next/dist/bin/next', (process.argv.includes('--test') || classroom) ? 'start' : 'dev', 'apps/web', '-H', '127.0.0.1', '-p', '3000', ...((process.argv.includes('--test') || classroom) ? [] : ['--webpack'])], { NODE_ENV: (process.argv.includes('--test') || classroom) ? 'production' : 'development', NEXT_PUBLIC_API_URL: 'http://127.0.0.1:4000' });
   for (const url of ['http://127.0.0.1:4000/api/ready', 'http://127.0.0.1:3000']) {
     const deadline = Date.now() + 60_000;

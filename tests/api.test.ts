@@ -1,6 +1,6 @@
 import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import Stripe from 'stripe';
 import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
 import { WebSocket } from 'ws';
@@ -405,4 +405,85 @@ test('provider failures do not mark a scheduled class live or recreate an expire
     assert.equal(createdRooms.length, before);
     assert.equal((await call('POST', '/api/sessions/join', 'student', { roomName: course.id })).statusCode, 403);
   } finally { RoomServiceClient.prototype.listRooms = list; }
+});
+
+
+test('quiz submission validates every answer and snapshots survive teacher edits, concurrent grading and replay', async () => {
+  const content = (await call('POST', `/api/courses/${freeId}/lessons`, 'teacher', { title: 'Snapshot lesson', description: 'Quiz snapshot verification', type: 'EXERCISE', contentUrl: 'https://example.com/snapshot', duration: 10 })).json().data;
+  const quiz = (await call('POST', `/api/content/${content.id}/quiz`, 'teacher', { title: 'Original quiz', passingScore: 70 })).json().data;
+  const create = async (body: any) => (await call('POST', `/api/quiz/${quiz.id}/questions`, 'teacher', body)).json().data;
+  const mcq = await create({ text: 'Original choice', options: ['A', 'B'], correctAnswer: 'A', points: 2 });
+  const one = await create({ text: 'Original written one', questionType: 'WRITTEN', points: 2 });
+  const two = await create({ text: 'Original written two', questionType: 'WRITTEN', points: 2 });
+  const answers = { [mcq.id]: 'A', [one.id]: '  مرحباً  ', [two.id]: 'جواب ثان' };
+  const initial = (await call('GET', `/api/quiz/${quiz.id}`, 'student')).json().data;
+  for (const invalid of [{}, { ...answers, [one.id]: '  ' }, { ...answers, foreign: 'answer' }, { ...answers, [mcq.id]: 'invented' }, { ...answers, [one.id]: 'x'.repeat(10001) }]) {
+    assert.equal((await call('POST', `/api/quiz/${quiz.id}/submit`, 'student', { answers: invalid })).statusCode, 400);
+  }
+  assert.equal(await prisma.studentQuizResult.count({ where: { quizId: quiz.id } }), 0);
+  const submissionKey = randomUUID();
+  const payload = { answers, submissionKey, quizRevision: initial.revision };
+  const [first, repeat] = await Promise.all([call('POST', `/api/quiz/${quiz.id}/submit`, 'student', payload), call('POST', `/api/quiz/${quiz.id}/submit`, 'student', payload)]);
+  assert.equal(first.statusCode, 201, first.body); assert.equal(repeat.statusCode, 201, repeat.body);
+  const result = first.json().data; assert.equal(result.id, repeat.json().data.id);
+  assert.equal(await prisma.studentQuizResult.count({ where: { quizId: quiz.id } }), 1);
+  assert.equal((await call('POST', `/api/quiz/${quiz.id}/submit`, 'student', { ...payload, answers: { ...answers, [two.id]: 'different' } })).statusCode, 409);
+  assert.equal((await call('PATCH', `/api/quiz/${quiz.id}/questions/${one.id}`, 'teacher', { text: 'Changed to choice', questionType: 'MCQ', options: ['X', 'Y'], correctAnswer: 'Y', points: 20 })).statusCode, 200);
+  assert.equal((await call('PATCH', `/api/quiz/${quiz.id}`, 'teacher', { title: 'Changed quiz', passingScore: 90 })).statusCode, 200);
+  assert.equal((await call('DELETE', `/api/quiz/${quiz.id}/questions/${one.id}`, 'teacher')).statusCode, 409);
+  assert.equal((await call('POST', `/api/quiz/${quiz.id}/submit`, 'student', { ...payload, submissionKey: randomUUID() })).statusCode, 409);
+  const pending = (await call('GET', '/api/teacher/pending-reviews', 'teacher')).json().data.filter(a => a.resultId === result.id);
+  assert.equal(pending.length, 2); assert.equal(pending.find(a => a.questionText === 'Original written one').points, 2);
+  const beforePoints = (await call('GET', '/api/students/me', 'student')).json().data.totalPoints;
+  const grades = await Promise.all(pending.map((a, i) => call('PATCH', `/api/teacher/answers/${a.id}/grade`, 'teacher', { pointsAwarded: i + 1, feedback: 'ملاحظة محفوظة' })));
+  grades.forEach(r => assert.equal(r.statusCode, 200, r.body));
+  const saved = (await call('GET', '/api/students/results', 'student')).json().data.find(r => r.id === result.id);
+  assert.equal(saved.score, 83); assert.equal(saved.passed, true); assert.equal(saved.status, 'COMPLETE');
+  assert.equal(saved.quizTitle, 'Original quiz'); assert.equal(saved.passingScore, 70);
+  const original = saved.answers.find(a => a.questionId === one.id);
+  assert.equal(original.text, 'Original written one'); assert.equal(original.points, 2); assert.equal(original.questionType, 'WRITTEN'); assert.equal(original.answerText, 'مرحباً');
+  const replay = (await call('POST', `/api/quiz/${quiz.id}/submit`, 'student', payload)).json().data;
+  assert.equal(replay.score, 83); assert.equal(replay.status, 'COMPLETE'); assert.equal(replay.id, result.id);
+  assert.equal((await call('PATCH', `/api/teacher/answers/${pending[0].id}/grade`, 'teacher', { pointsAwarded: 1, feedback: 'ملاحظة محفوظة' })).statusCode, 200);
+  assert.equal((await call('PATCH', `/api/teacher/answers/${pending[0].id}/grade`, 'teacher', { pointsAwarded: 2, feedback: 'changed' })).statusCode, 409);
+  assert.equal((await call('GET', '/api/students/me', 'student')).json().data.totalPoints, beforePoints + 20);
+  const parent = (await call('GET', '/api/parent/overview', 'parent')).json().data.children[0].quizResults.find(r => r.id === result.id);
+  assert.equal(parent.score, 83); assert.equal(parent.status, 'COMPLETE'); assert.equal(parent.quizTitle, 'Original quiz'); assert.equal(parent.answers, undefined);
+  assert.ok(!(await call('GET', '/api/students/results', 'noteStudent')).json().data.some(r => r.id === result.id));
+});
+
+test('ambiguous answer choices and excessive question points are rejected; unanswered draft questions can be deleted', async () => {
+  const content = (await call('POST', `/api/courses/${freeId}/lessons`, 'teacher', { title: 'Validation lesson', description: 'Validation quiz', type: 'EXERCISE', contentUrl: 'https://example.com/validation', duration: 5 })).json().data;
+  const quiz = (await call('POST', `/api/content/${content.id}/quiz`, 'teacher', { title: 'Validation quiz' })).json().data;
+  const body = { text: 'Choice', options: ['A', 'A'], correctAnswer: 'A' };
+  assert.equal((await call('POST', `/api/quiz/${quiz.id}/questions`, 'teacher', body)).statusCode, 400);
+  assert.equal((await call('POST', `/api/quiz/${quiz.id}/questions`, 'teacher', { ...body, options: ['A', 'B'], points: 1001 })).statusCode, 400);
+  const question = (await call('POST', `/api/quiz/${quiz.id}/questions`, 'teacher', { ...body, options: ['A', 'B'] })).json().data;
+  assert.equal((await call('DELETE', `/api/quiz/${quiz.id}/questions/${question.id}`, 'otherTeacher')).statusCode, 404);
+  assert.equal((await call('DELETE', `/api/quiz/${quiz.id}/questions/${question.id}`, 'teacher')).statusCode, 204);
+});
+
+
+test('verified users sharing one network have separate request limits; forged tokens and auth routes retain IP limits', async () => {
+  const Fastify = (await import('fastify')).default;
+  const jwt = (await import('@fastify/jwt')).default;
+  const limiter = (await import('@fastify/rate-limit')).default;
+  const { rateLimitKey } = await import('../apps/api/src/lib/rate-limit');
+  const server = Fastify();
+  await server.register(jwt, { secret: 'rate-limit-test-secret' });
+  await server.register(limiter, { max: 2, timeWindow: '1 minute', keyGenerator: req => rateLimitKey(req, token => server.jwt.verify<{ id: string }>(token)) });
+  server.get('/protected', async () => ({ ok: true }));
+  server.get('/api/auth/check', async () => ({ ok: true }));
+  const one = server.jwt.sign({ id: 'one' }); const two = server.jwt.sign({ id: 'two' });
+  const send = (token?: string, path = '/protected', remoteAddress = '10.5.5.1') => server.inject({ method: 'GET', url: path, remoteAddress, headers: token ? { authorization: `Bearer ${token}` } : {} });
+  try {
+    assert.equal((await send(one)).statusCode, 200); assert.equal((await send(one)).statusCode, 200); assert.equal((await send(one)).statusCode, 429);
+    assert.equal((await send(two)).statusCode, 200);
+    assert.equal((await send()).statusCode, 200); assert.equal((await send()).statusCode, 200);
+    const forged = one.slice(0, one.lastIndexOf('.') + 1) + 'invalid';
+    assert.equal((await send(forged)).statusCode, 429);
+    assert.equal((await send(server.jwt.sign({ id: 'expired' }, { expiresIn: -1 }))).statusCode, 429);
+    assert.equal((await send(one, '/api/auth/check', '10.5.5.2')).statusCode, 200); assert.equal((await send(one, '/api/auth/check', '10.5.5.2')).statusCode, 200);
+    assert.equal((await send(two, '/api/auth/check', '10.5.5.2')).statusCode, 429);
+  } finally { await server.close(); }
 });

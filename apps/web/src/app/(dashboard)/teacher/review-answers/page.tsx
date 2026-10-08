@@ -54,16 +54,17 @@ export default function ReviewAnswersPage() {
   }
 
   function updateDraft(id: string, patch: Partial<{ points: string; feedback: string }>) {
-    setDrafts((prev) => ({ ...prev, [id]: { ...(prev[id] ?? { points: '', feedback: '' }), ...patch } }));
+    setDrafts((prev) => ({ ...prev, [id]: { ...(prev[id] ?? { points: String(pending.find(answer => answer.id === id)?.points ?? ''), feedback: '' }), ...patch } }));
   }
 
   async function handleGrade(a: PendingAnswer) {
     const draft = getDraft(a);
-    const pointsAwarded = parseInt(draft.points, 10);
-    if (isNaN(pointsAwarded) || pointsAwarded < 0 || pointsAwarded > a.points) {
+    const pointsAwarded = Number(draft.points);
+    if (!draft.points.trim() || !Number.isInteger(pointsAwarded) || pointsAwarded < 0 || pointsAwarded > a.points) {
       setError(`Score for "${a.questionText}" must be between 0 and ${a.points}`);
       return;
     }
+    if (savingId) return;
     setError('');
     setSavingId(a.id);
     try {
@@ -97,7 +98,7 @@ export default function ReviewAnswersPage() {
           </div>
         </div>
 
-        {error && <div className="auth-error" style={{ marginBottom: 16 }}>{error}</div>}
+        {error && <div role="alert" className="auth-error" style={{ marginBottom: 16 }}>{error}</div>}
 
         {loading ? (
           <div className="card pad" style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14 }}>
@@ -122,8 +123,9 @@ export default function ReviewAnswersPage() {
 
                 <div className="grid-2">
                   <div className="field">
-                    <label>Score (out of {a.points})</label>
+                    <label htmlFor={`grade-${a.id}`}>Score (out of {a.points})</label>
                     <input
+                      id={`grade-${a.id}`}
                       className="input"
                       type="number"
                       min="0"
@@ -136,8 +138,10 @@ export default function ReviewAnswersPage() {
                 </div>
 
                 <div className="field">
-                  <label>Feedback <span className="muted" style={{ fontSize: 12 }}>(optional)</span></label>
+                  <label htmlFor={`feedback-${a.id}`}>Feedback <span className="muted" style={{ fontSize: 12 }}>(optional)</span></label>
                   <textarea
+                    id={`feedback-${a.id}`}
+                    maxLength={5000}
                     className="input"
                     rows={2}
                     placeholder="Leave a comment for the student…"
@@ -150,7 +154,7 @@ export default function ReviewAnswersPage() {
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <button
                     className="btn btn-gold btn-sm"
-                    disabled={savingId === a.id}
+                    disabled={savingId !== null}
                     style={{ opacity: savingId === a.id ? 0.65 : 1 }}
                     onClick={() => handleGrade(a)}
                   >

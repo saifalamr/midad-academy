@@ -56,21 +56,21 @@ export async function studentRoutes(app: FastifyInstance) {
       data: results.map((r) => ({
         id: r.id,
         quizId: r.quizId,
-        quizTitle: r.quiz.title,
+        quizTitle: r.quizTitleSnapshot ?? r.quiz.title,
         courseTitle: r.quiz.content.course.title,
         score: r.score,
         passed: r.passed,
-        passingScore: r.quiz.passingScore,
+        passingScore: r.passingScoreSnapshot ?? r.quiz.passingScore,
         status: r.status,
         completedAt: r.completedAt,
         answers: r.studentAnswers.map((a) => ({
           questionId: a.questionId,
-          text: a.question.text,
-          questionType: a.question.questionType,
+          text: a.questionTextSnapshot ?? a.question.text,
+          questionType: a.questionTypeSnapshot ?? a.question.questionType,
           answerText: a.answerText,
           status: a.status,
           correct: a.correct,
-          points: a.question.points,
+          points: a.maxPointsSnapshot ?? a.question.points,
           pointsAwarded: a.pointsAwarded,
           feedback: a.feedback,
         })),
@@ -129,10 +129,11 @@ export async function studentRoutes(app: FastifyInstance) {
     const { totalLessons, lessonsCompleted, courseProgress, recentSessions, materialProgress } = await studentProgress(profile.id);
 
     const quizResults = profile.quizResults.map((r) => ({
-      quizTitle: r.quiz.title,
+      quizTitle: r.quizTitleSnapshot ?? r.quiz.title,
       score: r.score,
       passed: r.passed,
       createdAt: r.completedAt,
+      status: r.status,
     }));
 
     return reply.send({

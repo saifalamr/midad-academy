@@ -2,15 +2,16 @@ import type { FastifyInstance } from 'fastify';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { canAccessCourse } from '../lib/access';
+import { canAccessCourse, httpError } from '../lib/access';
 import { awardQuiz } from '../lib/rewards';
+import { quizResultData } from '../lib/quiz-results';
 
 const createQuestionSchema = z.object({
-  text: z.string().min(1, 'Question text is required'),
+  text: z.string().trim().min(1, 'Question text is required').max(5000),
   questionType: z.enum(['MCQ', 'WRITTEN', 'TRUE_FALSE']).optional().default('MCQ'),
-  options: z.array(z.string().min(1)).optional(),
-  correctAnswer: z.string().min(1).optional(),
-  points: z.number().int().min(1).optional(),
+  options: z.array(z.string().trim().min(1).max(1000)).max(20).optional(),
+  correctAnswer: z.string().trim().min(1).max(1000).optional(),
+  points: z.number().int().min(1).max(1000).optional(),
 });
 
 const updateQuizSchema = z.object({
@@ -19,7 +20,9 @@ const updateQuizSchema = z.object({
 });
 
 const submitQuizSchema = z.object({
-  answers: z.record(z.string(), z.string()),
+  answers: z.record(z.string(), z.string().trim().max(10000)),
+  submissionKey: z.string().uuid().optional(),
+  quizRevision: z.number().int().min(0).optional(),
 });
 
 type ResolvedQuestion =
@@ -43,6 +46,7 @@ function resolveQuestionFields(body: z.infer<typeof createQuestionSchema>): Reso
   if (!body.options || body.options.length < 2) {
     return { ok: false, error: 'At least two options are required' };
   }
+  if (new Set(body.options).size !== body.options.length) return { ok: false, error: 'Answer options must be distinct' };
   if (!body.correctAnswer || !body.options.includes(body.correctAnswer)) {
     return { ok: false, error: 'correctAnswer must be one of the provided options' };
   }
@@ -62,6 +66,14 @@ async function findOwnedQuiz(userId: string, quizId: string) {
   });
   if (!quiz || quiz.content.course.teacherId !== teacherProfile.id) return null;
   return quiz;
+}
+
+async function mutateQuiz<T>(quizId: string, operation: (tx: Prisma.TransactionClient) => Promise<T>) {
+  return prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM "Quiz" WHERE id = ${quizId} FOR UPDATE`;
+    await tx.quiz.update({ where: { id: quizId }, data: { revision: { increment: 1 } } });
+    return operation(tx);
+  });
 }
 
 export async function quizRoutes(app: FastifyInstance) {
@@ -95,7 +107,7 @@ export async function quizRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: resolved.error });
     }
 
-    const question = await prisma.question.create({
+    const question = await mutateQuiz(quizId, tx => tx.question.create({
       data: {
         quizId,
         text: body.text,
@@ -104,7 +116,7 @@ export async function quizRoutes(app: FastifyInstance) {
         correctAnswer: resolved.correctAnswer,
         ...(body.points !== undefined ? { points: body.points } : {}),
       },
-    });
+    }));
 
     return reply.status(201).send({ data: question });
   });
@@ -126,14 +138,14 @@ export async function quizRoutes(app: FastifyInstance) {
 
     const body = updateQuizSchema.parse(request.body);
 
-    const updated = await prisma.quiz.update({
+    const updated = await mutateQuiz(quizId, tx => tx.quiz.update({
       where: { id: quizId },
       data: {
         ...(body.title !== undefined ? { title: body.title } : {}),
         ...(body.passingScore !== undefined ? { passingScore: body.passingScore } : {}),
       },
       include: { questions: true, content: { select: { courseId: true } } },
-    });
+    }));
 
     return reply.send({ data: updated });
   });
@@ -167,7 +179,7 @@ export async function quizRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: resolved.error });
     }
 
-    const question = await prisma.question.update({
+    const question = await mutateQuiz(quizId, tx => tx.question.update({
       where: { id: questionId },
       data: {
         text: body.text,
@@ -178,7 +190,7 @@ export async function quizRoutes(app: FastifyInstance) {
         correctAnswer: resolved.correctAnswer ?? null,
         ...(body.points !== undefined ? { points: body.points } : {}),
       },
-    });
+    }));
 
     return reply.send({ data: question });
   });
@@ -203,7 +215,10 @@ export async function quizRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Question not found' });
     }
 
-    await prisma.question.delete({ where: { id: questionId } });
+    await mutateQuiz(quizId, async tx => {
+      if (await tx.studentAnswer.count({ where: { questionId } })) throw httpError(409, 'لا يمكن حذف سؤال له إجابات طلاب. يمكنك تعديله مع حفظ نتائج المحاولات السابقة.');
+      await tx.question.delete({ where: { id: questionId } });
+    });
 
     return reply.status(204).send();
   });
@@ -252,95 +267,50 @@ export async function quizRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Student profile not found' });
     }
 
-    const quiz = await prisma.quiz.findUnique({
-      where: { id: quizId },
-      include: { questions: true, content: { select: { courseId: true } } },
-    });
-    if (!quiz) {
-      return reply.status(404).send({ error: 'Quiz not found' });
-    }
-
-    if (!await canAccessCourse(request.user, quiz.content.courseId)) return reply.status(403).send({ error: 'You cannot submit this quiz' });
-    if (!quiz.questions.length) return reply.status(400).send({ error: 'This quiz has no questions yet' });
     const body = submitQuizSchema.parse(request.body);
-
-    let totalPoints = 0;
-    let earnedPoints = 0;
-    let hasPending = false;
-
-    const graded = quiz.questions.map((q) => {
-      totalPoints += q.points;
-      const yourAnswer = body.answers[q.id] ?? '';
-
-      if (q.questionType === 'WRITTEN') {
-        hasPending = true;
-        return {
-          questionId: q.id,
-          text: q.text,
-          questionType: q.questionType,
-          yourAnswer,
-          correctAnswer: null as string | null,
-          correct: null as boolean | null,
-          points: q.points,
-          pointsAwarded: null as number | null,
-          status: 'PENDING' as const,
-        };
+    const result = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "Quiz" WHERE id = ${quizId} FOR UPDATE`;
+      const quiz = await tx.quiz.findUnique({ where: { id: quizId }, include: { questions: true, content: { select: { courseId: true } } } });
+      if (!quiz) throw httpError(404, 'Quiz not found');
+      const enrollment = await tx.enrollment.findFirst({ where: { studentId: studentProfile.id, courseId: quiz.content.courseId, status: 'ACTIVE' } });
+      if (!enrollment) throw httpError(403, 'You cannot submit this quiz');
+      if (body.submissionKey) {
+        const existing = await tx.studentQuizResult.findUnique({ where: { studentId_quizId_submissionKey: { studentId: studentProfile.id, quizId, submissionKey: body.submissionKey } }, include: { quiz: true, studentAnswers: { include: { question: true } } } });
+        if (existing) {
+          const old = existing.answers as Record<string, string>;
+          if (Object.keys(old).length !== Object.keys(body.answers).length || Object.entries(old).some(([id, value]) => body.answers[id] !== value)) throw httpError(409, 'هذا الطلب محفوظ بإجابات مختلفة. افتح محاولة جديدة لتغيير الإجابات.');
+          return existing;
+        }
       }
-
-      const correct = yourAnswer === q.correctAnswer;
-      const pointsAwarded = correct ? q.points : 0;
-      earnedPoints += pointsAwarded;
-      return {
-        questionId: q.id,
-        text: q.text,
-        questionType: q.questionType,
-        yourAnswer,
-        correctAnswer: q.correctAnswer,
-        correct,
-        points: q.points,
-        pointsAwarded,
-        status: 'GRADED' as const,
-      };
+      if (body.quizRevision !== undefined && body.quizRevision !== quiz.revision) throw httpError(409, 'تغير الاختبار أثناء الإجابة. أغلقه وافتحه مجددًا لرؤية أحدث الأسئلة.');
+      if (!quiz.questions.length) throw httpError(400, 'This quiz has no questions yet');
+      const ids = new Set(quiz.questions.map(q => q.id));
+      if (Object.keys(body.answers).some(id => !ids.has(id))) throw httpError(400, 'الإجابات تحتوي على سؤال لا ينتمي لهذا الاختبار.');
+      for (const q of quiz.questions) {
+        const answer = body.answers[q.id];
+        if (!answer) throw httpError(400, 'أجب عن جميع الأسئلة قبل تسليم الاختبار.');
+        if (q.questionType !== 'WRITTEN' && (!Array.isArray(q.options) || !q.options.includes(answer))) throw httpError(400, 'اختر إجابة من الخيارات المعروضة.');
+      }
+      let earnedPoints = 0;
+      const totalPoints = quiz.questions.reduce((sum, q) => sum + q.points, 0);
+      const hasPending = quiz.questions.some(q => q.questionType === 'WRITTEN');
+      const studentAnswers = quiz.questions.map(q => {
+        const correct = q.questionType === 'WRITTEN' ? null : body.answers[q.id] === q.correctAnswer;
+        const pointsAwarded = correct === null ? null : correct ? q.points : 0;
+        earnedPoints += pointsAwarded ?? 0;
+        return { questionId: q.id, answerText: body.answers[q.id], correct, pointsAwarded,
+          status: correct === null ? 'PENDING' as const : 'GRADED' as const,
+          questionTextSnapshot: q.text, questionTypeSnapshot: q.questionType,
+          maxPointsSnapshot: q.points, correctAnswerSnapshot: q.correctAnswer };
+      });
+      const score = totalPoints ? Math.round(earnedPoints / totalPoints * 100) : 0;
+      return tx.studentQuizResult.create({ data: { studentId: studentProfile.id, quizId,
+        submissionKey: body.submissionKey, quizTitleSnapshot: quiz.title, passingScoreSnapshot: quiz.passingScore,
+        score, passed: !hasPending && score >= quiz.passingScore,
+        status: hasPending ? 'PENDING_REVIEW' : 'COMPLETE', answers: body.answers,
+        studentAnswers: { create: studentAnswers } }, include: { quiz: true, studentAnswers: { include: { question: true } } } });
     });
-
-    const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
-    const passed = !hasPending && score >= quiz.passingScore;
-    const status = hasPending ? 'PENDING_REVIEW' : 'COMPLETE';
-
-    const result = await prisma.studentQuizResult.create({
-      data: {
-        studentId: studentProfile.id,
-        quizId,
-        score,
-        passed,
-        status,
-        answers: body.answers,
-        studentAnswers: {
-          create: graded.map((g) => ({
-            questionId: g.questionId,
-            answerText: g.yourAnswer,
-            status: g.status,
-            correct: g.correct,
-            pointsAwarded: g.pointsAwarded,
-          })),
-        },
-      },
-    });
-
     await awardQuiz(result.id);
-
-    return reply.status(201).send({
-      data: {
-        id: result.id,
-        score,
-        passed,
-        status,
-        passingScore: quiz.passingScore,
-        totalPoints,
-        earnedPoints,
-        results: graded,
-        completedAt: result.completedAt,
-      },
-    });
+    return reply.status(201).send({ data: quizResultData(result) });
   });
 }

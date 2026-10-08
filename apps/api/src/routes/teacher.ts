@@ -2,10 +2,11 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { awardQuiz } from '../lib/rewards';
+import { httpError } from '../lib/access';
 
 const gradeAnswerSchema = z.object({
   pointsAwarded: z.number().int().min(0),
-  feedback: z.string().optional(),
+  feedback: z.string().trim().max(5000).optional(),
 });
 
 export async function teacherRoutes(app: FastifyInstance) {
@@ -62,10 +63,10 @@ export async function teacherRoutes(app: FastifyInstance) {
         resultId: a.resultId,
         studentName: a.result.student.user.name,
         courseTitle: a.question.quiz.content.course.title,
-        quizTitle: a.question.quiz.title,
-        questionText: a.question.text,
+        quizTitle: a.result.quizTitleSnapshot ?? a.question.quiz.title,
+        questionText: a.questionTextSnapshot ?? a.question.text,
         answerText: a.answerText,
-        points: a.question.points,
+        points: a.maxPointsSnapshot ?? a.question.points,
         completedAt: a.result.completedAt,
       })),
     });
@@ -97,20 +98,26 @@ export async function teacherRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Answer not found' });
     }
 
-    if (answer.question.questionType !== 'WRITTEN') return reply.status(400).send({ error: 'Only written answers can be manually graded' });
+    if ((answer.questionTypeSnapshot ?? answer.question.questionType) !== 'WRITTEN') return reply.status(400).send({ error: 'Only written answers can be manually graded' });
     const body = gradeAnswerSchema.parse(request.body);
-    if (body.pointsAwarded > answer.question.points) {
-      return reply.status(400).send({ error: `pointsAwarded cannot exceed question points (${answer.question.points})` });
+    const maxPoints = answer.maxPointsSnapshot ?? answer.question.points;
+    if (body.pointsAwarded > maxPoints) {
+      return reply.status(400).send({ error: `pointsAwarded cannot exceed question points (${maxPoints})` });
     }
 
     const updatedResult = await prisma.$transaction(async (tx) => {
       // Serialize grading for an attempt so concurrent answers cannot leave stale totals.
       await tx.$queryRaw`SELECT id FROM "StudentQuizResult" WHERE id = ${answer.resultId} FOR UPDATE`;
+      const current = await tx.studentAnswer.findUniqueOrThrow({ where: { id: answerId } });
+      if (current.status === 'GRADED') {
+        if (current.pointsAwarded === body.pointsAwarded && (current.feedback ?? '') === (body.feedback ?? '')) return tx.studentQuizResult.findUniqueOrThrow({ where: { id: answer.resultId } });
+        throw httpError(409, 'تم تصحيح هذه الإجابة بالفعل. حدّث الصفحة لرؤية النتيجة المحفوظة.');
+      }
     await tx.studentAnswer.update({
       where: { id: answerId },
       data: {
         status: 'GRADED',
-        correct: body.pointsAwarded === answer.question.points,
+        correct: body.pointsAwarded === maxPoints,
         pointsAwarded: body.pointsAwarded,
         feedback: body.feedback,
       },
@@ -123,17 +130,17 @@ export async function teacherRoutes(app: FastifyInstance) {
     });
 
     const stillPending = allAnswers.some((a) => a.status === 'PENDING');
-    const totalPoints = allAnswers.reduce((sum, a) => sum + a.question.points, 0);
+    const totalPoints = allAnswers.reduce((sum, a) => sum + (a.maxPointsSnapshot ?? a.question.points), 0);
     const earnedPoints = allAnswers.reduce((sum, a) => sum + (a.id === answerId ? body.pointsAwarded : (a.pointsAwarded ?? 0)), 0);
     const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
-    const quiz = answer.question.quiz;
+    const passingScore = answer.result.passingScoreSnapshot ?? answer.question.quiz.passingScore;
 
     return await tx.studentQuizResult.update({
       where: { id: answer.resultId },
       data: {
         score,
         status: stillPending ? 'PENDING_REVIEW' : 'COMPLETE',
-        passed: !stillPending && score >= quiz.passingScore,
+        passed: !stillPending && score >= passingScore,
       },
     });
 

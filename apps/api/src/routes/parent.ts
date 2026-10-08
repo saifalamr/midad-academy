@@ -49,6 +49,7 @@ export async function parentRoutes(app: FastifyInstance) {
         children: {
           include: {
             user: { select: { name: true, email: true } },
+            quizResults: { include: { quiz: { select: { title: true } } }, orderBy: { completedAt: 'desc' }, take: 20 },
             // Last 90 point events for streak calculation
             pointEvents: {
               select: { createdAt: true },
@@ -96,6 +97,7 @@ export async function parentRoutes(app: FastifyInstance) {
         courseProgress,
         recentSessions,
         materialProgress,
+        quizResults: child.quizResults.map(r => ({ id: r.id, quizTitle: r.quizTitleSnapshot ?? r.quiz.title, score: r.score, passed: r.passed, status: r.status, completedAt: r.completedAt })),
       };
     }));
 

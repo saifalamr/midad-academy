@@ -187,6 +187,7 @@ model Quiz {
   courseContentId String @unique
   title           String
   passingScore    Int    @default(70)
+  revision        Int    @default(0)
 
   content   CourseContent       @relation(fields: [courseContentId], references: [id], onDelete: Cascade)
   questions Question[]
@@ -217,6 +218,9 @@ model StudentQuizResult {
   answers     Json
   status      ResultStatus @default(COMPLETE)
   completedAt DateTime     @default(now())
+  submissionKey String?
+  passingScoreSnapshot Int?
+  quizTitleSnapshot String?
 
   student        StudentProfile  @relation(fields: [studentId], references: [id])
   quiz           Quiz            @relation(fields: [quizId], references: [id], onDelete: Cascade)
@@ -224,6 +228,7 @@ model StudentQuizResult {
 
   @@index([studentId])
   @@index([quizId])
+  @@unique([studentId, quizId, submissionKey])
 }
 
 model StudentAnswer {
@@ -235,6 +240,10 @@ model StudentAnswer {
   correct       Boolean?
   pointsAwarded Int?
   feedback      String?
+  questionTextSnapshot String?
+  questionTypeSnapshot QuestionType?
+  maxPointsSnapshot Int?
+  correctAnswerSnapshot String?
 
   result   StudentQuizResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
   question Question          @relation(fields: [questionId], references: [id], onDelete: Cascade)

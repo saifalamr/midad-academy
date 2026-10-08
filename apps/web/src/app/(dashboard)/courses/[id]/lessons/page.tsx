@@ -39,6 +39,7 @@ type Quiz = {
   id: string;
   title: string;
   passingScore: number;
+  revision: number;
   questions: QuizQuestion[];
 };
 
@@ -89,6 +90,7 @@ export default function CourseLessonsPage() {
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [quizError, setQuizError] = useState('');
+  const [submissionKey, setSubmissionKey] = useState('');
 
   useEffect(() => {
     authFetch(`/api/courses/${courseId}/lessons`)
@@ -106,6 +108,8 @@ export default function CourseLessonsPage() {
     setQuizError('');
     setResult(null);
     setAnswers({});
+    setSubmissionKey(crypto.randomUUID());
+    setActiveQuiz(null);
     setQuizLoading(true);
     try {
       const res = await authFetch(`/api/quiz/${quizId}`);
@@ -120,19 +124,20 @@ export default function CourseLessonsPage() {
   }
 
   async function handleSubmitQuiz() {
-    if (!activeQuiz) return;
+    if (!activeQuiz || submitting) return;
+    if (activeQuiz.questions.some(q => !answers[q.id]?.trim())) { setQuizError('أجب عن جميع الأسئلة قبل تسليم الاختبار.'); return; }
     setSubmitting(true);
     setQuizError('');
     try {
       const res = await authFetch(`/api/quiz/${activeQuiz.id}/submit`, {
         method: 'POST',
-        body: JSON.stringify({ answers }),
+        body: JSON.stringify({ answers, submissionKey, quizRevision: activeQuiz.revision }),
       });
       const json = await res.json();
       if (!res.ok) { setQuizError(json.error || 'Failed to submit quiz'); return; }
       setResult(json.data);
     } catch {
-      setQuizError('Could not connect to server');
+      setQuizError('تعذر تأكيد التسليم. أعد المحاولة؛ لن تُسجل محاولة إضافية لنفس الطلب.');
     } finally {
       setSubmitting(false);
     }
@@ -190,7 +195,7 @@ export default function CourseLessonsPage() {
 
             <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
               {quizLoading && <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>Loading quiz…</p>}
-              {quizError && <div className="auth-error">{quizError}</div>}
+              {quizError && <div className="auth-error" role="alert">{quizError}</div>}
 
               {activeQuiz && !result && (
                 activeQuiz.questions.map((q, i) => (
@@ -202,6 +207,8 @@ export default function CourseLessonsPage() {
                       <textarea
                         className="input"
                         rows={3}
+                        aria-label={`إجابتك: ${q.text}`}
+                        maxLength={10000}
                         placeholder="Type your answer…"
                         value={answers[q.id] ?? ''}
                         onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}

@@ -25,7 +25,7 @@ export default function CourseBoard() {
     const token = localStorage.getItem('token') ?? sessionStorage.getItem('token');
     if (!token) { setError('سجّل الدخول لفتح سبورة الدورة'); return; }
     fetch(`${API_URL}/api/sessions/state/${id}`, { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal })
-      .then(async res => { if (!res.ok) throw new Error('لا تملك صلاحية فتح هذه السبورة'); setAccess((await res.json()).data); })
+      .then(async res => { if (!res.ok) throw new Error(res.status === 429 ? 'طلبات كثيرة خلال وقت قصير. انتظر دقيقة ثم أعد المحاولة.' : [401, 403].includes(res.status) ? 'سجّل الدخول وتأكد من تسجيلك في الدورة لفتح السبورة.' : 'تعذر تحميل السبورة. تحقق من الاتصال وأعد المحاولة.'); setAccess((await res.json()).data); })
       .catch(e => { if (!controller.signal.aborted) setError(e.message); });
     return () => controller.abort();
   }, [id]);
@@ -34,7 +34,7 @@ export default function CourseBoard() {
       <h1 style={{ fontSize: 24 }}>سبورة الدورة</h1><Link className="btn btn-ghost" href={`/courses/${id}/lessons`}>العودة للدروس</Link>
     </div>
     <p>الرسم محفوظ ومتزامن بين المشاركين. يمكنك استخدام السبورة خارج وقت المكالمة.</p>
-    {error ? <p role="alert">{error}</p> : !access ? <p>جاري التحقق من الصلاحية…</p> : <>
+    {error ? <p role="alert">{error} <button className="btn btn-sm btn-outline" onClick={() => window.location.reload()}>إعادة المحاولة</button></p> : !access ? <p>جاري التحقق من الصلاحية…</p> : <>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '16px 0' }}>
         {tools.map(item => <button key={item.id} disabled={!access.canDraw} className={`btn ${tool === item.id ? 'btn-gold' : 'btn-ghost'}`} onClick={() => setTool(item.id)}>{item.name}</button>)}
         {tool === 'eraser' && <>

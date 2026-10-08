@@ -23,6 +23,7 @@ import { paymentRoutes } from './routes/payments';
 import { sessionRoutes } from './routes/sessions';
 import { accountRoutes } from './routes/account';
 import { startWhiteboardWebSocketServer } from './ws-server';
+import { rateLimitKey } from './lib/rate-limit';
 
 export async function buildApp() {
   validateConfig();
@@ -49,7 +50,7 @@ export async function buildApp() {
     // browser stacks (some Edge/Safari/SmartTV builds) don't choke on it.
     optionsSuccessStatus: 200,
   });
-  await app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
+  await app.register(rateLimit, { max: 100, timeWindow: '1 minute', keyGenerator: request => rateLimitKey(request, token => app.jwt.verify<{ id: string }>(token)) });
   await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024 } });
 
   // ── JWT ─────────────────────────────────────────────────────────────────

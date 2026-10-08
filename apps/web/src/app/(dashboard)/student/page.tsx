@@ -66,7 +66,7 @@ type StudentStats = {
   totalLessons: number;
   materialProgress: { courseId: string; title: string; total: number; completed: number; nextLesson: { id: string; title: string } | null }[];
   courseProgress: { courseId: string; title: string; completed: number; total: number }[];
-  quizResults: { quizTitle: string; score: number; passed: boolean; createdAt: string }[];
+  quizResults: { quizTitle: string; score: number; passed: boolean; createdAt: string; status: 'PENDING_REVIEW' | 'COMPLETE' }[];
   recentSessions: { title: string; scheduledAt: string; attended: boolean }[];
 };
 
@@ -193,6 +193,7 @@ export default function StudentDashboard() {
   const quizChart = (stats?.quizResults ?? [])
     .slice()
     .reverse() // chronological for the line
+    .filter(q => q.status === 'COMPLETE')
     .map((q) => ({ name: q.quizTitle.slice(0, 10), score: q.score }));
 
   const courseChart = (stats?.courseProgress ?? []).map((c) => ({
