@@ -54,7 +54,7 @@ test('teacher and student exchange real media, synchronized ink, permissions and
     await page.mouse.click(box.x + box.width * offset, box.y + box.height * .5);
   };
   expect(await ink(student)).toBe(0);
-  await placeShape(teacher, 'Rectangle', .5);
+  await placeShape(teacher, 'مستطيل', .5);
   await expect.poll(() => ink(student)).toBeGreaterThan(20);
   await teacher.getByRole('button', { name: 'تراجع', exact: true }).click();
   await expect.poll(() => ink(student)).toBe(0);
@@ -68,7 +68,7 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   await expect(student.getByText('متزامنة', { exact: true })).toBeVisible();
   await expect(student.getByText('مشاهدة فقط')).toHaveCount(0);
   const before = await ink(teacher);
-  await Promise.all([placeShape(teacher, 'Circle', .25), placeShape(student, 'Rectangle', .75)]);
+  await Promise.all([placeShape(teacher, 'دائرة', .25), placeShape(student, 'مستطيل', .75)]);
   await expect.poll(() => ink(teacher)).toBeGreaterThan(before + 100);
   await api('patch', '/api/sessions/state/preview-arabic', teacherToken, { sharedDoc: { url: '', name: 'درس متزامن', docType: 'html', htmlContent: '<h1 dir="rtl">مرحباً</h1>' }, pdfPage: 1 });
   await expect(teacher.getByText('درس متزامن', { exact: true })).toBeVisible();

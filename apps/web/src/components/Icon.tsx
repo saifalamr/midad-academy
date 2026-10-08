@@ -10,6 +10,7 @@ const paths = {
   family: 'M8 4a3 3 0 1 0 0 6 3 3 0 0 0 0-6 M17 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4 M2 21v-4a6 6 0 0 1 12 0v4 M14 13a5 5 0 0 1 8 4v4',
   edit: 'm4 16 12-12 4 4L8 20H4z M13 7l4 4',
   file: 'M5 3h9l5 5v13H5z M14 3v6h5 M8 13h8 M8 17h6',
+  mic: 'M9 6a3 3 0 0 1 6 0v6a3 3 0 0 1-6 0z M5 10v2a7 7 0 0 0 14 0v-2 M12 19v3 M8 22h8',
   video: 'M3 5h18v14H3z m7 4 6 3-6 3z',
   dashboard: 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',
   logout: 'M10 3H4v18h6 M9 12h12 M17 8l4 4-4 4',

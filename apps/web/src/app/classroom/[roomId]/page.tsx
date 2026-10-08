@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   LiveKitRoom,
-  PreJoin,
   StartAudio,
   type LocalUserChoices,
   useTracks,
@@ -21,6 +20,8 @@ import type { TrackReferenceOrPlaceholder } from '@livekit/components-react';
 import { Track, RoomEvent, DisconnectReason, type RemoteParticipant } from 'livekit-client';
 import Whiteboard, { PALETTE, type Tool, type EraserMode, type WhiteboardHandle } from '@/components/Whiteboard';
 import './classroom.css';
+import ClassroomLobby, { type LessonInfo } from '@/components/ClassroomLobby';
+import { useAuth } from '@/components/AuthProvider';
 import { API_URL } from '@/lib/config';
 
 
@@ -124,7 +125,7 @@ function PdfViewer({ url, page, isTeacher, onPageChange }: {
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, overflow: 'auto', padding: 12 }}>
       {error && <p role="alert" style={{ color: '#f87171' }}>{error}</p>}
-      {loading && <p style={{ color: '#8ea0bb', fontSize: 13 }}>Loading page {page}…</p>}
+      {loading && <p style={{ color: '#8ea0bb', fontSize: 13 }}>جارٍ تحميل الصفحة {page}…</p>}
       <canvas ref={canvasRef} style={{ maxWidth: '100%', boxShadow: '0 4px 20px rgba(0,0,0,.3)', borderRadius: 8, display: loading ? 'none' : 'block' }} />
       {isTeacher && totalPages > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(16,30,52,.9)', padding: '8px 16px', borderRadius: 999, position: 'sticky', bottom: 8 }}>
@@ -135,7 +136,7 @@ function PdfViewer({ url, page, isTeacher, onPageChange }: {
       )}
       {!isTeacher && totalPages > 0 && (
         <div style={{ color: '#8ea0bb', fontSize: 12, padding: '4px 12px', background: 'rgba(16,30,52,.7)', borderRadius: 999 }}>
-          Page {page} of {totalPages} — teacher controls navigation
+          صفحة {page} من {totalPages} · التنقل بإدارة المعلم
         </div>
       )}
     </div>
@@ -144,7 +145,8 @@ function PdfViewer({ url, page, isTeacher, onPageChange }: {
 
 // ── Inner classroom UI (inside LiveKitRoom context) ──────────────────────────
 
-function ClassroomContent({ roomId, isTeacher, onLeave }: {
+function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
+  title?: string;
   roomId: string;
   isTeacher: boolean;
   onLeave: () => void;
@@ -485,7 +487,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
               </div>
             )}
             <button className="perm-close" onClick={() => setShowPermPicker(false)}>
-              Close
+              إغلاق
             </button>
           </div>
         </div>
@@ -500,7 +502,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
           <div>
-            <div className="rt-title ar">فصل مداد المباشر</div>
+            <div className="rt-title ar">{title || 'فصل مداد المباشر'}</div>
             <div className="rt-sub">نتعلم ونشارك معًا</div>
           </div>
         </div>
@@ -518,9 +520,9 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
             </button>
           )}
           {isTeacher && <button className="rt-leave btn btn-sm" onClick={async () => {
-            if (!window.confirm('End this class for everyone?')) return;
+            if (!window.confirm('إنهاء الحصة لجميع المشاركين؟')) return;
             const res = await authFetch('/api/sessions/end', { method: 'POST', body: JSON.stringify({ roomName: roomId }) });
-            if (!res.ok) { window.alert('Could not end the class. Please try again.'); return; }
+            if (!res.ok) { window.alert('تعذر إنهاء الحصة. أعد المحاولة.'); return; }
             onLeave();
           }}>إنهاء الحصة</button>}
           <button className="rt-leave btn btn-sm" onClick={onLeave}>مغادرة</button>
@@ -536,7 +538,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
             <div className="vph"><span>بانتظار المعلم…</span></div>
           )}
           <div className="vlabel">
-            <span className="vmic on"></span>
+            <span className={`vmic ${teacherTrack?.participant.isMicrophoneEnabled ? "on" : ""}`}></span>
             المعلم
             <span className="vhost">المضيف</span>
           </div>
@@ -546,7 +548,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
           <div key={track.participant.identity} className="vtile">
             <ParticipantTile trackRef={track} style={{ width: '100%', height: '100%' }} />
             <div className="vlabel">
-              <span className="vmic on"></span>
+              <span className={`vmic ${track.participant.isMicrophoneEnabled ? "on" : ""}`}></span>
               {track.participant.name ?? track.participant.identity}
             </div>
             {raisedSet.has(track.participant.identity) && <span className="vhand"><Icon name="hand" /></span>}
@@ -561,37 +563,37 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
       {/* ── Whiteboard area ── */}
       <div className="board-wrap">
         {/* Drawing tools — left sidebar */}
-        <div className="wb-toolbar" aria-label="أدوات السبورة">
-          <button className={`wb-tool ${tool === 'pen' ? 'on' : ''}`} title="Pen" aria-label="قلم" disabled={!inkInteractive} onClick={() => setTool('pen')}>
+        <div className="wb-toolbar" role="toolbar" aria-label="أدوات السبورة">
+          <button className={`wb-tool ${tool === 'pen' ? 'on' : ''}`} title="قلم" aria-pressed={tool === 'pen'} aria-label="قلم" disabled={!inkInteractive} onClick={() => setTool('pen')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 19l7-7 3 3-7 7-4 1 1-4z"/><path d="M18 13l-1.5-1.5"/><path d="M3 21l5-1 9-9-4-4-9 9z"/></svg>
-          </button>
-          <button className={`wb-tool ${tool === 'highlighter' ? 'on' : ''}`} title="Highlighter" aria-label="تظليل" disabled={!inkInteractive} onClick={() => setTool('highlighter')}>
+          <span>قلم</span></button>
+          <button className={`wb-tool ${tool === 'highlighter' ? 'on' : ''}`} title="تظليل" aria-pressed={tool === 'highlighter'} aria-label="تظليل" disabled={!inkInteractive} onClick={() => setTool('highlighter')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M9 11l-4 4v3h3l4-4"/><path d="M13 7l4 4 4-4-4-4z"/><path d="M12 8l4 4"/></svg>
-          </button>
-          <button className={`wb-tool ${tool === 'eraser' ? 'on' : ''}`} title="Eraser" aria-label="ممحاة" disabled={!inkInteractive} onClick={() => setTool('eraser')}>
+          <span>تظليل</span></button>
+          <button className={`wb-tool ${tool === 'eraser' ? 'on' : ''}`} title="ممحاة" aria-pressed={tool === 'eraser'} aria-label="ممحاة" disabled={!inkInteractive} onClick={() => setTool('eraser')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 14l6-6 8 8-4 4H9z"/><path d="M5 20h14"/></svg>
-          </button>
+          <span>ممحاة</span></button>
           <span className="wb-sep"></span>
-          <button className={`wb-tool ${tool === 'text' ? 'on' : ''}`} title="Text" aria-label="نص" disabled={!inkInteractive} onClick={() => setTool('text')}>
+          <button className={`wb-tool ${tool === 'text' ? 'on' : ''}`} title="نص" aria-pressed={tool === 'text'} aria-label="نص" disabled={!inkInteractive} onClick={() => setTool('text')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 6V5h16v1M12 5v14M9 19h6"/></svg>
-          </button>
-          <button className={`wb-tool ${tool === 'rectangle' ? 'on' : ''}`} title="Rectangle" aria-label="مستطيل" disabled={!inkInteractive} onClick={() => setTool('rectangle')}>
+          <span>نص</span></button>
+          <button className={`wb-tool ${tool === 'rectangle' ? 'on' : ''}`} title="مستطيل" aria-pressed={tool === 'rectangle'} aria-label="مستطيل" disabled={!inkInteractive} onClick={() => setTool('rectangle')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg>
-          </button>
-          <button className={`wb-tool ${tool === 'circle' ? 'on' : ''}`} title="Circle" aria-label="دائرة" disabled={!inkInteractive} onClick={() => setTool('circle')}>
+          <span>مستطيل</span></button>
+          <button className={`wb-tool ${tool === 'circle' ? 'on' : ''}`} title="دائرة" aria-pressed={tool === 'circle'} aria-label="دائرة" disabled={!inkInteractive} onClick={() => setTool('circle')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="8"/></svg>
-          </button>
-          <button className={`wb-tool ${tool === 'line' ? 'on' : ''}`} title="Line" aria-label="خط" disabled={!inkInteractive} onClick={() => setTool('line')}>
+          <span>دائرة</span></button>
+          <button className={`wb-tool ${tool === 'line' ? 'on' : ''}`} title="خط" aria-pressed={tool === 'line'} aria-label="خط" disabled={!inkInteractive} onClick={() => setTool('line')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 19L19 5"/></svg>
-          </button>
-          <button className={`wb-tool ${tool === 'select' ? 'on' : ''}`} title="Select" aria-label="تحديد" disabled={!inkInteractive} onClick={() => setTool('select')}>
+          <span>خط</span></button>
+          <button className={`wb-tool ${tool === 'select' ? 'on' : ''}`} title="تحديد" aria-pressed={tool === 'select'} aria-label="تحديد" disabled={!inkInteractive} onClick={() => setTool('select')}>
             <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M4 4l7.07 16.97 2.51-7.39 7.39-2.51z"/></svg>
-          </button>
+          <span>تحديد</span></button>
           <span className="wb-sep"></span>
-          <button className="wb-tool" title="تراجع" aria-label="تراجع" onClick={() => whiteboardRef.current?.undo()}><Icon name="undo" /></button>
-          <button className="wb-tool" title="إعادة" aria-label="إعادة" onClick={() => whiteboardRef.current?.redo()}><Icon name="redo" /></button>
+          <button disabled={!inkInteractive} className="wb-tool" title="تراجع" aria-label="تراجع" onClick={() => whiteboardRef.current?.undo()}><Icon name="undo" /></button>
+          <button disabled={!inkInteractive} className="wb-tool" title="إعادة" aria-label="إعادة" onClick={() => whiteboardRef.current?.redo()}><Icon name="redo" /></button>
           <button className="wb-tool" title="حفظ صورة السبورة" aria-label="حفظ صورة السبورة" onClick={() => whiteboardRef.current?.exportImage()}><Icon name="download" /></button>
-          <button className="wb-tool" title="Clear board" aria-label="مسح السبورة" onClick={() => { if (window.confirm('مسح جميع الرسومات؟ يمكنك التراجع بعد المسح.')) whiteboardRef.current?.clear(); }}>
+          <button disabled={!inkInteractive} className="wb-tool" title="مسح السبورة" aria-label="مسح السبورة" onClick={() => { if (window.confirm('مسح جميع الرسومات؟ يمكنك التراجع بعد المسح.')) whiteboardRef.current?.clear(); }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
           </button>
         </div>
@@ -618,14 +620,14 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
               {showZoom && (
                 <>
                   <button
-                    className="bb-ic" title="Zoom out"
+                    className="bb-ic" title="تصغير" aria-label="تصغير المحتوى"
                     onClick={() => setZoom((z) => Math.max(1, +(z - 0.25).toFixed(2)))}
                     disabled={zoom <= 1}
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4M8 11h6"/></svg>
                   </button>
                   <button
-                    className="bb-ic" title="Zoom in"
+                    className="bb-ic" title="تكبير" aria-label="تكبير المحتوى"
                     onClick={() => setZoom((z) => Math.min(2.5, +(z + 0.25).toFixed(2)))}
                     disabled={zoom >= 2.5}
                   >
@@ -669,7 +671,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
                         />
                       ) : (
                         <a className="btn btn-gold" href={sharedDoc.url} target="_blank" rel="noreferrer">
-                          Open video in new tab
+                          فتح الفيديو في نافذة جديدة
                         </a>
                       );
                     })()
@@ -719,7 +721,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
               </div>
             </div>
 
-            {view === 'board' && <div className="board-guide ar"><Icon name="edit" /> اكتب على السبورة</div>}
+            {view === 'board' && <div className="board-guide ar">{!drawPermission ? 'مشاهدة فقط · المعلم يتحكم بإذن الرسم' : tool === 'text' ? 'اضغط لإضافة نص، ثم اكتب' : tool === 'select' ? 'اضغط على الشكل لتحريكه أو تغيير حجمه' : 'اختر أداة ثم ارسم على السبورة'}</div>}
             {contentVisible && annotatable && <div className="board-guide ar"><Icon name="edit" /> اكتب فوق المحتوى</div>}
 
             {view === 'screen' && screenTrack && <div className="workspace-screen"><ParticipantTile trackRef={screenTrack} style={{ height: '100%' }} /></div>}
@@ -752,7 +754,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
         </div>
 
         {/* Color palette + line width — right sidebar */}
-        <div className="wb-colors">
+        <div className="wb-colors" aria-label="خصائص أداة السبورة"><span className="tool-caption">{tool === 'eraser' ? 'الممحاة' : tool === 'text' ? 'النص' : 'اللون والسُمك'}</span>
           {tool === 'eraser' && <div className="eraser-options">
             <select aria-label="نوع الممحاة" value={eraserMode} onChange={e => setEraserMode(e.target.value as EraserMode)}>
               <option value="object">حذف الشكل كامل</option><option value="partial">مسح جزء من الشكل</option>
@@ -760,21 +762,21 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
             {eraserMode === 'partial' && <input aria-label="حجم الممحاة" type="range" min="8" max="100" value={eraserSize} onChange={e => setEraserSize(Number(e.target.value))} />}
           </div>}
 
-          {PALETTE.map((c) => (
+          {tool !== 'eraser' && PALETTE.map((c) => (
             <button
               key={c}
               className={`wb-color ${color === c ? 'on' : ''}`}
               style={{ background: c, boxShadow: c === '#ffffff' ? 'inset 0 0 0 1px #ccc' : undefined }}
               onClick={() => setColor(c)}
-              aria-label={`Color ${c}`}
+              aria-label={`لون ${c}`} aria-pressed={color === c} disabled={!inkInteractive}
             />
           ))}
-          <input
-            type="range" min={1} max={20} value={lineWidth}
+          {tool !== 'eraser' && <label className="tool-size">السُمك <input
+            disabled={!inkInteractive} type="range" min={1} max={20} value={lineWidth}
             onChange={(e) => setLineWidth(Number(e.target.value))}
             className="wb-width"
-            aria-label="Line width"
-          />
+            aria-label="سُمك الخط"
+          /><output>{lineWidth}</output></label>}
         </div>
       </div>
 
@@ -783,10 +785,10 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
       {classError && <div role="alert" style={{ color: '#f87171', textAlign: 'center' }}>{classError} <button onClick={() => setClassError('')}>إغلاق</button></div>}
       <StartAudio className="classroom-start-audio" label="تشغيل صوت الحصة" />
       {/* ── Room controls ── */}
-      <div className="room-controls">
-        {isTeacher && <button className="rc-btn" onClick={() => { void localParticipant.setScreenShareEnabled(!localParticipant.isScreenShareEnabled).catch(() => setClassError('تعذر مشاركة الشاشة. قد لا يدعمها متصفح الجوال.')); }}><CallIcon name="screen" /><span>الشاشة</span></button>}
+      <div className="room-controls" aria-label="أدوات المكالمة">
+
         <button
-          className="rc-btn"
+          className={`rc-btn ${!isMicrophoneEnabled ? "rc-off" : ""}`} aria-pressed={isMicrophoneEnabled}
           onClick={() => { void localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled).catch(() => setClassError('تعذر تشغيل الميكروفون. تحقق من إذن المتصفح والجهاز.')); }}
         >
           <CallIcon name="mic" off={!isMicrophoneEnabled} />
@@ -794,14 +796,14 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
         </button>
 
         <button
-          className="rc-btn"
+          className={`rc-btn ${!isCameraEnabled ? "rc-off" : ""}`} aria-pressed={isCameraEnabled}
           onClick={() => { void localParticipant.setCameraEnabled(!isCameraEnabled).catch(() => setClassError('تعذر تشغيل الكاميرا. تحقق من إذن المتصفح والجهاز.')); }}
         >
           <CallIcon name="camera" off={!isCameraEnabled} />
           <span>{isCameraEnabled ? 'إيقاف الكاميرا' : 'تشغيل الكاميرا'}</span>
         </button>
 
-        {/* Students: رفع اليد sends a data-channel message to the teacher */}
+        <details className="call-more"><summary><Icon name="menu" /><span>المزيد</span></summary><div className="call-more-menu">        {isTeacher && <button className="rc-btn" onClick={() => { void localParticipant.setScreenShareEnabled(!localParticipant.isScreenShareEnabled).catch(() => setClassError('تعذر مشاركة الشاشة. قد لا يدعمها متصفح الجوال.')); }}><CallIcon name="screen" /><span>الشاشة</span></button>}        {/* Students: رفع اليد sends a data-channel message to the teacher */}
         {!isTeacher && (
           <button className="rc-btn" onClick={handleRaiseHand}>
             <CallIcon name="hand" />
@@ -821,6 +823,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
           <CallIcon name="react" />
           <span>تفاعل</span>
         </button>
+</div></details>
 
         <DisconnectButton onClick={onLeave} className="rc-btn rc-leave">
           <CallIcon name="leave" />
@@ -897,8 +900,8 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
                   </div>
 
                   <div className="field">
-                    <label htmlFor="doc-name">Name <span className="muted" style={{ fontSize: 12 }}>(optional)</span></label>
-                    <input id="doc-name" className="input" type="text" placeholder="e.g. Worksheet 1"
+                    <label htmlFor="doc-name">اسم المحتوى <span className="muted" style={{ fontSize: 12 }}>(اختياري)</span></label>
+                    <input id="doc-name" className="input" type="text" placeholder="مثال: ورقة التدريب"
                       value={manualName} onChange={(e) => setManualName(e.target.value)} />
                   </div>
                 </>
@@ -920,8 +923,8 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
                   </div>
 
                   <div className="field">
-                    <label htmlFor="html-name">Name <span className="muted" style={{ fontSize: 12 }}>(optional)</span></label>
-                    <input id="html-name" className="input" type="text" placeholder="e.g. Interactive Quiz"
+                    <label htmlFor="html-name">اسم المحتوى <span className="muted" style={{ fontSize: 12 }}>(اختياري)</span></label>
+                    <input id="html-name" className="input" type="text" placeholder="مثال: نشاط تفاعلي"
                       value={manualName} onChange={(e) => setManualName(e.target.value)} />
                   </div>
                 </>
@@ -952,6 +955,19 @@ export default function ClassroomPage() {
   const params = useParams();
   const router = useRouter();
   const roomId = params.roomId as string;
+  const { user } = useAuth();
+  const [lesson, setLesson] = useState<LessonInfo | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    authFetch('/api/sessions/upcoming', { signal: controller.signal }).then(async res => {
+      if (!res.ok) return;
+      const json = await res.json();
+      if (controller.signal.aborted) return;
+      const matches = (json.data as LessonInfo[]).filter(item => item.courseId === roomId);
+      setLesson(matches.find(item => item.status === 'LIVE') ?? matches[0] ?? null);
+    }).catch(() => { /* Session details are optional; joining stays available. */ });
+    return () => controller.abort();
+  }, [roomId]);
 
   const [token, setToken] = useState<string | null>(null);
   const [role, setRole] = useState<string | null>(null);
@@ -998,7 +1014,7 @@ export default function ClassroomPage() {
       .then(async (res) => {
         const json = await res.json();
         if (!active) return;
-        if (!res.ok) { setError(res.status === 409 ? 'الحصة غير مباشرة الآن. انتظر بدء المعلم للحصة ثم أعد المحاولة.' : json.error || 'تعذر دخول الحصة'); return; }
+        if (!res.ok) { setError(res.status === 409 ? 'الحصة غير مباشرة الآن. انتظر بدء المعلم للحصة ثم أعد المحاولة.' : res.status === 503 ? 'الحصة غير متاحة مؤقتًا. أعد المحاولة لاحقًا أو تواصل مع الأكاديمية.' : res.status === 403 ? 'هذا الحساب ليس مسجّلًا في هذه الحصة. ارجع إلى صفوفك وتأكد من الدورة.' : 'تعذر دخول الحصة. أعد المحاولة أو تواصل مع الأكاديمية.'); return; }
         setToken(json.data.token);
         setLivekitUrl(json.data.livekitUrl);
       })
@@ -1039,8 +1055,8 @@ export default function ClassroomPage() {
   if (error) {
     return (
       <div className="midad classroom-lobby" style={{ alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center', padding: 32 }}>
-          <p role="alert" dir="rtl" style={{ color: '#f87171', fontWeight: 600, marginBottom: 12 }}>{error}</p>
+        <div className="lobby-state">
+          <p role="alert" dir="rtl" style={{ color: '#a83232', fontWeight: 600, marginBottom: 12 }}>{error}</p>
           <button className="btn btn-gold btn-sm" onClick={retryJoin}>إعادة دخول الحصة</button>
           <button className="btn btn-ghost btn-sm" onClick={handleLeave}>الرجوع للوحة التحكم</button>
         </div>
@@ -1048,18 +1064,14 @@ export default function ClassroomPage() {
     );
   }
 
-  if (!choices) return <div className="midad classroom-lobby">
-    <h1 dir="rtl" style={{ textAlign: 'center' }}>تجهيز الكاميرا والميكروفون قبل الحصة</h1>
-    <PreJoin onSubmit={setChoices} persistUserChoices={false} joinLabel="دخول الحصة" defaults={{ username: 'مشارك', audioEnabled: false, videoEnabled: false }} />
-    <p dir="rtl" style={{ textAlign: 'center' }}>اختر الأجهزة أو ادخل والصوت والكاميرا مغلقان، ثم شغّلهما داخل الحصة.</p>
-  </div>;
+  if (!choices) return <ClassroomLobby lesson={lesson} name={user?.name || 'مشارك'} onJoin={setChoices} onBack={handleLeave} />;
 
   if (!token) {
     return (
       <div className="midad classroom-lobby" style={{ alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center', padding: 32 }}>
+        <div className="lobby-state">
           <div className="animate-spin" style={{ width: 32, height: 32, border: '2px solid rgba(255,255,255,.3)', borderTopColor: '#fff', borderRadius: '50%', margin: '0 auto 12px' }} />
-          <p style={{ fontSize: 14, color: '#8ea0bb' }}>جارٍ دخول الحصة…</p>
+          <p style={{ fontSize: 14, color: '#60728a' }}>جارٍ دخول الحصة…</p>
         </div>
       </div>
     );
@@ -1077,7 +1089,7 @@ export default function ClassroomPage() {
       onError={() => setError("تعذر الاتصال بالحصة. تحقق من الإنترنت وأعد الدخول.")}
       style={{ height: '100dvh' }}
     >
-      <ClassroomContent roomId={roomId} isTeacher={role === 'teacher'} onLeave={handleLeave} />
+      <ClassroomContent title={lesson?.title} roomId={roomId} isTeacher={role === 'teacher'} onLeave={handleLeave} />
     </LiveKitRoom>
   );
 }
