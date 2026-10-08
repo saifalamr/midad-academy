@@ -19,6 +19,29 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   await api('patch', `/api/sessions/${scheduled.data.id}/start`, teacherToken, {});
   const teacherContext = await browser.newContext({ viewport: { width: 1280, height: 900 }, permissions: ['camera', 'microphone'] });
   const studentContext = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });
+  // Generate moving video and a speech-like tone in this device-less runtime.
+  // Media still travels through LiveKit/WebRTC and is decoded by the peer.
+  for (const context of [teacherContext, studentContext]) await context.addInitScript(() => {
+    navigator.mediaDevices.getUserMedia = async constraints => {
+      const stream = new MediaStream();
+      if (constraints.video) {
+        const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 360;
+        const ctx = canvas.getContext('2d')!; let frame = 0;
+        const draw = () => { ctx.fillStyle = '#18365f'; ctx.fillRect(0, 0, 640, 360); ctx.fillStyle = '#c9922a'; ctx.fillRect((frame++ * 8) % 600, 80, 40, 100); };
+        draw(); const timer = setInterval(draw, 100);
+        const track = canvas.captureStream(10).getVideoTracks()[0];
+        const stop = track.stop.bind(track); track.stop = () => { clearInterval(timer); stop(); };
+        stream.addTrack(track);
+      }
+      if (constraints.audio) {
+        const context = new AudioContext(); const source = context.createOscillator();
+        const destination = context.createMediaStreamDestination(); source.connect(destination); source.start();
+        const track = destination.stream.getAudioTracks()[0]; const stop = track.stop.bind(track);
+        track.stop = () => { source.stop(); void context.close(); stop(); }; stream.addTrack(track);
+      }
+      return stream;
+    };
+  });
   await teacherContext.addInitScript(token => localStorage.setItem('token', token), teacherToken);
   await studentContext.addInitScript(token => localStorage.setItem('token', token), studentToken);
   const teacher = await teacherContext.newPage(); const student = await studentContext.newPage();
@@ -43,6 +66,12 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   await expect.poll(async () => (await remoteMedia(teacher)).videos).toBeGreaterThanOrEqual(2);
   await expect.poll(async () => (await remoteMedia(student)).audio).toBeGreaterThan(0);
   await expect.poll(async () => (await remoteMedia(teacher)).audio).toBeGreaterThan(0);
+  const videoFrames = (page: Page) => page.evaluate(() => [...document.querySelectorAll<HTMLVideoElement>('.video-strip video')].map(v => v.getVideoPlaybackQuality().totalVideoFrames));
+  const expectMovingVideo = async (page: Page) => {
+    const before = await videoFrames(page);
+    await expect.poll(async () => { const after = await videoFrames(page); return after.length >= 2 && before.every((count, i) => after[i] > count + 3); }, { timeout: 15000 }).toBeTruthy();
+  };
+  await expectMovingVideo(teacher); await expectMovingVideo(student);
   const ink = (page: Page) => page.locator('canvas.lower-canvas').evaluate((canvas: HTMLCanvasElement) => {
     const pixels = canvas.getContext('2d')!.getImageData(0,0,canvas.width,canvas.height).data;
     let count = 0; for (let i=0; i<pixels.length; i+=4) if (pixels[i] < 100 && pixels[i+1] < 120 && pixels[i+2] > 50 && pixels[i+3] > 100) count++;
@@ -87,6 +116,7 @@ test('teacher and student exchange real media, synchronized ink, permissions and
     await teacher.getByRole('button', { name: 'المحتوى', exact: true }).click();
     await expect(teacher.frameLocator('iframe[title="درس متزامن"]').getByText('مرحباً')).toBeVisible();
   }
+  await expectMovingVideo(teacher); await expectMovingVideo(student);
   await teacher.getByRole('button', { name: 'السبورة', exact: true }).click();
   expect(await ink(teacher)).toBeGreaterThan(before + 100);
   await teacher.getByRole('button', { name: 'إضافة محتوى', exact: true }).click();
@@ -94,6 +124,11 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   await teacher.locator('#class-file').setInputFiles({ name: 'نشاط.html', mimeType: 'text/html', buffer: Buffer.from('<h1>نشاط جديد</h1>') });
   await expect(teacher.frameLocator('iframe[title="نشاط.html"]').getByText('نشاط جديد')).toBeVisible();
   await expect(student.frameLocator('iframe[title="نشاط.html"]').getByText('نشاط جديد')).toBeVisible();
+  await expect(teacher.getByRole('button', { name: 'إيقاف المشاركة', exact: true })).toBeVisible();
+  await teacher.getByRole('button', { name: 'إيقاف المشاركة', exact: true }).click();
+  await expect(student.getByRole('button', { name: 'المحتوى', exact: true })).toHaveCount(0);
+  await expect(teacher.getByRole('button', { name: 'إيقاف المشاركة', exact: true })).toHaveCount(0);
+  await expectMovingVideo(teacher); await expectMovingVideo(student);
   await api('post', '/api/sessions/end' , teacherToken, { roomName: 'preview-arabic' });
   await expect(student).toHaveURL(/\/student/);
   expect(errors).toEqual([]);

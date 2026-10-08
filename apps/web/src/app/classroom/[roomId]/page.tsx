@@ -1,7 +1,7 @@
 'use client';
 
 import Icon, { type IconName } from '@/components/Icon';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   LiveKitRoom,
@@ -17,7 +17,7 @@ import {
 } from '@livekit/components-react';
 import '@livekit/components-styles';
 import type { TrackReferenceOrPlaceholder } from '@livekit/components-react';
-import { Track, RoomEvent, DisconnectReason, type RemoteParticipant } from 'livekit-client';
+import { Track, RoomEvent, DisconnectReason, VideoPresets, AudioPresets, type RoomOptions, type RemoteParticipant } from 'livekit-client';
 import Whiteboard, { PALETTE, type Tool, type EraserMode, type WhiteboardHandle } from '@/components/Whiteboard';
 import './classroom.css';
 import ClassroomLobby, { type LessonInfo } from '@/components/ClassroomLobby';
@@ -25,6 +25,20 @@ import { useAuth } from '@/components/AuthProvider';
 import { API_URL } from '@/lib/config';
 
 
+
+// Video tiles are small. Avoid capturing and decoding HD on mobile, while
+// letting LiveKit select visible layers and pause unused encodings.
+const CLASSROOM_MEDIA_OPTIONS: RoomOptions = {
+  adaptiveStream: { pixelDensity: 1 },
+  dynacast: true,
+  videoCaptureDefaults: { resolution: VideoPresets.h360.resolution },
+  publishDefaults: {
+    simulcast: true,
+    videoEncoding: VideoPresets.h360.encoding,
+    videoSimulcastLayers: [VideoPresets.h180],
+    audioPreset: AudioPresets.speech,
+  },
+};
 
 function authFetch(path: string, options: RequestInit = {}) {
   const token = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
@@ -514,11 +528,6 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
           </span>
         </div>
         <div className="rt-right">
-          {isTeacher && sharedDoc && (
-            <button className="rt-icon" title="إيقاف مشاركة المحتوى" aria-label="إيقاف مشاركة المحتوى" onClick={stopSharing}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M6 6l12 12M18 6 6 18"/></svg>
-            </button>
-          )}
           {isTeacher && <button className="rt-leave btn btn-sm" onClick={async () => {
             if (!window.confirm('إنهاء الحصة لجميع المشاركين؟')) return;
             const res = await authFetch('/api/sessions/end', { method: 'POST', body: JSON.stringify({ roomName: roomId }) });
@@ -617,6 +626,7 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
             </div>
 
             <div className="bb-right">
+              {isTeacher && sharedDoc && <button className="stop-content-share" onClick={stopSharing} title="إيقاف مشاركة المحتوى"><Icon name="close" /><span>إيقاف المشاركة</span></button>}
               {showZoom && (
                 <>
                   <button
@@ -1025,7 +1035,7 @@ export default function ClassroomPage() {
     return () => { active = false; controller.abort(); };
   }, [roomId, router, choices, attempt]);
 
-  function handleLeave() {
+  const handleLeave = useCallback(() => {
     const appToken = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
     if (appToken) {
       try {
@@ -1037,20 +1047,23 @@ export default function ClassroomPage() {
       } catch { /* fall through */ }
     }
     router.push('/login');
-  }
+  }, [router]);
 
   function retryJoin() {
     setToken(null); setError(''); setAttempt(value => value + 1);
   }
 
-  function handleDisconnected(reason?: DisconnectReason) {
+  const handleDisconnected = useCallback((reason?: DisconnectReason) => {
     if ([DisconnectReason.CLIENT_INITIATED, DisconnectReason.ROOM_DELETED, DisconnectReason.ROOM_CLOSED, DisconnectReason.PARTICIPANT_REMOVED].includes(reason ?? DisconnectReason.UNKNOWN_REASON)) {
       handleLeave(); return;
     }
     setError(reason === DisconnectReason.DUPLICATE_IDENTITY
       ? 'تم فتح الحصة بحسابك في جهاز أو نافذة أخرى. أغلقها هناك قبل إعادة الدخول.'
       : 'انقطع الاتصال بالحصة. تحقق من الإنترنت ثم أعد الدخول.');
-  }
+  }, [handleLeave]);
+  const handleRoomError = useCallback(() => setError('تعذر الاتصال بالحصة. تحقق من الإنترنت وأعد الدخول.'), []);
+  const cameraCapture = useMemo(() => choices?.videoEnabled ? { deviceId: choices.videoDeviceId } : false, [choices?.videoEnabled, choices?.videoDeviceId]);
+  const audioCapture = useMemo(() => choices?.audioEnabled ? { deviceId: choices.audioDeviceId } : false, [choices?.audioEnabled, choices?.audioDeviceId]);
 
   if (error) {
     return (
@@ -1083,10 +1096,11 @@ export default function ClassroomPage() {
       serverUrl={livekitUrl}
       token={token}
       connect
-      video={choices.videoEnabled ? { deviceId: choices.videoDeviceId } : false}
-      audio={choices.audioEnabled ? { deviceId: choices.audioDeviceId } : false}
+      options={CLASSROOM_MEDIA_OPTIONS}
+      video={cameraCapture}
+      audio={audioCapture}
       onDisconnected={handleDisconnected}
-      onError={() => setError("تعذر الاتصال بالحصة. تحقق من الإنترنت وأعد الدخول.")}
+      onError={handleRoomError}
       style={{ height: '100dvh' }}
     >
       <ClassroomContent title={lesson?.title} roomId={roomId} isTeacher={role === 'teacher'} onLeave={handleLeave} />
