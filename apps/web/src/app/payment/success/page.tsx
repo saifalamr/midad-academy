@@ -1,5 +1,6 @@
 'use client';
 
+import Icon from '@/components/Icon';
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { API_URL } from '@/lib/config';
@@ -83,7 +84,7 @@ function PaymentSuccessContent() {
 
         {status === 'done' && result && (
           <>
-            <div className="text-5xl mb-3">🎉</div>
+            <div className="text-5xl mb-3"><Icon name="celebration" /></div>
             <h1 className="text-lg font-bold text-gray-900 mb-1">Payment successful!</h1>
             <p className="text-sm text-gray-500 mb-6">
               You&apos;re enrolled in <span className="font-medium text-gray-700">{result.course.title}</span>.
@@ -102,7 +103,7 @@ function PaymentSuccessContent() {
 
         {(status === 'error' || status === 'review') && (
           <>
-            <div className="text-5xl mb-3">⚠️</div>
+            <div className="text-5xl mb-3"><Icon name="warning" /></div>
             <h1 className="text-lg font-bold text-gray-900 mb-1">{status === 'review' ? 'تم تسجيل الدفع · التسجيل يحتاج مراجعة' : 'We could not confirm your payment'}</h1>
             <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-6">{error}</p>
             <button

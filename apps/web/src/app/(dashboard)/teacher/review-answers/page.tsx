@@ -1,5 +1,6 @@
 'use client';
 
+import Icon from '@/components/Icon';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
@@ -88,7 +89,7 @@ export default function ReviewAnswersPage() {
 
       <div className="wrap" style={{ paddingTop: 32, paddingBottom: 48 }}>
         <button className="btn btn-sm btn-outline" onClick={() => router.push('/teacher')} style={{ marginBottom: 16 }}>
-          ← Back to dashboard
+          <Icon name="left" /> Back to dashboard
         </button>
 
         <div className="page-head" style={{ marginBottom: 24 }}>
@@ -106,7 +107,7 @@ export default function ReviewAnswersPage() {
           </div>
         ) : pending.length === 0 ? (
           <div className="card pad" style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14 }}>
-            🎉 No written answers are waiting for review.
+            <Icon name="celebration" /> No written answers are waiting for review.
           </div>
         ) : (
           pending.map((a) => {

@@ -1,3 +1,4 @@
+import Icon from '@/components/Icon';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import Navbar from '@/components/Navbar';
@@ -16,5 +17,5 @@ export default async function InfoPage({ params }: { params: Promise<{ info: str
   const { info } = await params;
   const page = pages[info]; if (!page) notFound();
   const email = process.env.NEXT_PUBLIC_SUPPORT_EMAIL;
-  return <><Navbar /><main className="midad wrap" style={{ maxWidth: 900, padding: '64px 24px' }}><Link href="/" className="link-gold">← Home</Link><h1 className="sec-h2">{page.title}</h1><p className="sec-sub">{page.description}</p>{page.sections.map(([title, body]) => <section key={title} className="card pad" style={{ margin: '20px 0' }}><h2 style={{ fontSize: 22, marginBottom: 12 }}>{title}</h2><p style={{ lineHeight: 1.8 }}>{body}</p></section>)}<div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 28 }}><Link className="btn btn-gold" href="/courses">Browse courses</Link><Link className="btn btn-outline" href="/help">Help centre</Link>{email && <a className="btn btn-outline" href={`mailto:${email}`}>Email the academy</a>}</div></main></>;
+  return <><Navbar /><main className="midad wrap" style={{ maxWidth: 900, padding: '64px 24px' }}><Link href="/" className="link-gold"><Icon name="left" /> Home</Link><h1 className="sec-h2">{page.title}</h1><p className="sec-sub">{page.description}</p>{page.sections.map(([title, body]) => <section key={title} className="card pad" style={{ margin: '20px 0' }}><h2 style={{ fontSize: 22, marginBottom: 12 }}>{title}</h2><p style={{ lineHeight: 1.8 }}>{body}</p></section>)}<div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 28 }}><Link className="btn btn-gold" href="/courses">Browse courses</Link><Link className="btn btn-outline" href="/help">Help centre</Link>{email && <a className="btn btn-outline" href={`mailto:${email}`}>Email the academy</a>}</div></main></>;
 }

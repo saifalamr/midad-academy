@@ -1,5 +1,6 @@
 'use client';
 
+import Icon from '@/components/Icon';
 import { flushSync } from 'react-dom';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
@@ -496,7 +497,7 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
               backdropFilter: 'blur(4px)',
             }}
           >
-            👁️ مشاهدة فقط
+            <Icon name="eye" /> مشاهدة فقط
           </span>
         )}
       </div>

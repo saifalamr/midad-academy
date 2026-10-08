@@ -1,5 +1,6 @@
 'use client';
 
+import Icon from '@/components/Icon';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -156,10 +157,10 @@ export default function CourseLessonsPage() {
 
       <div className="wrap" style={{ paddingTop: 32, paddingBottom: 48 }}>
         <button className="btn btn-sm btn-outline" onClick={() => router.push('/student')} style={{ marginBottom: 16 }}>
-          ← Back to dashboard
+          <Icon name="left" /> Back to dashboard
         </button>
 
-        <Link className="btn btn-sm btn-outline" href={`/courses/${courseId}/board`} style={{ marginBottom: 16 }}>✏️ سبورة الدورة</Link>
+        <Link className="btn btn-sm btn-outline" href={`/courses/${courseId}/board`} style={{ marginBottom: 16 }}><Icon name="edit" /> سبورة الدورة</Link>
 
         <div className="page-head" style={{ marginBottom: 24 }}>
           <div>
@@ -248,8 +249,8 @@ export default function CourseLessonsPage() {
                     </div>
                     <div style={{ fontWeight: 700, marginTop: 4 }}>
                       {result.status === 'PENDING_REVIEW'
-                        ? '⏳ Pending Review'
-                        : result.passed ? '✓ Passed' : '✗ Not passed'}
+                        ? <><Icon name="clock" /> Pending Review</>
+                        : result.passed ? <><Icon name="check" /> Passed</> : <><Icon name="close" /> Not passed</>}
                     </div>
                     <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 4 }}>
                       Passing score: {result.passingScore}% · {result.earnedPoints}/{result.totalPoints} points graded so far
@@ -273,7 +274,7 @@ export default function CourseLessonsPage() {
                       }}
                     >
                       <b style={{ fontSize: 14, display: 'block', marginBottom: 6 }}>
-                        {i + 1}. {r.text} {r.status === 'PENDING' ? '⏳' : r.correct ? '✓' : '✗'}
+                        {i + 1}. {r.text} {r.status === 'PENDING' ? <><Icon name="clock" /></> : r.correct ? <Icon name="check" label="Correct" /> : <Icon name="close" label="Incorrect" />}
                       </b>
                       <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>
                         Your answer: <b>{r.yourAnswer || '—'}</b>

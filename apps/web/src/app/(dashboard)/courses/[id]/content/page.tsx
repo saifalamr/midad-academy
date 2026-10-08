@@ -1,5 +1,6 @@
 'use client';
 
+import Icon from '@/components/Icon';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
@@ -66,11 +67,7 @@ function buildQuestionPayload(q: DraftQuestion): Record<string, unknown> {
   return payload;
 }
 
-const TYPE_ICON: Record<ContentType, string> = {
-  VIDEO: '🎬',
-  PDF: '📄',
-  EXERCISE: '📝',
-};
+const TYPE_ICON = { VIDEO: 'video', PDF: 'file', EXERCISE: 'edit' } as const;
 
 function authFetch(path: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? (localStorage.getItem('token') ?? sessionStorage.getItem('token')) : null;
@@ -423,7 +420,7 @@ export default function CourseContentPage() {
 
       <div className="wrap" style={{ paddingTop: 32, paddingBottom: 48 }}>
         <button className="btn btn-sm btn-outline" onClick={() => router.push('/teacher')} style={{ marginBottom: 16 }}>
-          ← Back to dashboard
+          <Icon name="left" /> Back to dashboard
         </button>
 
         <div className="page-head" style={{ marginBottom: 24 }}>
@@ -498,7 +495,7 @@ export default function CourseContentPage() {
                   </button>
                 </div>
 
-                <div style={{ fontSize: 24 }}>{TYPE_ICON[lesson.type]}</div>
+                <div style={{ fontSize: 24 }}><Icon name={TYPE_ICON[lesson.type]} size={26} /></div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700 }}>{lesson.title}</div>
@@ -511,7 +508,7 @@ export default function CourseContentPage() {
                 {lesson.quiz ? (
                   <>
                     <span className="pill" style={{ background: 'rgba(27,58,107,.08)', color: 'var(--navy)', whiteSpace: 'nowrap' }}>
-                      ✓ Quiz added
+                      <Icon name="check" /> Quiz added
                     </span>
                     <button className="btn btn-sm btn-outline" onClick={() => openEditQuiz(lesson)}>
                       Edit Quiz
@@ -699,7 +696,7 @@ export default function CourseContentPage() {
                           {q.options.length > 2 && (
                             <button type="button" className="btn btn-sm btn-outline" style={{ padding: '4px 10px' }}
                               onClick={() => removeOption(qIdx, oIdx)} aria-label="Remove option">
-                              ✕
+                              <Icon name="close" />
                             </button>
                           )}
                         </div>

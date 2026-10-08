@@ -1,5 +1,6 @@
 'use client';
 
+import Icon from '@/components/Icon';
 import { useRouter } from 'next/navigation';
 
 export default function PaymentCancelPage() {
@@ -8,7 +9,7 @@ export default function PaymentCancelPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 max-w-md w-full text-center">
-        <div className="text-5xl mb-3">😕</div>
+        <div className="text-5xl mb-3"><Icon name="smile" /></div>
         <h1 className="text-lg font-bold text-gray-900 mb-1">Payment cancelled</h1>
         <p className="text-sm text-gray-500 mb-6">
           No charge was made and you haven&apos;t been enrolled. You can try again whenever you&apos;re ready.

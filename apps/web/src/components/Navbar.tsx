@@ -1,5 +1,6 @@
 'use client';
 
+import Icon from '@/components/Icon';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -102,8 +103,8 @@ export default function Navbar() {
                     <b>{user.name}</b>
                     <span>{user.role.toLowerCase()}</span>
                   </div>
-                  <Link href={dashboardHref} onClick={() => setMenuOpen(false)}>📊 My Dashboard</Link>
-                  <button className="logout" onClick={handleLogout}>🚪 Log out</button>
+                  <Link href={dashboardHref} onClick={() => setMenuOpen(false)}><Icon name="dashboard" /> My Dashboard</Link>
+                  <button className="logout" onClick={handleLogout}><Icon name="logout" /> Log out</button>
                 </div>
               )}
             </div>
@@ -116,7 +117,7 @@ export default function Navbar() {
         </div>
 
         <button className="nav-burger" aria-label="Toggle menu" onClick={() => setMobileOpen((o) => !o)}>
-          <span style={{ fontSize: 20 }}>{mobileOpen ? '✕' : '☰'}</span>
+          <span style={{ fontSize: 20 }}>{mobileOpen ? <><Icon name="close" /></> : <><Icon name="menu" /></>}</span>
         </button>
       </div>
 
@@ -127,7 +128,7 @@ export default function Navbar() {
         <Link href={dashboardHref} onClick={() => setMobileOpen(false)}>Dashboard</Link>
 
         {user ? (
-          <button className="logout" onClick={handleLogout}>🚪 Log out ({user.name})</button>
+          <button className="logout" onClick={handleLogout}><Icon name="logout" /> Log out ({user.name})</button>
         ) : (
           <div className="nm-cta">
             <Link className="btn btn-sm btn-outline" href="/login" onClick={() => setMobileOpen(false)}>Log in</Link>

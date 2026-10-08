@@ -1,5 +1,6 @@
 'use client';
 
+import Icon from '@/components/Icon';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -236,7 +237,7 @@ export default function TeacherDashboard() {
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <Link href="/teacher/review-answers" className="btn btn-outline btn-lg">
-              📝 Review Answers
+              <Icon name="edit" /> Review Answers
             </Link>
             <button className="btn btn-gold btn-lg" onClick={() => setShowModal(true)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M12 5v14M5 12h14"/></svg>
@@ -249,10 +250,10 @@ export default function TeacherDashboard() {
         {formError && <p className="auth-error" role="alert">{formError}</p>}
         {/* ── Stats row ── */}
         <div className="stat-row">
-          <div className="stat card"><div className="st-ic st-navy">📚</div><div><b>{courses.length}</b><span>Active courses</span></div></div>
-          <div className="stat card"><div className="st-ic st-gold">👨‍🎓</div><div><b>{totalStudents}</b><span>Students</span></div></div>
-          <div className="stat card"><div className="st-ic st-fire">🗓️</div><div><b>{sessions.length}</b><span>Lessons scheduled</span></div></div>
-          <div className="stat card"><div className="st-ic st-green">★</div><div><b>{reviewCount ?? '…'}</b><span>Reviews to grade</span></div></div>
+          <div className="stat card"><div className="st-ic st-navy"><Icon name="book" /></div><div><b>{courses.length}</b><span>Active courses</span></div></div>
+          <div className="stat card"><div className="st-ic st-gold"><Icon name="graduate" /></div><div><b>{totalStudents}</b><span>Students</span></div></div>
+          <div className="stat card"><div className="st-ic st-fire"><Icon name="calendar" /></div><div><b>{sessions.length}</b><span>Lessons scheduled</span></div></div>
+          <div className="stat card"><div className="st-ic st-green"><Icon name="star" /></div><div><b>{reviewCount ?? '…'}</b><span>Reviews to grade</span></div></div>
         </div>
 
         <div className="dash-grid t-grid">

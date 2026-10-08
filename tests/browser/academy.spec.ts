@@ -11,7 +11,7 @@ test('mobile student login, enrollment, quiz and account linking code', async ({
   await expect(page.getByText('Arabic Foundations · أساسيات العربية', { exact: true })).toBeVisible();
   const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Arabic Foundations · أساسيات العربية', exact: true }) });
   const enroll = card.getByRole('button', { name: /Enroll/ });
-  if (await enroll.isEnabled()) { await enroll.click(); await expect(card.getByRole('button', { name: '✓ Enrolled', exact: true })).toBeVisible(); }
+  if (await enroll.isEnabled()) { await enroll.click(); await expect(card.getByRole('button', { name: 'Enrolled', exact: true })).toBeVisible(); }
   await page.goto('/courses/preview-arabic/lessons');
   await expect(page.getByText('First Arabic words', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'ملاحظاتي', exact: true }).click();
@@ -19,9 +19,9 @@ test('mobile student login, enrollment, quiz and account linking code', async ({
   await page.getByRole('button', { name: 'حفظ الملاحظة', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('تم حفظ الملاحظة');
   await page.getByRole('button', { name: 'تحديد كمكتمل', exact: true }).click();
-  await expect(page.getByRole('button', { name: '✓ مكتمل · إلغاء الإنجاز' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'مكتمل · إلغاء الإنجاز' })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('button', { name: '✓ مكتمل · إلغاء الإنجاز' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'مكتمل · إلغاء الإنجاز' })).toBeVisible();
   await page.getByRole('button', { name: 'ملاحظاتي', exact: true }).click();
   await expect(page.getByLabel('ملاحظتك الخاصة لهذا الدرس')).toHaveValue('تعلمت أن مرحباً تعني Hello');
   await page.getByLabel('عرض الدروس').selectOption('todo');
@@ -30,7 +30,7 @@ test('mobile student login, enrollment, quiz and account linking code', async ({
   await page.getByLabel('ابحث عن درس').fill('not-a-lesson');
   await expect(page.getByText('لا توجد دروس تطابق البحث أو الفلتر.')).toBeVisible();
   await page.getByLabel('ابحث عن درس').fill('');
-  await page.getByRole('button', { name: '✓ مكتمل · إلغاء الإنجاز' }).click();
+  await page.getByRole('button', { name: 'مكتمل · إلغاء الإنجاز' }).click();
   await page.getByLabel('ملاحظتك الخاصة لهذا الدرس').fill('ملاحظة تبقى هنا عند تعذر الحفظ');
   await page.route('**/api/learning/lessons/*', route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'تعذر الحفظ، حاول مرة أخرى' }) }));
   await page.getByRole('button', { name: 'حفظ الملاحظة', exact: true }).click();
@@ -47,7 +47,7 @@ test('mobile student login, enrollment, quiz and account linking code', async ({
   await page.getByLabel('Hello', { exact: true }).check();
   await page.getByPlaceholder('Type your answer…').fill('مرحباً');
   await page.getByRole('button', { name: 'Submit Quiz' }).click();
-  await expect(page.getByText('⏳ Pending Review', { exact: true })).toBeVisible();
+  await expect(page.getByText('Pending Review', { exact: true })).toBeVisible();
   await page.goto('/account');
   await page.getByRole('button', { name: 'Generate linking code' }).click();
   await expect(page.locator('code')).toHaveText(/^[a-f0-9]{16}$/);
@@ -195,7 +195,7 @@ test('mobile quiz delivery retries one saved attempt, teacher feedback and final
   await studentPage.getByRole('button', { name: 'Submit Quiz', exact: true }).click();
   await expect(studentPage.getByRole('alert').filter({ hasText: 'تعذر تأكيد التسليم' })).toBeVisible();
   await studentPage.getByRole('button', { name: 'Submit Quiz', exact: true }).click();
-  await expect(studentPage.getByText('⏳ Pending Review', { exact: true })).toBeVisible();
+  await expect(studentPage.getByText('Pending Review', { exact: true })).toBeVisible();
   expect(keys.length).toBe(2); expect(keys[0]).toBe(keys[1]);
   const results = await request.get('http://127.0.0.1:4000/api/students/results', { headers: { Authorization: `Bearer ${student.token}` } });
   expect((await results.json()).data.filter(result => result.quizId === quiz.id)).toHaveLength(1);

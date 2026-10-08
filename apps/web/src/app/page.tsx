@@ -1,3 +1,4 @@
+import Icon from '@/components/Icon';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 
@@ -10,7 +11,7 @@ export default function HomePage() {
       <div className="hero geo">
         <div className="wrap hero-grid">
           <div className="hero-copy">
-            <span className="pill">🕌 Trusted Arabic learning for ages 5–15</span>
+            <span className="pill"><Icon name="academy" /> Trusted Arabic learning for ages 5–15</span>
             <h1 className="hero-h1">Where children fall in<br />love with <span className="u-gold">Arabic</span>.</h1>
             <p className="ar hero-ar">حيث يتعلّم الأطفال العربية بشغفٍ ومتعة</p>
             <p className="hero-sub">Live classes with your course teacher, an interactive whiteboard built for kids, and a parent dashboard that keeps you in the loop — all in one warm, beautifully crafted academy.</p>
@@ -44,10 +45,10 @@ export default function HomePage() {
               </div>
             </div>
             <div className="float-chip chip-xp">
-              <div className="ci">⭐</div><div><b>+150 XP</b><span>earned today</span></div>
+              <div className="ci"><Icon name="star" /></div><div><b>+150 XP</b><span>earned today</span></div>
             </div>
             <div className="float-chip chip-streak">
-              <div className="ci">🔥</div><div><b>14 days</b><span>streak</span></div>
+              <div className="ci"><Icon name="flame" /></div><div><b>14 days</b><span>streak</span></div>
             </div>
           </div>
         </div>

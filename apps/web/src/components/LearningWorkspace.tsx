@@ -1,11 +1,12 @@
 'use client';
 
+import Icon from '@/components/Icon';
 import { useEffect, useState } from 'react';
 import { API_URL } from '@/lib/config';
 
 type Lesson = { id: string; title: string; description: string; type: 'VIDEO' | 'PDF' | 'EXERCISE'; contentUrl: string; duration: number; quiz: { id: string } | null };
 type LearningState = { contentId: string; completedAt: string | null; note: string; updatedAt: string };
-const icons = { VIDEO: '🎬', PDF: '📄', EXERCISE: '📝' };
+const icons = { VIDEO: 'video', PDF: 'file', EXERCISE: 'edit' } as const;
 
 async function request(path: string, options: RequestInit = {}) {
   const token = localStorage.getItem('token') ?? sessionStorage.getItem('token');
@@ -72,7 +73,7 @@ export default function LearningWorkspace({ courseId, lessons, onQuiz, quizLoadi
     {student && <div className="card pad learning-summary" dir="rtl">
       <div><h2>خطوة جديدة كل يوم</h2><p>{completed} من {lessons.length} مواد مكتملة</p><small className="muted">تسجّل إنجازك بنفسك؛ الحضور ودرجات الاختبار يُحسبان بشكل مستقل.</small></div>
       <progress aria-label="إنجاز مواد الدورة" value={completed} max={Math.max(1, lessons.length)} />
-      {ready && next ? <a className="btn btn-gold btn-sm" href={`#lesson-${next.id}`} onClick={() => { setQuery(''); setFilter('all'); }}>تابع التعلم</a> : ready ? <span className="pill">✓ أنجزت جميع المواد</span> : <span>جاري تحميل تقدمك…</span>}
+      {ready && next ? <a className="btn btn-gold btn-sm" href={`#lesson-${next.id}`} onClick={() => { setQuery(''); setFilter('all'); }}>تابع التعلم</a> : ready ? <span className="pill"><Icon name="check" /> أنجزت جميع المواد</span> : <span>جاري تحميل تقدمك…</span>}
     </div>}
     <div className="learning-toolbar">
       <label>ابحث عن درس<input className="learning-input" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="اسم الدرس أو وصفه" /></label>
@@ -85,12 +86,12 @@ export default function LearningWorkspace({ courseId, lessons, onQuiz, quizLoadi
       const note = notes[lesson.id] ?? '';
       const dirty = note !== (states[lesson.id]?.note ?? '');
       return <article key={lesson.id} id={`lesson-${lesson.id}`} className={`card pad learning-lesson${done ? ' is-complete' : ''}`}>
-        <div className="learning-lesson-head"><span aria-hidden="true">{icons[lesson.type]}</span><div><h3>{lesson.title}</h3><p className="muted">{lesson.description}</p></div><span className="pill">{lesson.duration} min</span></div>
+        <div className="learning-lesson-head"><span aria-hidden="true"><Icon name={icons[lesson.type]} size={26} /></span><div><h3>{lesson.title}</h3><p className="muted">{lesson.description}</p></div><span className="pill">{lesson.duration} min</span></div>
         <div className="learning-actions">
           <a className="btn btn-sm btn-outline" href={lesson.contentUrl} target="_blank" rel="noreferrer">Open</a>
           {lesson.quiz && <button className="btn btn-sm btn-gold" disabled={quizLoading} onClick={() => onQuiz(lesson.quiz!.id)}>Take Quiz</button>}
           {student && <>
-            <button className="btn btn-sm btn-outline" aria-pressed={done} disabled={!ready || busy[lesson.id]} onClick={() => save(lesson.id, { completed: !done })}>{done ? '✓ مكتمل · إلغاء الإنجاز' : 'تحديد كمكتمل'}</button>
+            <button className="btn btn-sm btn-outline" aria-pressed={done} disabled={!ready || busy[lesson.id]} onClick={() => save(lesson.id, { completed: !done })}>{done ? <><Icon name="check" /> مكتمل · إلغاء الإنجاز</> : 'تحديد كمكتمل'}</button>
             <button className="btn btn-sm btn-outline" aria-expanded={!!openedNotes[lesson.id]} aria-controls={`notes-${lesson.id}`} onClick={() => setOpenedNotes(prev => ({ ...prev, [lesson.id]: !prev[lesson.id] }))}>ملاحظاتي {dirty ? '•' : ''}</button>
           </>}
         </div>

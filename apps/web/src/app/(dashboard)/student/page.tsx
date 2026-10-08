@@ -1,5 +1,6 @@
 'use client';
 
+import Icon from '@/components/Icon';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -237,7 +238,7 @@ export default function StudentDashboard() {
         {/* ── Hero banner ── */}
         <div className="dash-hero card">
           <div>
-            <p className="dh-hi">Welcome back, <b>{userName}</b> 👋 <span className="ar dh-ar">أهلاً</span></p>
+            <p className="dh-hi">Welcome back, <b>{userName}</b> <Icon name="hand" /> <span className="ar dh-ar">أهلاً</span></p>
             <h1 className="dh-title">Ready for today&apos;s lesson?</h1>
             <p className="dh-sub">
               {liveEnrollments.length > 0
@@ -272,10 +273,10 @@ export default function StudentDashboard() {
 
         {/* ── Stats row ── */}
         <div className="stat-row">
-          <div className="stat card"><div className="st-ic st-gold">⭐</div><div><b>{totalPoints}</b><span>Total XP</span></div></div>
-          <div className="stat card"><div className="st-ic st-fire">🔥</div><div><b>{streak} days</b><span>Current streak</span></div></div>
-          <div className="stat card"><div className="st-ic st-navy">📚</div><div><b>{lessonsCompleted}</b><span>Lessons done</span></div></div>
-          <div className="stat card"><div className="st-ic st-green">✓</div><div><b>{enrollments.length}</b><span>Enrolled classes</span></div></div>
+          <div className="stat card"><div className="st-ic st-gold"><Icon name="star" /></div><div><b>{totalPoints}</b><span>Total XP</span></div></div>
+          <div className="stat card"><div className="st-ic st-fire"><Icon name="flame" /></div><div><b>{streak} days</b><span>Current streak</span></div></div>
+          <div className="stat card"><div className="st-ic st-navy"><Icon name="book" /></div><div><b>{lessonsCompleted}</b><span>Lessons done</span></div></div>
+          <div className="stat card"><div className="st-ic st-green"><Icon name="check" /></div><div><b>{enrollments.length}</b><span>Enrolled classes</span></div></div>
         </div>
 
         {error && <div className="auth-error" style={{ marginBottom: 18 }}>{error}</div>}
@@ -287,7 +288,7 @@ export default function StudentDashboard() {
             <div className="learning-actions">{stats.materialProgress.filter(course => course.total > 0).map(course => <div key={course.courseId} style={{ flex: '1 1 220px', minWidth: 0 }}>
               <h3 style={{ fontSize: 16 }}>{course.title}</h3><p className="muted">{course.completed}/{course.total} مواد مكتملة</p>
               <progress aria-label={`إنجاز مواد ${course.title}`} max={course.total} value={course.completed} style={{ width: '100%', accentColor: 'var(--gold)', marginBottom: 12 }} />
-              <Link className="btn btn-gold btn-sm" href={`/courses/${course.courseId}/lessons${course.nextLesson ? `#lesson-${course.nextLesson.id}` : ''}`}>{course.nextLesson ? `تابع: ${course.nextLesson.title}` : '✓ اكتملت المواد · مراجعة الدورة'}</Link>
+              <Link className="btn btn-gold btn-sm" href={`/courses/${course.courseId}/lessons${course.nextLesson ? `#lesson-${course.nextLesson.id}` : ''}`}>{course.nextLesson ? `تابع: ${course.nextLesson.title}` : <><Icon name="check" /> اكتملت المواد · مراجعة الدورة</>}</Link>
             </div>)}</div>
           </section>}
 
@@ -295,7 +296,7 @@ export default function StudentDashboard() {
           <div className="dash-col">
             <div className="col-head">
               <h2>My Classes <span className="ar muted">صفوفي</span></h2>
-              <Link href="/courses" className="link-gold">Browse more →</Link>
+              <Link href="/courses" className="link-gold">Browse more <Icon name="right" /></Link>
             </div>
 
             {loading ? (
@@ -394,14 +395,14 @@ export default function StudentDashboard() {
                 <h3>My Badges <span className="ar muted">أوسمتي</span></h3>
               </div>
               <div className="badge-grid">
-                {stats?.badges?.length ? stats.badges.map((badge) => <div key={badge.name} className="bg-item"><div className="bg-ic">⭐</div><span title={badge.description}>{badge.name}</span></div>) : <p className="muted">Pass a quiz with a perfect score to earn your first badge.</p>}
+                {stats?.badges?.length ? stats.badges.map((badge) => <div key={badge.name} className="bg-item"><div className="bg-ic"><Icon name="star" /></div><span title={badge.description}>{badge.name}</span></div>) : <p className="muted">Pass a quiz with a perfect score to earn your first badge.</p>}
               </div>
             </div>
 
             <div className="card pad">
               <div className="col-head sm">
                 <h3>Streak <span className="ar muted">المواظبة</span></h3>
-                <span className="pill">🔥 {streak} days</span>
+                <span className="pill"><Icon name="flame" /> {streak} days</span>
               </div>
               <div className="streak-week">
                 {last7Days.map((d, i) => (
@@ -412,7 +413,7 @@ export default function StudentDashboard() {
               </div>
               <p className="streak-note">
                 {streak > 0
-                  ? <>🔥 {streak}-day streak — keep it going!</>
+                  ? <><Icon name="flame" /> {streak}-day streak — keep it going!</>
                   : 'Attend a class today to start your streak!'}
               </p>
             </div>
@@ -504,7 +505,7 @@ export default function StudentDashboard() {
                           <br />
                           <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
                             {r.status === 'PENDING_REVIEW'
-                              ? <>⏳ Pending Review · {r.score}% so far</>
+                              ? <><Icon name="clock" /> Pending Review · {r.score}% so far</>
                               : <>Score: {r.score}% · {r.passed ? 'Passed' : 'Not passed'}</>}
                           </span>
                           {feedbacks.length > 0 && (

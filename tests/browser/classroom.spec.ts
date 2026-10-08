@@ -66,7 +66,7 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   // Re-entry restores the saved drawing grant.
   await student.reload(); await student.getByRole('button', { name: 'دخول الحصة', exact: true }).click();
   await expect(student.getByText('متزامنة', { exact: true })).toBeVisible();
-  await expect(student.getByText('👁️ عرض فقط')).toHaveCount(0);
+  await expect(student.getByText('مشاهدة فقط')).toHaveCount(0);
   const before = await ink(teacher);
   await Promise.all([placeShape(teacher, 'Circle', .25), placeShape(student, 'Rectangle', .75)]);
   await expect.poll(() => ink(teacher)).toBeGreaterThan(before + 100);

@@ -1,4 +1,5 @@
 'use client';
+import Icon from '@/components/Icon';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { API_URL } from '@/lib/config';
@@ -22,7 +23,7 @@ export default function TeacherStudents() {
     (!course || student.courseId === course) && (progressFilter === 'all' || (progressFilter === 'done' ? student.materialsTotal > 0 && student.materialsCompleted === student.materialsTotal : student.materialsCompleted === 0)));
   const courses = [...new Map(students.map(student => [student.courseId, student.courseTitle])).entries()];
   return <main className="midad wrap" style={{ padding: '32px 20px' }}>
-    <Link href="/teacher" className="link-gold">← Teacher dashboard</Link>
+    <Link href="/teacher" className="link-gold"><Icon name="left" /> Teacher dashboard</Link>
     <h1 className="sec-h2">Your students · طلابك</h1>
     <p className="muted">تابع إنجاز المواد لكل طالب. الإنجاز يحدده الطالب؛ درجات الاختبارات والحضور مستقلان.</p>
     {error && <p role="alert" className="auth-error">{error} <button className="btn btn-outline btn-sm" onClick={() => window.location.reload()}>إعادة المحاولة</button></p>}

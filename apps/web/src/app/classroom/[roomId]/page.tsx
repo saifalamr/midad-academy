@@ -1,5 +1,6 @@
 'use client';
 
+import Icon, { type IconName } from '@/components/Icon';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
@@ -50,6 +51,7 @@ function getRole(trackRef: TrackReferenceOrPlaceholder): string {
 }
 
 type RaisedHand = { identity: string; name: string };
+const reactionIcons: Record<string, IconName> = { '\u{1f44d}': 'thumbsUp', '\u{2764}\u{fe0f}': 'heart', '\u{1f44f}': 'applause', '\u{1f389}': 'celebration' };
 type Reaction  = { id: string; emoji: string; x: number };
 type DocType = 'pdf' | 'image' | 'youtube' | 'video' | 'html';
 type SharedDoc = { url: string; name: string; docType: DocType; htmlContent?: string };
@@ -126,9 +128,9 @@ function PdfViewer({ url, page, isTeacher, onPageChange }: {
       <canvas ref={canvasRef} style={{ maxWidth: '100%', boxShadow: '0 4px 20px rgba(0,0,0,.3)', borderRadius: 8, display: loading ? 'none' : 'block' }} />
       {isTeacher && totalPages > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(16,30,52,.9)', padding: '8px 16px', borderRadius: 999, position: 'sticky', bottom: 8 }}>
-          <button className="bb-ic" onClick={() => onPageChange?.(Math.max(1, page - 1))} disabled={page <= 1}>◀</button>
+          <button className="bb-ic" aria-label="الصفحة السابقة" onClick={() => onPageChange?.(Math.max(1, page - 1))} disabled={page <= 1}><Icon name="left" /></button>
           <span style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>{page} / {totalPages}</span>
-          <button className="bb-ic" onClick={() => onPageChange?.(Math.min(totalPages, page + 1))} disabled={page >= totalPages}>▶</button>
+          <button className="bb-ic" aria-label="الصفحة التالية" onClick={() => onPageChange?.(Math.min(totalPages, page + 1))} disabled={page >= totalPages}><Icon name="right" /></button>
         </div>
       )}
       {!isTeacher && totalPages > 0 && (
@@ -279,7 +281,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
               : [...prev, { identity: msg.identity, name: msg.name ?? msg.identity }],
           );
         } else if (msg.type === 'reaction') {
-          if (sender && ['👍', '❤️', '👏', '🎉'].includes(msg.emoji ?? '')) addReaction(msg.emoji!);
+          if (sender && ['\u{1f44d}', '\u{2764}\u{fe0f}', '\u{1f44f}', '\u{1f389}'].includes(msg.emoji ?? '')) addReaction(msg.emoji!);
         }
       } catch { /* malformed message — ignore */ }
     };
@@ -438,13 +440,13 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
         <div className="rh-list">
           {raisedHands.map((h) => (
             <div key={h.identity} className="rh-toast">
-              <span>✋ <b>{h.name}</b> raised their hand</span>
+              <span><Icon name="hand" /> <b>{h.name}</b> raised their hand</span>
               <button
                 className="rh-dismiss"
                 aria-label="Dismiss"
                 onClick={() => setRaisedHands((prev) => prev.filter((x) => x.identity !== h.identity))}
               >
-                ✕
+                <Icon name="close" />
               </button>
             </div>
           ))}
@@ -458,7 +460,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
           onClick={(e) => { if (e.target === e.currentTarget) setShowPermPicker(false); }}
         >
           <div className="perm-picker">
-            <h4>✏️ إذن الرسم</h4>
+            <h4><Icon name="edit" /> إذن الرسم</h4>
             {remoteParticipants.length === 0 ? (
               <p style={{ color: '#8ea0bb', fontSize: 14 }}>لم ينضم أحد بعد.</p>
             ) : (
@@ -547,7 +549,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
               <span className="vmic on"></span>
               {track.participant.name ?? track.participant.identity}
             </div>
-            {raisedSet.has(track.participant.identity) && <span className="vhand">✋</span>}
+            {raisedSet.has(track.participant.identity) && <span className="vhand"><Icon name="hand" /></span>}
           </div>
         ))}
 
@@ -586,9 +588,9 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
             <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M4 4l7.07 16.97 2.51-7.39 7.39-2.51z"/></svg>
           </button>
           <span className="wb-sep"></span>
-          <button className="wb-tool" title="تراجع" aria-label="تراجع" onClick={() => whiteboardRef.current?.undo()}>↶</button>
-          <button className="wb-tool" title="إعادة" aria-label="إعادة" onClick={() => whiteboardRef.current?.redo()}>↷</button>
-          <button className="wb-tool" title="حفظ صورة السبورة" aria-label="حفظ صورة السبورة" onClick={() => whiteboardRef.current?.exportImage()}>⇩</button>
+          <button className="wb-tool" title="تراجع" aria-label="تراجع" onClick={() => whiteboardRef.current?.undo()}><Icon name="undo" /></button>
+          <button className="wb-tool" title="إعادة" aria-label="إعادة" onClick={() => whiteboardRef.current?.redo()}><Icon name="redo" /></button>
+          <button className="wb-tool" title="حفظ صورة السبورة" aria-label="حفظ صورة السبورة" onClick={() => whiteboardRef.current?.exportImage()}><Icon name="download" /></button>
           <button className="wb-tool" title="Clear board" aria-label="مسح السبورة" onClick={() => { if (window.confirm('مسح جميع الرسومات؟ يمكنك التراجع بعد المسح.')) whiteboardRef.current?.clear(); }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
           </button>
@@ -717,8 +719,8 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
               </div>
             </div>
 
-            {view === 'board' && <div className="board-guide ar">✍️ اكتب على السبورة</div>}
-            {contentVisible && annotatable && <div className="board-guide ar">✍️ اكتب فوق المحتوى</div>}
+            {view === 'board' && <div className="board-guide ar"><Icon name="edit" /> اكتب على السبورة</div>}
+            {contentVisible && annotatable && <div className="board-guide ar"><Icon name="edit" /> اكتب فوق المحتوى</div>}
 
             {view === 'screen' && screenTrack && <div className="workspace-screen"><ParticipantTile trackRef={screenTrack} style={{ height: '100%' }} /></div>}
             {/* shared-materials dock (teacher-only) */}
@@ -729,7 +731,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
                   const dt = detectDocType(c.contentUrl);
                   const active = sharedDoc?.url === c.contentUrl;
                   const cls = dt === 'image' ? 'img' : (dt === 'video' || dt === 'youtube') ? 'aud' : 'doc';
-                  const label = dt === 'image' ? 'IMG' : (dt === 'video' || dt === 'youtube') ? '▶' : 'PDF';
+                  const label = <Icon name={dt === 'image' ? 'file' : (dt === 'video' || dt === 'youtube') ? 'video' : 'file'} />;
                   return (
                     <button
                       key={c.id}
@@ -815,7 +817,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
           </button>
         )}
 
-        <button className="rc-btn" onClick={() => handleReaction('👍')}>
+        <button className="rc-btn" onClick={() => handleReaction('\u{1f44d}')}>
           <CallIcon name="react" />
           <span>تفاعل</span>
         </button>
@@ -833,7 +835,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
           className="reaction-float"
           style={{ left: `${r.x}%`, bottom: '90px' }}
         >
-          {r.emoji}
+          <Icon name={reactionIcons[r.emoji] ?? "thumbsUp"} size={40} />
         </div>
       ))}
 
@@ -872,7 +874,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
                     <div className="share-list">
                       {courseContent.map((c) => {
                         const docType = detectDocType(c.contentUrl);
-                        const icon = docType === 'youtube' || docType === 'video' ? '🎬' : docType === 'image' ? '🖼️' : '📄';
+                        const icon = docType === 'youtube' || docType === 'video' ? <><Icon name="video" /></> : docType === 'image' ? <><Icon name="file" /></> : <><Icon name="file" /></>;
                         return (
                           <button key={c.id} type="button" className="share-list-item"
                             onClick={() => shareDocument(c.contentUrl, c.title, docType)}>

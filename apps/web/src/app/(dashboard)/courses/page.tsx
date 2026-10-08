@@ -1,5 +1,6 @@
 'use client';
 
+import Icon from '@/components/Icon';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
@@ -203,7 +204,7 @@ export default function BrowseCoursesPage() {
                       disabled={enrolled || full || enrollingId === course.id}
                       style={{ opacity: enrollingId === course.id ? 0.65 : 1 }}
                     >
-                      {enrolled ? '✓ Enrolled' : enrollingId === course.id ? 'Enrolling…' : full ? 'اكتملت المقاعد' : 'Enroll'}
+                      {enrolled ? <><Icon name="check" /> Enrolled</> : enrollingId === course.id ? 'Enrolling…' : full ? 'اكتملت المقاعد' : 'Enroll'}
                     </button>
                   </div>
                 </article>

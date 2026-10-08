@@ -1,5 +1,6 @@
 'use client';
 
+import Icon from '@/components/Icon';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -156,10 +157,10 @@ export default function ParentDashboard() {
 
         {/* ── Stats row ── */}
         <div className="stat-row" id="children">
-          <div className="stat card"><div className="st-ic st-navy">👨‍👩‍👧</div><div><b>{loading ? '—' : children.length}</b><span>Children enrolled</span></div></div>
-          <div className="stat card"><div className="st-ic st-fire">🗓️</div><div><b>{loading ? '—' : totalEnrolled}</b><span>Active classes</span></div></div>
-          <div className="stat card"><div className="st-ic st-gold">⭐</div><div><b>{loading ? '—' : familyXP}</b><span>Family XP</span></div></div>
-          <div className="stat card"><div className="st-ic st-green">✓</div><div><b>{loading ? '—' : totalCompleted}</b><span>Lessons done</span></div></div>
+          <div className="stat card"><div className="st-ic st-navy"><Icon name="family" /></div><div><b>{loading ? '—' : children.length}</b><span>Children enrolled</span></div></div>
+          <div className="stat card"><div className="st-ic st-fire"><Icon name="calendar" /></div><div><b>{loading ? '—' : totalEnrolled}</b><span>Active classes</span></div></div>
+          <div className="stat card"><div className="st-ic st-gold"><Icon name="star" /></div><div><b>{loading ? '—' : familyXP}</b><span>Family XP</span></div></div>
+          <div className="stat card"><div className="st-ic st-green"><Icon name="check" /></div><div><b>{loading ? '—' : totalCompleted}</b><span>Lessons done</span></div></div>
         </div>
 
         {loading ? (
@@ -193,7 +194,7 @@ export default function ParentDashboard() {
                         <div className="ch-name">{child.name}</div>
                         <div className="ch-meta capitalize">{child.level}</div>
                       </div>
-                      <span className="mini-chip"><span className="mc-ic">🔥</span> {child.streak}</span>
+                      <span className="mini-chip"><span className="mc-ic"><Icon name="flame" /></span> {child.streak}</span>
                       <button
                         style={{ fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}
                         onClick={async () => {
@@ -329,7 +330,7 @@ export default function ParentDashboard() {
                     <div className="rep-row"><span>Lessons done</span><b>{totalCompleted} / {children.reduce((s, c) => s + c.totalLessons, 0)}</b></div>
                     <div className="rep-row"><span>Active children</span><b>{children.length}</b></div>
                   </div>
-                  <p className="rep-note">Keep supporting your children&apos;s learning! 🌟</p>
+                  <p className="rep-note">Keep supporting your children&apos;s learning! <Icon name="star" /></p>
                 </div>
 
                 <div className="card pad">
@@ -350,7 +351,7 @@ export default function ParentDashboard() {
             <div className="modal">
               <div className="modal-head">
                 <h3>Link a Child</h3>
-                <button className="modal-x" onClick={() => setShowLinkModal(false)}>✕</button>
+                <button className="modal-x" aria-label="Close" onClick={() => setShowLinkModal(false)}><Icon name="close" /></button>
               </div>
               <div className="modal-body">
                 <p style={{ fontSize: 14, color: 'var(--ink-2)', marginBottom: 16 }}>
