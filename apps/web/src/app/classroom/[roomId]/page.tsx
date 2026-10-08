@@ -320,6 +320,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
   async function shareDocument(url: string, name: string, docType: DocType, html = '') {
     const ok = await saveState({ sharedDoc: { url, name, docType, ...(docType === 'html' ? { htmlContent: html } : {}) }, pdfPage: 1 });
     if (ok) { setShowShareModal(false); setView('content'); }
+    else setShareError('تعذر حفظ المحتوى. تحقق من الاتصال ثم أعد المحاولة.');
   }
 
   function handleShareUrl() {
@@ -350,8 +351,13 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
     finally { setUploading(false); }
   }
 
-  useEffect(() => { setView(sharedDoc ? 'content' : 'board'); setZoom(1); }, [sharedDoc?.url, sharedDoc?.htmlContent]);
-  useEffect(() => { if (screenTrack) setView('screen'); else setView(sharedDoc ? 'content' : 'board'); }, [screenTrack?.publication?.trackSid]);
+  const sharedContentIdentity = sharedDoc ? JSON.stringify([sharedDoc.url, sharedDoc.name, sharedDoc.docType, sharedDoc.htmlContent]) : '';
+  const sharedScreenIdentity = screenTrack?.publication?.trackSid ?? '';
+  useEffect(() => { setView(sharedContentIdentity ? 'content' : 'board'); setZoom(1); }, [sharedContentIdentity]);
+  useEffect(() => {
+    if (sharedScreenIdentity) setView('screen');
+    else setView(current => current === 'screen' ? 'board' : current);
+  }, [sharedScreenIdentity]);
 
   function handleShareHtml() {
     if (!htmlContent.trim() || htmlContent.length > 32000) { setShareError('أضف HTML لا يتجاوز 32 ألف حرف'); return; }
