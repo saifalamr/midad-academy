@@ -3,7 +3,6 @@
 import Icon from '@/components/Icon';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Navbar from '@/components/Navbar';
 import { API_URL } from '@/lib/config';
 
 type Course = {
@@ -111,7 +110,6 @@ export default function BrowseCoursesPage() {
 
   return (
     <div className="midad" style={{ background: 'var(--paper)', minHeight: '100vh' }}>
-      <Navbar />
 
       {/* ── Courses hero ── */}
       <div className="courses-hero geo">

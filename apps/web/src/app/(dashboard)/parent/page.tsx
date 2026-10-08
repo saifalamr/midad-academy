@@ -114,31 +114,12 @@ export default function ParentDashboard() {
     const a = document.createElement('a'); a.href = url; a.download = 'midad-learning-report.csv'; a.click(); URL.revokeObjectURL(url);
   }
 
-  const initial = userName.charAt(0).toUpperCase();
 
   return (
     <div className="midad" style={{ minHeight: '100vh', background: 'var(--cream)' }}>
 
       {/* ── App bar ── */}
-      <header className="appbar">
-        <div className="ab-inner">
-          <Link className="brand" href="/">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/midad-logo-transparent.png" alt="Midad Academy" className="logo-full" />
-          </Link>
-          <nav className="ab-nav">
-            <a className="on">Overview</a>
-            <a href="#children">Children</a>
-            <a href="#reports">Reports</a>
-          </nav>
-          <div className="ab-right">
-            <span className="role-tag">Parent · وليّ أمر</span>
-            <div className="ab-user">
-              <span className="avatar" style={{ width: 38, height: 38, background: '#f4dede', color: '#b3463b' }}>{initial}</span>
-            </div>
-          </div>
-        </div>
-      </header>
+
 
       <main className="dash">
         {loadError && <div className="auth-error" role="alert">{loadError}</div>}

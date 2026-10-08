@@ -6,7 +6,7 @@ test('mobile student login, enrollment, quiz and account linking code', async ({
   await page.locator('#password').fill('MidadPreview2026!');
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
   await expect(page).toHaveURL(/\/student$/);
-  await expect(page.getByText('Preview Student', { exact: true })).toBeVisible();
+  await expect(page.locator('main').getByText('Preview Student', { exact: true })).toBeVisible();
   await page.goto('/courses');
   await expect(page.getByText('Arabic Foundations · أساسيات العربية', { exact: true })).toBeVisible();
   const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Arabic Foundations · أساسيات العربية', exact: true }) });
@@ -222,4 +222,54 @@ test('mobile quiz delivery retries one saved attempt, teacher feedback and final
   await parentPage.reload(); await expect(familyResults).toContainText('100% · ناجح');
   expect(await teacherPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
   await studentContext.close(); await teacherContext.close(); await parentContext.close();
+});
+
+test('signed-in home stays a workspace across navigation, reloads and connection failures', async ({ page }) => {
+  await page.goto('/login');
+  await page.locator('#email').fill('teacher@preview.midad.test');
+  await page.locator('#password').fill('MidadPreview2026!');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await expect(page).toHaveURL(/\/teacher$/);
+  await page.getByRole('link', { name: 'الرئيسية', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'أهلاً، Preview Teacher' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Create an account', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'فتح صفوفي وحصصي', exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'أهلاً، Preview Teacher' })).toBeVisible();
+  for (const [label, width, height] of [['desktop', 1440, 900], ['tablet', 1024, 768], ['mobile', 390, 844]] as const) {
+    await page.setViewportSize({ width, height });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBeTruthy();
+    await page.screenshot({ path: `test-results/workspace-${label}.png`, fullPage: true });
+  }
+  await page.route('**/api/auth/me', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"Offline"}' }));
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'تعذر تحميل حسابك' })).toBeVisible();
+  expect(await page.evaluate(() => !!localStorage.getItem('token'))).toBeTruthy();
+  await expect(page.getByRole('link', { name: 'Create an account', exact: true })).toHaveCount(0);
+  await page.unroute('**/api/auth/me');
+  await page.getByRole('button', { name: 'إعادة المحاولة', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'أهلاً، Preview Teacher' })).toBeVisible();
+  await page.getByRole('button', { name: 'Log out · خروج', exact: true }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await page.goto('/');
+  await expect(page.getByRole('link', { name: 'Create an account', exact: true }).first()).toBeVisible();
+});
+
+test('session-only login survives home reload and expires on a confirmed unauthorized response', async ({ page }) => {
+  await page.goto('/login');
+  await page.locator('#email').fill('student@preview.midad.test');
+  await page.locator('#password').fill('MidadPreview2026!');
+  await page.getByLabel('Remember me', { exact: true }).uncheck();
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await expect(page).toHaveURL(/\/student$/);
+  await page.getByRole('link', { name: 'الرئيسية', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'أهلاً، Preview Student' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'أهلاً، Preview Student' })).toBeVisible();
+  expect(await page.evaluate(() => !localStorage.getItem('token') && !!sessionStorage.getItem('token'))).toBeTruthy();
+  await page.route('**/api/auth/me', route => route.fulfill({ status: 401, contentType: 'application/json', body: '{}' }));
+  await page.reload();
+  await page.getByRole('button', { name: 'Toggle menu' }).click();
+  await expect(page.getByRole('link', { name: 'Log in', exact: true }).first()).toBeVisible();
+  expect(await page.evaluate(() => sessionStorage.getItem('token'))).toBeNull();
 });

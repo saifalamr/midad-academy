@@ -3,7 +3,6 @@
 import Icon from '@/components/Icon';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Navbar from '@/components/Navbar';
 import { API_URL } from '@/lib/config';
 
 type PendingAnswer = {
@@ -85,7 +84,6 @@ export default function ReviewAnswersPage() {
 
   return (
     <div className="midad" style={{ background: 'var(--paper)', minHeight: '100vh' }}>
-      <Navbar />
 
       <div className="wrap" style={{ paddingTop: 32, paddingBottom: 48 }}>
         <button className="btn btn-sm btn-outline" onClick={() => router.push('/teacher')} style={{ marginBottom: 16 }}>

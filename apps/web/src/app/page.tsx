@@ -1,10 +1,11 @@
+import HomeExperience from '@/components/HomeExperience';
 import Icon from '@/components/Icon';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 
 export default function HomePage() {
   return (
-    <main className="midad" style={{ background: 'var(--cream)' }}>
+    <HomeExperience><main className="midad" style={{ background: 'var(--cream)' }}>
       <Navbar />
 
       {/* hero */}
@@ -28,27 +29,27 @@ export default function HomePage() {
           <div className="hero-visual">
             <div className="hero-card card">
               <div className="hc-top">
-                <span className="badge-live"><span className="dot"></span> Live now</span>
-                <span className="hc-time">10:00 — 10:45</span>
+                <span className="badge-live"><span className="dot"></span> Lesson preview</span>
+                <span className="hc-time">Arabic letters</span>
               </div>
               <div className="hc-stage">
-                <div className="hc-ph"><span>teacher video feed</span></div>
-                <div className="hc-tn"><span>student</span></div>
-                <div className="hc-tn"><span>student</span></div>
+                <div className="hc-ph"><span className="ar" style={{ fontSize: 40 }}>أ ب ت</span></div>
+                <div className="hc-tn"><Icon name="graduate" size={24} /></div>
+                <div className="hc-tn"><Icon name="graduate" size={24} /></div>
               </div>
               <div className="hc-foot">
                 <div>
                   <div className="hc-title ar">الحروف الهجائية</div>
                   <div className="hc-sub">Arabic Letters · Beginner</div>
                 </div>
-                <Link className="btn btn-sm btn-gold" href="/courses">Join</Link>
+                <Link className="btn btn-sm btn-gold" href="/lesson-sample">View sample</Link>
               </div>
             </div>
             <div className="float-chip chip-xp">
-              <div className="ci"><Icon name="star" /></div><div><b>+150 XP</b><span>earned today</span></div>
+              <div className="ci"><Icon name="star" /></div><div><b>Practice together</b><span>Interactive lessons</span></div>
             </div>
             <div className="float-chip chip-streak">
-              <div className="ci"><Icon name="flame" /></div><div><b>14 days</b><span>streak</span></div>
+              <div className="ci"><Icon name="flame" /></div><div><b>Step by step</b><span>Learn at your level</span></div>
             </div>
           </div>
         </div>
@@ -150,6 +151,6 @@ export default function HomePage() {
       <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, textAlign: 'center', padding: '8px', fontSize: '12px', color: 'var(--ink-3)', background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', zIndex: 50, borderTop: '1px solid var(--line)' }}>
         By Yousef Al-Omari
       </div>
-    </main>
+    </main></HomeExperience>
   );
 }

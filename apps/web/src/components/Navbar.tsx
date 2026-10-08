@@ -4,7 +4,7 @@ import Icon from '@/components/Icon';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { API_URL } from '@/lib/config';
+import { useAuth } from './AuthProvider';
 
 type CurrentUser = { name: string; role: 'TEACHER' | 'STUDENT' | 'PARENT' };
 
@@ -20,39 +20,17 @@ const NAV_LINKS = [
   { href: '/#pricing-anchor', label: 'Pricing' },
 ];
 
-function authFetch(path: string, options: RequestInit = {}) {
-  const token = typeof window !== 'undefined' ? (localStorage.getItem('token') ?? sessionStorage.getItem('token')) : null;
-  return fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
-}
 
 export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
 
-  const [user, setUser] = useState<CurrentUser | null>(null);
+  const { user, status, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const token = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
-    if (!token) { setUser(null); return; }
 
-    authFetch('/api/auth/me')
-      .then(async (res) => {
-        if (!res.ok) { setUser(null); return; }
-        const json = await res.json();
-        setUser({ name: json.data.name, role: json.data.role });
-      })
-      .catch(() => setUser(null));
-  }, [pathname]);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -63,8 +41,7 @@ export default function Navbar() {
   }, []);
 
   function handleLogout() {
-    localStorage.removeItem('token'); sessionStorage.removeItem('token');
-    setUser(null);
+    logout();
     setMenuOpen(false);
     setMobileOpen(false);
     router.push('/');
@@ -92,10 +69,10 @@ export default function Navbar() {
         <div className="nav-cta">
           {user ? (
             <div className="nav-user" ref={menuRef}>
-              <button className="nav-user-btn" onClick={() => setMenuOpen((o) => !o)}>
+              <button className="nav-user-btn" aria-expanded={menuOpen} aria-label="قائمة الحساب" onClick={() => setMenuOpen((o) => !o)}>
                 <span className="avatar" style={{ width: 34, height: 34 }}>{user.name.charAt(0).toUpperCase()}</span>
                 <span className="name">{user.name}</span>
-                <span className="chev">▾</span>
+                <Icon name="right" size={14} />
               </button>
               {menuOpen && (
                 <div className="nav-user-menu card">
@@ -108,7 +85,7 @@ export default function Navbar() {
                 </div>
               )}
             </div>
-          ) : (
+          ) : status !== 'ready' ? <span role="status">جارٍ تحميل الحساب…</span> : (
             <>
               <Link className="btn btn-sm btn-outline" href="/login">Log in</Link>
               <Link className="btn btn-sm btn-gold" href="/register">Get Started</Link>
@@ -116,7 +93,7 @@ export default function Navbar() {
           )}
         </div>
 
-        <button className="nav-burger" aria-label="Toggle menu" onClick={() => setMobileOpen((o) => !o)}>
+        <button className="nav-burger" aria-label="Toggle menu" aria-expanded={mobileOpen} onClick={() => setMobileOpen((o) => !o)}>
           <span style={{ fontSize: 20 }}>{mobileOpen ? <><Icon name="close" /></> : <><Icon name="menu" /></>}</span>
         </button>
       </div>
@@ -129,7 +106,7 @@ export default function Navbar() {
 
         {user ? (
           <button className="logout" onClick={handleLogout}><Icon name="logout" /> Log out ({user.name})</button>
-        ) : (
+        ) : status !== 'ready' ? <span role="status">جارٍ تحميل الحساب…</span> : (
           <div className="nm-cta">
             <Link className="btn btn-sm btn-outline" href="/login" onClick={() => setMobileOpen(false)}>Log in</Link>
             <Link className="btn btn-sm btn-gold" href="/register" onClick={() => setMobileOpen(false)}>Get Started</Link>

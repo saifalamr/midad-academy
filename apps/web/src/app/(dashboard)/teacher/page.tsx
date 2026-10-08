@@ -201,31 +201,12 @@ export default function TeacherDashboard() {
   }
 
   const totalStudents = courses.reduce((sum, c) => sum + c._count.enrollments, 0);
-  const initial = userName.charAt(0).toUpperCase();
 
   return (
     <div className="midad" style={{ minHeight: '100vh', background: 'var(--cream)' }}>
 
       {/* ── App bar ── */}
-      <header className="appbar">
-        <div className="ab-inner">
-          <Link className="brand" href="/">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/midad-logo-transparent.png" alt="Midad Academy" className="logo-full" />
-          </Link>
-          <nav className="ab-nav">
-            <a className="on">Dashboard</a>
-            <a href="#teacher-courses">My Courses</a>
-            <Link href="/teacher/students">Students</Link>
-          </nav>
-          <div className="ab-right">
-            <span className="role-tag">Teacher · معلّم</span>
-            <div className="ab-user">
-              <span className="avatar" style={{ width: 38, height: 38, background: 'rgba(27,58,107,.12)', color: 'var(--navy)' }}>{initial}</span>
-            </div>
-          </div>
-        </div>
-      </header>
+
 
       <main className="dash">
 

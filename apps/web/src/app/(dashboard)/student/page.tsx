@@ -163,7 +163,6 @@ export default function StudentDashboard() {
   }
 
   const liveEnrollments = enrollments.filter((e) => e.isLive);
-  const initial = userName.charAt(0).toUpperCase();
 
   // ── Real progress, derived from /api/students/me (falls back to 0 / empty) ──
   const totalPoints = stats?.totalPoints ?? 0;
@@ -215,30 +214,14 @@ export default function StudentDashboard() {
     <div className="midad" style={{ minHeight: '100vh', background: 'var(--cream)' }}>
 
       {/* ── App bar ── */}
-      <header className="appbar">
-        <div className="ab-inner">
-          <Link className="brand" href="/">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/midad-logo-transparent.png" alt="Midad Academy" className="logo-full" />
-          </Link>
-          <nav className="ab-nav">
-            <a className="on">Dashboard</a>
-            <Link href="/courses">Courses</Link>
-          </nav>
-          <div className="ab-right">
-            <div className="ab-user">
-              <span className="avatar" style={{ width: 38, height: 38 }}>{initial}</span>
-            </div>
-          </div>
-        </div>
-      </header>
+
 
       <main className="dash">
 
         {/* ── Hero banner ── */}
         <div className="dash-hero card">
           <div>
-            <p className="dh-hi">Welcome back, <b>{userName}</b> <Icon name="hand" /> <span className="ar dh-ar">أهلاً</span></p>
+            <p className="dh-hi">Welcome back, <b>{userName}</b> <span className="ar dh-ar">أهلاً</span></p>
             <h1 className="dh-title">Ready for today&apos;s lesson?</h1>
             <p className="dh-sub">
               {liveEnrollments.length > 0

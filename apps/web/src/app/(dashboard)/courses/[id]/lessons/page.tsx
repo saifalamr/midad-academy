@@ -4,7 +4,6 @@ import Icon from '@/components/Icon';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Navbar from '@/components/Navbar';
 import LearningWorkspace from '@/components/LearningWorkspace';
 import { API_URL } from '@/lib/config';
 
@@ -153,7 +152,6 @@ export default function CourseLessonsPage() {
 
   return (
     <div className="midad" style={{ background: 'var(--paper)', minHeight: '100vh' }}>
-      <Navbar />
 
       <div className="wrap" style={{ paddingTop: 32, paddingBottom: 48 }}>
         <button className="btn btn-sm btn-outline" onClick={() => router.push('/student')} style={{ marginBottom: 16 }}>

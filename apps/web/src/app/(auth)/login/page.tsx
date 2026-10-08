@@ -35,6 +35,7 @@ export default function LoginPage() {
 
       localStorage.removeItem('token'); sessionStorage.removeItem('token');
       (remember ? localStorage : sessionStorage).setItem('token', json.data.token);
+      window.dispatchEvent(new Event('midad-auth'));
 
       const role: string = json.data.user?.role?.toLowerCase() ?? '';
       if (role === 'teacher') router.push('/teacher');
