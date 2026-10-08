@@ -1,0 +1,49 @@
+# Development preview only. Frontend stays on Vercel.
+# Select fix/client-ready when creating this Blueprint in the Dashboard.
+services:
+  - type: web
+    name: midad-preview-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: fix/client-ready
+    autoDeployTrigger: "off"
+    buildCommand: npm ci --include=dev && npm run build:api
+    # Free services do not offer a pre-deploy phase. Apply the tracked,
+    # additive migrations only to the new preview database before listening.
+    startCommand: >-
+      export API_URL="$RENDER_EXTERNAL_URL";
+      node scripts/check-deploy.mjs api &&
+      npm run db:migrate:deploy &&
+      exec node apps/api/dist/index.js
+    healthCheckPath: /api/ready
+    maxShutdownDelaySeconds: 30
+    envVars:
+      - key: NODE_VERSION
+        value: 24.19.0
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: midad-preview-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: TEACHER_INVITE_CODE
+        generateValue: true
+      # Enter the same exact Vercel preview origin for both fields, no slash.
+      - key: FRONTEND_URL
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+
+databases:
+  - name: midad-preview-db
+    plan: free
+    region: frankfurt
+    databaseName: midad_preview
+    user: midad_preview
+    postgresMajorVersion: "17"
+    ipAllowList: []
