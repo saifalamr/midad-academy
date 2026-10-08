@@ -30,10 +30,10 @@ test('teacher and student exchange real media, synchronized ink, permissions and
     await expect(page.getByText('متزامنة', { exact: true })).toBeVisible();
   };
   await enter(teacher); await enter(student);
-  await teacher.getByRole('button', { name: 'Start Video' }).click();
-  await student.getByRole('button', { name: 'Start Video' }).click();
-  await teacher.getByRole('button', { name: 'Unmute', exact: true }).click();
-  await student.getByRole('button', { name: 'Unmute', exact: true }).click();
+  await teacher.getByRole('button', { name: 'تشغيل الكاميرا' }).click();
+  await student.getByRole('button', { name: 'تشغيل الكاميرا' }).click();
+  await teacher.getByRole('button', { name: 'تشغيل الصوت', exact: true }).click();
+  await student.getByRole('button', { name: 'تشغيل الصوت', exact: true }).click();
   const remoteMedia = (page: Page) => page.evaluate(() => {
     const videos = [...document.querySelectorAll('video')].filter(v => v.videoWidth > 0 && v.readyState >= 2);
     const audio = [...document.querySelectorAll('audio')].filter(a => a.srcObject instanceof MediaStream && a.srcObject.getAudioTracks().some(t => t.readyState === 'live'));
@@ -74,7 +74,27 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   await expect(teacher.getByText('درس متزامن', { exact: true })).toBeVisible();
   await student.reload(); await student.getByRole('button', { name: 'دخول الحصة', exact: true }).click();
   await expect(student.getByText('درس متزامن', { exact: true })).toBeVisible();
-  await api('post', '/api/sessions/end', teacherToken, { roomName: 'preview-arabic' });
+  await expect(student.frameLocator('iframe[title="درس متزامن"]').getByText('مرحباً')).toBeVisible();
+  for (const size of [{ width: 390, height: 844 }, { width: 820, height: 1180 }, { width: 1180, height: 820 }, { width: 1440, height: 900 }]) {
+    await teacher.setViewportSize(size);
+    await teacher.getByRole('button', { name: 'السبورة', exact: true }).click();
+    await expect(teacher.locator('.board-paper')).toBeVisible();
+    const box = (await teacher.locator('.board-paper').boundingBox())!;
+    expect(box.width).toBeGreaterThan(250); expect(box.height).toBeGreaterThan(180);
+    expect(await teacher.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await expect(teacher.getByRole('button', { name: 'كتم الصوت', exact: true })).toBeVisible();
+    await teacher.screenshot({ path: `test-results/classroom-${size.width}.png` });
+    await teacher.getByRole('button', { name: 'المحتوى', exact: true }).click();
+    await expect(teacher.frameLocator('iframe[title="درس متزامن"]').getByText('مرحباً')).toBeVisible();
+  }
+  await teacher.getByRole('button', { name: 'السبورة', exact: true }).click();
+  expect(await ink(teacher)).toBeGreaterThan(before + 100);
+  await teacher.getByRole('button', { name: 'إضافة محتوى', exact: true }).click();
+  await teacher.getByRole('button', { name: 'رفع ملف', exact: true }).click();
+  await teacher.locator('#class-file').setInputFiles({ name: 'نشاط.html', mimeType: 'text/html', buffer: Buffer.from('<h1>نشاط جديد</h1>') });
+  await expect(teacher.frameLocator('iframe[title="نشاط.html"]').getByText('نشاط جديد')).toBeVisible();
+  await expect(student.frameLocator('iframe[title="نشاط.html"]').getByText('نشاط جديد')).toBeVisible();
+  await api('post', '/api/sessions/end' , teacherToken, { roomName: 'preview-arabic' });
   await expect(student).toHaveURL(/\/student/);
   expect(errors).toEqual([]);
   await teacherContext.close(); await studentContext.close();

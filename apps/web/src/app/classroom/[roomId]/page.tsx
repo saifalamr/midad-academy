@@ -19,6 +19,7 @@ import '@livekit/components-styles';
 import type { TrackReferenceOrPlaceholder } from '@livekit/components-react';
 import { Track, RoomEvent, DisconnectReason, type RemoteParticipant } from 'livekit-client';
 import Whiteboard, { PALETTE, type Tool, type EraserMode, type WhiteboardHandle } from '@/components/Whiteboard';
+import './classroom.css';
 import { API_URL } from '@/lib/config';
 
 
@@ -35,6 +36,11 @@ function authFetch(path: string, options: RequestInit = {}) {
   });
 }
 
+function CallIcon({ name, off = false }: { name: 'mic' | 'camera' | 'screen' | 'draw' | 'hand' | 'react' | 'leave'; off?: boolean }) {
+  const paths = { mic: 'M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z M5 10v2a7 7 0 0 0 14 0v-2 M12 19v3 M8 22h8', camera: 'M3 6h12v12H3z M15 10l6-3v10l-6-3', screen: 'M3 4h18v13H3z M8 21h8 M12 17v4', draw: 'M4 16l12-12 4 4L8 20H4z M13 7l4 4', hand: 'M8 12V5a2 2 0 0 1 4 0v6 M12 11V4a2 2 0 0 1 4 0v7 M16 11V7a2 2 0 0 1 4 0v8c0 5-3 7-7 7-3 0-5-2-7-5l-3-4a2 2 0 0 1 3-2l2 2', react: 'M8 10h.01 M16 10h.01 M8 15q4 4 8 0 M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20', leave: 'M3 15v-4q9-8 18 0v4l-5-1v-3q-4-2-8 0v3z' };
+  return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={paths[name]} />{off && <path d="M3 3l18 18" />}</svg>;
+}
+
 function getRole(trackRef: TrackReferenceOrPlaceholder): string {
   try {
     return JSON.parse(trackRef.participant.metadata ?? '{}').role ?? 'student';
@@ -48,7 +54,7 @@ type Reaction  = { id: string; emoji: string; x: number };
 type DocType = 'pdf' | 'image' | 'youtube' | 'video' | 'html';
 type SharedDoc = { url: string; name: string; docType: DocType; htmlContent?: string };
 type CourseContentItem = { id: string; title: string; type: string; contentUrl: string };
-type ShareTab = 'content' | 'url' | 'html';
+type ShareTab = 'content' | 'url' | 'html' | 'file';
 
 function getYouTubeId(url: string): string | null {
   try {
@@ -157,7 +163,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
   const screenTrack = screenTracks.find(t => getRole(t) === 'teacher');
   function publish(payload: Uint8Array) { void localParticipant.publishData(payload, { reliable: true }).catch(() => setClassError('تعذر إرسال التحديث. تحقق من الاتصال.')); }
 
-  // ── Raise Hand ───────────────────────────────────────────────────────────
+  // ── رفع اليد ───────────────────────────────────────────────────────────
   const [raisedHands, setRaisedHands] = useState<RaisedHand[]>([]);
 
   // ── Emoji reactions ───────────────────────────────────────────────────────
@@ -171,7 +177,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
     setTimeout(() => setReactions((prev) => prev.filter((r) => r.id !== id)), 2100);
   }, []);
 
-  // ── Drawing Permission ────────────────────────────────────────────────────
+  // ── إذن الرسم ────────────────────────────────────────────────────
   // Starts true for teachers. Students start view-only; teacher can grant
   // or revoke per-student drawing access via the data channel.
   const [drawPermission, setDrawPermission] = useState(isTeacher);
@@ -194,6 +200,8 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
   const [manualUrl, setManualUrl] = useState('');
   const [manualName, setManualName] = useState('');
   const [htmlContent, setHtmlContent] = useState('');
+  const [view, setView] = useState<'board' | 'content' | 'screen'>('board');
+  const [uploading, setUploading] = useState(false);
   const [shareTab, setShareTab] = useState<ShareTab>('content');
   const [shareError, setShareError] = useState('');
 
@@ -311,7 +319,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
 
   async function shareDocument(url: string, name: string, docType: DocType, html = '') {
     const ok = await saveState({ sharedDoc: { url, name, docType, ...(docType === 'html' ? { htmlContent: html } : {}) }, pdfPage: 1 });
-    if (ok) setShowShareModal(false);
+    if (ok) { setShowShareModal(false); setView('content'); }
   }
 
   function handleShareUrl() {
@@ -320,8 +328,33 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
     shareDocument(url, manualName.trim() || 'Document', detectDocType(url));
   }
 
+  async function uploadFile(file: File) {
+    setShareError('');
+    if (file.size > 10 * 1024 * 1024) { setShareError('اختر ملفًا أصغر من 10 ميجابايت'); return; }
+    setUploading(true);
+    try {
+      if (/\.html?$/i.test(file.name)) {
+        const html = await file.text();
+        if (!html.trim() || html.length > 32000) throw new Error('ملف HTML يجب أن يحتوي محتوى وألا يتجاوز 32 ألف حرف');
+        await shareDocument('', file.name, 'html', html);
+      } else {
+        if (!['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'].includes(file.type)) throw new Error('اختر PDF أو صورة أو ملف HTML');
+        const body = new FormData(); body.append('file', file);
+        const token = localStorage.getItem('token') ?? sessionStorage.getItem('token');
+        const res = await fetch(`${API_URL}/api/upload`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error?.includes('not configured') ? 'خدمة رفع الملفات تحتاج إعداد التخزين. يمكنك الآن مشاركة رابط الملف أو إضافة HTML.' : 'تعذر رفع الملف. حاول مرة أخرى');
+        await shareDocument(json.data.url, file.name, file.type.startsWith('image/') ? 'image' : 'pdf');
+      }
+    } catch (e) { setShareError(e instanceof Error ? e.message : 'تعذر رفع الملف'); }
+    finally { setUploading(false); }
+  }
+
+  useEffect(() => { setView(sharedDoc ? 'content' : 'board'); setZoom(1); }, [sharedDoc?.url, sharedDoc?.htmlContent]);
+  useEffect(() => { if (screenTrack) setView('screen'); else setView(sharedDoc ? 'content' : 'board'); }, [screenTrack?.publication?.trackSid]);
+
   function handleShareHtml() {
-    if (!htmlContent.trim()) { setShareError('Paste some HTML to share'); return; }
+    if (!htmlContent.trim() || htmlContent.length > 32000) { setShareError('أضف HTML لا يتجاوز 32 ألف حرف'); return; }
     shareDocument('', manualName.trim() || 'Interactive Lesson', 'html', htmlContent);
   }
 
@@ -337,7 +370,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
     addReaction(emoji); // show on the sender's screen immediately
   }
 
-  // ── Raise Hand: student broadcasts their name to all participants ─────────
+  // ── رفع اليد: student broadcasts their name to all participants ─────────
   function handleRaiseHand() {
     const payload = new TextEncoder().encode(
       JSON.stringify({
@@ -349,7 +382,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
     publish(payload);
   }
 
-  // ── Drawing Permission: teacher sends targeted grant / revoke ─────────────
+  // ── إذن الرسم: teacher sends targeted grant / revoke ─────────────
   async function sendDrawPermission(identity: string, grant: boolean) {
     const res = await authFetch('/api/sessions/drawing-permission', { method: 'POST', body: JSON.stringify({ roomName: roomId, studentId: identity, canDraw: grant }) });
     if (!res.ok) { setClassError('تعذر تغيير صلاحية الرسم'); return; }
@@ -374,10 +407,11 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
   // Images are annotated on top → the ink layer stays interactive and the
   // content layer ignores pointer events. For PDFs, video, YouTube and HTML the
   // content layer is interactive (per role) and the ink layer isn't.
-  const annotatable = !sharedDoc || sharedDoc.docType === 'image';
+  const contentVisible = view === 'content' && !!sharedDoc;
+  const annotatable = view !== 'screen' && (!contentVisible || sharedDoc?.docType === 'image');
   const inkInteractive = drawPermission && annotatable;
   const raisedSet = new Set(raisedHands.map((h) => h.identity));
-  const showZoom = !!sharedDoc && sharedDoc.docType === 'image';
+  const showZoom = contentVisible && sharedDoc?.docType === 'image';
 
   // Pointer-events for the shared-content layer:
   //  • image → none (so the teacher draws on top via the ink layer)
@@ -390,7 +424,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
     : 'auto';
 
   return (
-    <div className="midad room">
+    <div className="midad room classroom-v2">
       <RoomAudioRenderer />
 
       {/* ── Raised-hand notifications (teacher-only, fixed overlay) ── */}
@@ -418,9 +452,9 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
           onClick={(e) => { if (e.target === e.currentTarget) setShowPermPicker(false); }}
         >
           <div className="perm-picker">
-            <h4>✏️ Drawing Permission</h4>
+            <h4>✏️ إذن الرسم</h4>
             {remoteParticipants.length === 0 ? (
-              <p style={{ color: '#8ea0bb', fontSize: 14 }}>No other participants in the room yet.</p>
+              <p style={{ color: '#8ea0bb', fontSize: 14 }}>لم ينضم أحد بعد.</p>
             ) : (
               <div className="perm-picker-list">
                 {remoteParticipants.map((p) => {
@@ -430,11 +464,11 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
                       <span className="perm-item-name">{p.name ?? p.identity}</span>
                       {granted ? (
                         <button className="perm-btn-revoke" onClick={() => revokeDraw(p.identity)}>
-                          Revoke
+                          سحب الإذن
                         </button>
                       ) : (
                         <button className="perm-btn-grant" onClick={() => grantDraw(p.identity)}>
-                          Grant
+                          السماح
                         </button>
                       )}
                     </div>
@@ -452,16 +486,18 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
       {/* ── Room top bar ── */}
       <header className="room-top">
         <div className="rt-left">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="classroom-logo" src="/midad-logo-transparent.png" alt="مداد" />
           <button className="rt-back" onClick={onLeave} aria-label="Leave room">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
           <div>
-            <div className="rt-title ar">Arabic Live Class</div>
-            <div className="rt-sub">Interactive whiteboard session</div>
+            <div className="rt-title ar">فصل مداد المباشر</div>
+            <div className="rt-sub">نتعلم ونشارك معًا</div>
           </div>
         </div>
         <div className="rt-center">
-          <span className="badge-live"><span className="dot"></span> Live</span>
+          <span className="badge-live"><span className="dot"></span> مباشر</span>
           <span className="rt-count">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M16 19v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="3"/><path d="M22 19v-2a4 4 0 0 0-3-3.9"/></svg>
             {participantCount}
@@ -469,7 +505,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
         </div>
         <div className="rt-right">
           {isTeacher && sharedDoc && (
-            <button className="rt-icon" title="Stop sharing" onClick={stopSharing}>
+            <button className="rt-icon" title="إيقاف مشاركة المحتوى" aria-label="إيقاف مشاركة المحتوى" onClick={stopSharing}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M6 6l12 12M18 6 6 18"/></svg>
             </button>
           )}
@@ -478,8 +514,8 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
             const res = await authFetch('/api/sessions/end', { method: 'POST', body: JSON.stringify({ roomName: roomId }) });
             if (!res.ok) { window.alert('Could not end the class. Please try again.'); return; }
             onLeave();
-          }}>End class</button>}
-          <button className="rt-leave btn btn-sm" onClick={onLeave}>Leave</button>
+          }}>إنهاء الحصة</button>}
+          <button className="rt-leave btn btn-sm" onClick={onLeave}>مغادرة</button>
         </div>
       </header>
 
@@ -489,12 +525,12 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
           {teacherTrack ? (
             <ParticipantTile trackRef={teacherTrack} style={{ width: '100%', height: '100%' }} />
           ) : (
-            <div className="vph"><span>Waiting for teacher…</span></div>
+            <div className="vph"><span>بانتظار المعلم…</span></div>
           )}
           <div className="vlabel">
             <span className="vmic on"></span>
-            Teacher
-            <span className="vhost">Host</span>
+            المعلم
+            <span className="vhost">المضيف</span>
           </div>
         </div>
 
@@ -517,37 +553,37 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
       {/* ── Whiteboard area ── */}
       <div className="board-wrap">
         {/* Drawing tools — left sidebar */}
-        <div className="wb-toolbar">
-          <button className={`wb-tool ${tool === 'pen' ? 'on' : ''}`} title="Pen" onClick={() => setTool('pen')}>
+        <div className="wb-toolbar" aria-label="أدوات السبورة">
+          <button className={`wb-tool ${tool === 'pen' ? 'on' : ''}`} title="Pen" aria-label="قلم" disabled={!inkInteractive} onClick={() => setTool('pen')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 19l7-7 3 3-7 7-4 1 1-4z"/><path d="M18 13l-1.5-1.5"/><path d="M3 21l5-1 9-9-4-4-9 9z"/></svg>
           </button>
-          <button className={`wb-tool ${tool === 'highlighter' ? 'on' : ''}`} title="Highlighter" onClick={() => setTool('highlighter')}>
+          <button className={`wb-tool ${tool === 'highlighter' ? 'on' : ''}`} title="Highlighter" aria-label="تظليل" disabled={!inkInteractive} onClick={() => setTool('highlighter')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M9 11l-4 4v3h3l4-4"/><path d="M13 7l4 4 4-4-4-4z"/><path d="M12 8l4 4"/></svg>
           </button>
-          <button className={`wb-tool ${tool === 'eraser' ? 'on' : ''}`} title="Eraser" onClick={() => setTool('eraser')}>
+          <button className={`wb-tool ${tool === 'eraser' ? 'on' : ''}`} title="Eraser" aria-label="ممحاة" disabled={!inkInteractive} onClick={() => setTool('eraser')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 14l6-6 8 8-4 4H9z"/><path d="M5 20h14"/></svg>
           </button>
           <span className="wb-sep"></span>
-          <button className={`wb-tool ${tool === 'text' ? 'on' : ''}`} title="Text" onClick={() => setTool('text')}>
+          <button className={`wb-tool ${tool === 'text' ? 'on' : ''}`} title="Text" aria-label="نص" disabled={!inkInteractive} onClick={() => setTool('text')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 6V5h16v1M12 5v14M9 19h6"/></svg>
           </button>
-          <button className={`wb-tool ${tool === 'rectangle' ? 'on' : ''}`} title="Rectangle" onClick={() => setTool('rectangle')}>
+          <button className={`wb-tool ${tool === 'rectangle' ? 'on' : ''}`} title="Rectangle" aria-label="مستطيل" disabled={!inkInteractive} onClick={() => setTool('rectangle')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg>
           </button>
-          <button className={`wb-tool ${tool === 'circle' ? 'on' : ''}`} title="Circle" onClick={() => setTool('circle')}>
+          <button className={`wb-tool ${tool === 'circle' ? 'on' : ''}`} title="Circle" aria-label="دائرة" disabled={!inkInteractive} onClick={() => setTool('circle')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="8"/></svg>
           </button>
-          <button className={`wb-tool ${tool === 'line' ? 'on' : ''}`} title="Line" onClick={() => setTool('line')}>
+          <button className={`wb-tool ${tool === 'line' ? 'on' : ''}`} title="Line" aria-label="خط" disabled={!inkInteractive} onClick={() => setTool('line')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 19L19 5"/></svg>
           </button>
-          <button className={`wb-tool ${tool === 'select' ? 'on' : ''}`} title="Select" onClick={() => setTool('select')}>
+          <button className={`wb-tool ${tool === 'select' ? 'on' : ''}`} title="Select" aria-label="تحديد" disabled={!inkInteractive} onClick={() => setTool('select')}>
             <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M4 4l7.07 16.97 2.51-7.39 7.39-2.51z"/></svg>
           </button>
           <span className="wb-sep"></span>
           <button className="wb-tool" title="تراجع" aria-label="تراجع" onClick={() => whiteboardRef.current?.undo()}>↶</button>
           <button className="wb-tool" title="إعادة" aria-label="إعادة" onClick={() => whiteboardRef.current?.redo()}>↷</button>
           <button className="wb-tool" title="حفظ صورة السبورة" aria-label="حفظ صورة السبورة" onClick={() => whiteboardRef.current?.exportImage()}>⇩</button>
-          <button className="wb-tool" title="Clear board" onClick={() => { if (window.confirm('مسح جميع الرسومات؟ يمكنك التراجع بعد المسح.')) whiteboardRef.current?.clear(); }}>
+          <button className="wb-tool" title="Clear board" aria-label="مسح السبورة" onClick={() => { if (window.confirm('مسح جميع الرسومات؟ يمكنك التراجع بعد المسح.')) whiteboardRef.current?.clear(); }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
           </button>
         </div>
@@ -566,7 +602,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
                   </span>
                 </>
               ) : (
-                <span className="bb-name">Whiteboard · السبورة</span>
+                <span className="bb-name">السبورة</span>
               )}
             </div>
 
@@ -593,19 +629,25 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
               {/* PDF page controls now live inside PdfViewer itself. */}
 
               {isTeacher && (
-                <button className="bb-chip" title="Share content" onClick={openShareModal}>
+                <button className="bb-chip" title="إضافة محتوى" onClick={openShareModal}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>
-                  Share content
+                  إضافة محتوى
                 </button>
               )}
             </div>
           </div>
 
           {/* The board itself: shared content layer + transparent ink canvas on top */}
+          <nav className="workspace-tabs" aria-label="مساحة الحصة">
+            <button aria-pressed={view === 'board'} onClick={() => { setView('board'); setZoom(1); }}>السبورة</button>
+            {sharedDoc && <button aria-pressed={view === 'content'} onClick={() => { setView('content'); setZoom(1); }}>المحتوى</button>}
+            {screenTrack && <button aria-pressed={view === 'screen'} onClick={() => { setView('screen'); setZoom(1); }}>الشاشة المشتركة</button>}
+            <span>{drawPermission ? 'يمكنك الرسم' : 'مشاهدة · اطلب إذن الرسم'}</span>
+          </nav>
           <div className="board-paper">
             <div className="board-zoom" style={{ transform: `scale(${zoom})` }}>
               {/* shared content layer — sits UNDER the ink so the teacher draws on top */}
-              {sharedDoc && (
+              {contentVisible && sharedDoc && (
                 <div className="board-shared" style={{ pointerEvents: sharedPointer }}>
                   {sharedDoc.docType === 'youtube' ? (
                     (() => {
@@ -630,7 +672,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={sharedDoc.url} alt={sharedDoc.name} />
                   ) : sharedDoc.docType === 'html' ? (
-                    // Interactive HTML lesson — sandboxed so pasted markup can't
+                    // HTML تفاعلي lesson — sandboxed so pasted markup can't
                     // touch the parent page; scripts/forms are allowed so the
                     // lesson can be interactive for both teacher and students.
                     <iframe
@@ -654,24 +696,25 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
               )}
 
               {/* ink layer — transparent fabric canvas overlaying the content */}
-              <div className="board-ink" style={{ pointerEvents: inkInteractive ? 'auto' : 'none' }}>
+              <div className="board-ink" style={{ pointerEvents: inkInteractive ? 'auto' : 'none', visibility: annotatable ? 'visible' : 'hidden' }}>
                 <Whiteboard
                   ref={whiteboardRef}
                   roomId={roomId}
-                  canDraw={drawPermission}
+                  canDraw={inkInteractive}
                   tool={tool}
                   color={color}
                   lineWidth={lineWidth}
                   eraserMode={eraserMode}
                   eraserSize={eraserSize}
-                  overlay={!!sharedDoc}
+                  overlay={contentVisible}
                 />
               </div>
             </div>
 
-            {!sharedDoc && <div className="board-guide ar">✍️ اكتب على السبورة</div>}
-            {sharedDoc && annotatable && <div className="board-guide ar">✍️ اكتب فوق المحتوى</div>}
+            {view === 'board' && <div className="board-guide ar">✍️ اكتب على السبورة</div>}
+            {contentVisible && annotatable && <div className="board-guide ar">✍️ اكتب فوق المحتوى</div>}
 
+            {view === 'screen' && screenTrack && <div className="workspace-screen"><ParticipantTile trackRef={screenTrack} style={{ height: '100%' }} /></div>}
             {/* shared-materials dock (teacher-only) */}
             {isTeacher && (
               <div className="board-dock">
@@ -692,7 +735,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
                     </button>
                   );
                 })}
-                <button className="dock-add" title="Share a file" onClick={openShareModal}>
+                <button className="dock-add" title="إضافة محتوى" onClick={openShareModal}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
                 </button>
               </div>
@@ -702,7 +745,7 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
 
         {/* Color palette + line width — right sidebar */}
         <div className="wb-colors">
-          {tool === 'eraser' && <div style={{ position: 'absolute', right: 16, top: 100, zIndex: 22, background: '#fff', color: '#101e34', padding: 8, borderRadius: 8 }}>
+          {tool === 'eraser' && <div className="eraser-options">
             <select aria-label="نوع الممحاة" value={eraserMode} onChange={e => setEraserMode(e.target.value as EraserMode)}>
               <option value="object">حذف الشكل كامل</option><option value="partial">مسح جزء من الشكل</option>
             </select>
@@ -727,53 +770,53 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
         </div>
       </div>
 
-      {screenTrack && <div style={{ position: 'fixed', inset: '10% 10% 20%', zIndex: 30, background: '#101e34' }}><ParticipantTile trackRef={screenTrack} style={{ height: '100%' }} /></div>}
+
       {reconnecting && <div role="status" style={{ color: '#fbbf24', textAlign: 'center' }}>نعيد الاتصال بالحصة…</div>}
       {classError && <div role="alert" style={{ color: '#f87171', textAlign: 'center' }}>{classError} <button onClick={() => setClassError('')}>إغلاق</button></div>}
-      <StartAudio label="تشغيل صوت الحصة" />
+      <StartAudio className="classroom-start-audio" label="تشغيل صوت الحصة" />
       {/* ── Room controls ── */}
       <div className="room-controls">
-        {isTeacher && <button className="rc-btn" onClick={() => { void localParticipant.setScreenShareEnabled(!localParticipant.isScreenShareEnabled).catch(() => setClassError('تعذر مشاركة الشاشة. قد لا يدعمها متصفح الجوال.')); }}>🖥 مشاركة الشاشة</button>}
+        {isTeacher && <button className="rc-btn" onClick={() => { void localParticipant.setScreenShareEnabled(!localParticipant.isScreenShareEnabled).catch(() => setClassError('تعذر مشاركة الشاشة. قد لا يدعمها متصفح الجوال.')); }}><CallIcon name="screen" /><span>الشاشة</span></button>}
         <button
           className="rc-btn"
           onClick={() => { void localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled).catch(() => setClassError('تعذر تشغيل الميكروفون. تحقق من إذن المتصفح والجهاز.')); }}
         >
-          <span className="rci">{isMicrophoneEnabled ? '🎤' : '🔇'}</span>
-          <span>{isMicrophoneEnabled ? 'Mute' : 'Unmute'}</span>
+          <CallIcon name="mic" off={!isMicrophoneEnabled} />
+          <span>{isMicrophoneEnabled ? 'كتم الصوت' : 'تشغيل الصوت'}</span>
         </button>
 
         <button
           className="rc-btn"
           onClick={() => { void localParticipant.setCameraEnabled(!isCameraEnabled).catch(() => setClassError('تعذر تشغيل الكاميرا. تحقق من إذن المتصفح والجهاز.')); }}
         >
-          <span className="rci">{isCameraEnabled ? '📷' : '📵'}</span>
-          <span>{isCameraEnabled ? 'Stop Video' : 'Start Video'}</span>
+          <CallIcon name="camera" off={!isCameraEnabled} />
+          <span>{isCameraEnabled ? 'إيقاف الكاميرا' : 'تشغيل الكاميرا'}</span>
         </button>
 
-        {/* Students: Raise Hand sends a data-channel message to the teacher */}
+        {/* Students: رفع اليد sends a data-channel message to the teacher */}
         {!isTeacher && (
           <button className="rc-btn" onClick={handleRaiseHand}>
-            <span className="rci">✋</span>
-            <span>Raise Hand</span>
+            <CallIcon name="hand" />
+            <span>رفع اليد</span>
           </button>
         )}
 
         {/* Teacher: open the drawing-permission picker */}
         {isTeacher && (
           <button className="rc-btn" onClick={() => setShowPermPicker(true)}>
-            <span className="rci">✏️</span>
-            <span>Draw Access</span>
+            <CallIcon name="draw" />
+            <span>إذن الرسم</span>
           </button>
         )}
 
         <button className="rc-btn" onClick={() => handleReaction('👍')}>
-          <span className="rci">👍</span>
-          <span>React</span>
+          <CallIcon name="react" />
+          <span>تفاعل</span>
         </button>
 
         <DisconnectButton onClick={onLeave} className="rc-btn rc-leave">
-          <span className="rci">📞</span>
-          <span>Leave</span>
+          <CallIcon name="leave" />
+          <span>مغادرة</span>
         </DisconnectButton>
       </div>
 
@@ -793,15 +836,15 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
         <div className="modal-bg" onClick={(e) => { if (e.target === e.currentTarget) setShowShareModal(false); }}>
           <div className="modal">
             <div className="modal-head">
-              <div><h3>Share Content</h3></div>
-              <button className="modal-x" onClick={() => setShowShareModal(false)}>
+              <div><h3>إضافة محتوى للحصة</h3></div>
+              <button className="modal-x" aria-label="إغلاق إضافة المحتوى" onClick={() => setShowShareModal(false)}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 6l12 12M18 6 6 18"/></svg>
               </button>
             </div>
 
             {/* Tab switcher */}
             <div style={{ display: 'flex', gap: 8, padding: '14px 28px 0' }}>
-              {([['content', 'Course Content'], ['url', 'URL'], ['html', 'Interactive HTML']] as const).map(([key, label]) => (
+              {([['content', 'الدروس'], ['file', 'رفع ملف'], ['url', 'رابط / يوتيوب'], ['html', 'HTML']] as const).map(([key, label]) => (
                 <button
                   key={key}
                   type="button"
@@ -816,9 +859,9 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
             <div className="modal-body">
               {shareTab === 'content' && (
                 <div className="field">
-                  <label>From course content</label>
+                  <label>من دروس الدورة</label>
                   {courseContent.length === 0 ? (
-                    <p style={{ fontSize: 13, color: 'var(--ink-3)' }}>This course has no content yet.</p>
+                    <p style={{ fontSize: 13, color: 'var(--ink-3)' }}>لا توجد ملفات في الدورة بعد.</p>
                   ) : (
                     <div className="share-list">
                       {courseContent.map((c) => {
@@ -836,10 +879,11 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
                 </div>
               )}
 
+              {shareTab === 'file' && <div className="field"><label htmlFor="class-file">PDF أو صورة أو HTML</label><input id="class-file" type="file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.svg,.html,.htm" disabled={uploading} onChange={e => { const file = e.target.files?.[0]; if (file) void uploadFile(file); e.target.value = ''; }} /><p role="status">{uploading ? 'جارٍ رفع الملف ومشاركته…' : 'حتى 10 ميجابايت. HTML حتى 32 ألف حرف.'}</p></div>}
               {shareTab === 'url' && (
                 <>
                   <div className="field">
-                    <label htmlFor="doc-url">Document / image URL</label>
+                    <label htmlFor="doc-url">رابط PDF أو صورة أو فيديو يوتيوب</label>
                     <input id="doc-url" className="input" type="text" placeholder="https://…"
                       value={manualUrl} onChange={(e) => setManualUrl(e.target.value)} />
                   </div>
@@ -855,12 +899,12 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
               {shareTab === 'html' && (
                 <>
                   <div className="field">
-                    <label htmlFor="html-content">HTML lesson</label>
+                    <label htmlFor="html-content">درس HTML</label>
                     <textarea
                       id="html-content"
                       className="input"
                       rows={8}
-                      placeholder="Paste your HTML lesson here…"
+                      placeholder="الصق محتوى درس HTML هنا…"
                       value={htmlContent}
                       onChange={(e) => setHtmlContent(e.target.value)}
                       style={{ height: 'auto', minHeight: 160, padding: '12px 16px', fontFamily: 'monospace', fontSize: 13 }}
@@ -879,12 +923,12 @@ function ClassroomContent({ roomId, isTeacher, onLeave }: {
             </div>
 
             <div className="modal-foot">
-              <button className="btn btn-outline" type="button" onClick={() => setShowShareModal(false)}>Cancel</button>
+              <button className="btn btn-outline" type="button" onClick={() => setShowShareModal(false)}>إلغاء</button>
               {shareTab === 'url' && (
-                <button className="btn btn-gold" type="button" onClick={handleShareUrl}>Share</button>
+                <button className="btn btn-gold" type="button" onClick={handleShareUrl}>مشاركة</button>
               )}
               {shareTab === 'html' && (
-                <button className="btn btn-gold" type="button" onClick={handleShareHtml}>Share</button>
+                <button className="btn btn-gold" type="button" onClick={handleShareHtml}>مشاركة</button>
               )}
             </div>
           </div>
@@ -986,7 +1030,7 @@ export default function ClassroomPage() {
 
   if (error) {
     return (
-      <div className="midad room" style={{ alignItems: 'center', justifyContent: 'center' }}>
+      <div className="midad classroom-lobby" style={{ alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center', padding: 32 }}>
           <p role="alert" dir="rtl" style={{ color: '#f87171', fontWeight: 600, marginBottom: 12 }}>{error}</p>
           <button className="btn btn-gold btn-sm" onClick={retryJoin}>إعادة دخول الحصة</button>
@@ -996,7 +1040,7 @@ export default function ClassroomPage() {
     );
   }
 
-  if (!choices) return <div className="midad" style={{ minHeight: '100vh', background: '#101e34', color: '#fff', padding: 24 }}>
+  if (!choices) return <div className="midad classroom-lobby">
     <h1 dir="rtl" style={{ textAlign: 'center' }}>تجهيز الكاميرا والميكروفون قبل الحصة</h1>
     <PreJoin onSubmit={setChoices} persistUserChoices={false} joinLabel="دخول الحصة" defaults={{ username: 'مشارك', audioEnabled: false, videoEnabled: false }} />
     <p dir="rtl" style={{ textAlign: 'center' }}>اختر الأجهزة أو ادخل والصوت والكاميرا مغلقان، ثم شغّلهما داخل الحصة.</p>
@@ -1004,10 +1048,10 @@ export default function ClassroomPage() {
 
   if (!token) {
     return (
-      <div className="midad room" style={{ alignItems: 'center', justifyContent: 'center' }}>
+      <div className="midad classroom-lobby" style={{ alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center', padding: 32 }}>
           <div className="animate-spin" style={{ width: 32, height: 32, border: '2px solid rgba(255,255,255,.3)', borderTopColor: '#fff', borderRadius: '50%', margin: '0 auto 12px' }} />
-          <p style={{ fontSize: 14, color: '#8ea0bb' }}>Joining classroom…</p>
+          <p style={{ fontSize: 14, color: '#8ea0bb' }}>جارٍ دخول الحصة…</p>
         </div>
       </div>
     );
@@ -1023,7 +1067,7 @@ export default function ClassroomPage() {
       audio={choices.audioEnabled ? { deviceId: choices.audioDeviceId } : false}
       onDisconnected={handleDisconnected}
       onError={() => setError("تعذر الاتصال بالحصة. تحقق من الإنترنت وأعد الدخول.")}
-      style={{ height: '100vh' }}
+      style={{ height: '100dvh' }}
     >
       <ClassroomContent roomId={roomId} isTeacher={role === 'teacher'} onLeave={handleLeave} />
     </LiveKitRoom>
