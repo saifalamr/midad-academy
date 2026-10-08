@@ -18,7 +18,7 @@ async function setup(page: Page, mode: 'recover' | 'fail' = 'recover') {
     video.srcObject = canvas.captureStream(15); await video.play();
     const state = { restores: 0, stalled: false, enabled: true, cleaned: false };
     const stop = monitorCamera(video, {
-      staleMs: 650, intervalMs: 100, cooldownMs: 900,
+      staleMs: 650, intervalMs: 100, cooldownMs: 900, stableMs: 900,
       shouldMonitor: () => state.enabled,
       onStalled: (value: boolean) => { state.stalled = value; },
       restore: async () => {
@@ -64,4 +64,27 @@ test('camera-off and offscreen video do not recover; failed recovery is bounded 
   await page.evaluate(() => (window as any).cameraTest.cleanup());
   await page.waitForTimeout(900);
   expect((await state(page)).restores).toBe(2);
+});
+
+test('a returning page resumes playback and later freezes remain recoverable after stable video', async ({ page }) => {
+  await setup(page);
+  await page.evaluate(() => {
+    (window as any).cameraTest.state.enabled = false;
+    document.querySelector('video')!.pause();
+  });
+  await expect.poll(() => page.evaluate(() => document.querySelector('video')!.paused)).toBe(true);
+  await page.evaluate(() => {
+    (window as any).cameraTest.state.enabled = true;
+    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+  });
+  await expect.poll(() => page.evaluate(() => document.querySelector('video')!.paused)).toBe(false);
+  for (let expected = 1; expected <= 3; expected++) {
+    await page.evaluate(() => (window as any).cameraTest.freeze());
+    await expect.poll(async () => (await state(page)).restores).toBe(expected);
+    await expect.poll(async () => (await state(page)).stalled).toBe(false);
+    // Actual moving decoded frames must continue beyond the stable interval.
+    const frames = await page.evaluate(() => document.querySelector('video')!.getVideoPlaybackQuality().totalVideoFrames);
+    await expect.poll(() => page.evaluate(() => document.querySelector('video')!.getVideoPlaybackQuality().totalVideoFrames), { timeout: 5000 }).toBeGreaterThan(frames + 20);
+  }
+  await page.evaluate(() => (window as any).cameraTest.cleanup());
 });
