@@ -1,5 +1,6 @@
 'use client';
 
+import CameraVideo from '@/components/CameraVideo';
 import Icon, { type IconName } from '@/components/Icon';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -542,7 +543,7 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
       <div className="video-strip">
         <div className="vtile vteacher">
           {teacherTrack ? (
-            <ParticipantTile trackRef={teacherTrack} style={{ width: '100%', height: '100%' }} />
+            <CameraVideo trackRef={teacherTrack} />
           ) : (
             <div className="vph"><span>بانتظار المعلم…</span></div>
           )}
@@ -555,7 +556,7 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
 
         {studentTracks.slice(0, 4).map((track) => (
           <div key={track.participant.identity} className="vtile">
-            <ParticipantTile trackRef={track} style={{ width: '100%', height: '100%' }} />
+            <CameraVideo trackRef={track} />
             <div className="vlabel">
               <span className={`vmic ${track.participant.isMicrophoneEnabled ? "on" : ""}`}></span>
               {track.participant.name ?? track.participant.identity}
