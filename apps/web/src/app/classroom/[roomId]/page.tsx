@@ -1,6 +1,7 @@
 'use client';
 
 import CameraVideo from '@/components/CameraVideo';
+import Link from 'next/link';
 import Icon, { type IconName } from '@/components/Icon';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -160,11 +161,12 @@ function PdfViewer({ url, page, isTeacher, onPageChange }: {
 
 // ── Inner classroom UI (inside LiveKitRoom context) ──────────────────────────
 
-function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
+function ClassroomContent({ roomId, title, isTeacher, onLeave, onEnd }: {
   title?: string;
   roomId: string;
   isTeacher: boolean;
   onLeave: () => void;
+  onEnd: () => void;
 }) {
   const cameraTracks = useTracks(
     [{ source: Track.Source.Camera, withPlaceholder: true }],
@@ -221,6 +223,13 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
   const [htmlContent, setHtmlContent] = useState('');
   const [view, setView] = useState<'board' | 'content' | 'screen'>('board');
   const [uploading, setUploading] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const shareInFlight = useRef(false);
+  const [contentNotice, setContentNotice] = useState('');
+  const [contentLoading, setContentLoading] = useState(false);
+  const [contentLoadError, setContentLoadError] = useState('');
+  const contentController = useRef<AbortController | null>(null);
+  const contentBusy = uploading || sharing;
   const [shareTab, setShareTab] = useState<ShareTab>('content');
   const [shareError, setShareError] = useState('');
 
@@ -262,7 +271,7 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
   async function saveState(body: { sharedDoc?: SharedDoc | null; pdfPage?: number }) {
     try {
       const res = await authFetch(`/api/sessions/state/${roomId}`, { method: 'PATCH', body: JSON.stringify(body) });
-      if (!res.ok) { const json = await res.json(); throw new Error(json.error || 'تعذر حفظ محتوى الحصة'); }
+      if (!res.ok) throw new Error('تعذر تحديث محتوى الحصة. تحقق من الاتصال وأعد المحاولة.');
       await refreshState();
       publish(new TextEncoder().encode(JSON.stringify({ type: 'state-changed' })));
       return true;
@@ -307,45 +316,44 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
     return () => { room.off(RoomEvent.DataReceived, onData); };
   }, [room, localParticipant.identity, addReaction, refreshState]);
 
-  // Preload the teacher's course content so the shared-materials dock is populated.
+  const loadCourseContent = useCallback(async () => {
+    contentController.current?.abort();
+    const controller = new AbortController(); contentController.current = controller;
+    setContentLoading(true); setContentLoadError('');
+    try {
+      const res = await authFetch(`/api/courses/${roomId}/lessons`, { signal: controller.signal });
+      if (!res.ok) throw new Error();
+      const json = await res.json();
+      if (!controller.signal.aborted) setCourseContent(json.data ?? []);
+    } catch {
+      if (!controller.signal.aborted) setContentLoadError('تعذر تحميل مواد الدورة. أعد المحاولة أو شارك ملفًا من جهازك.');
+    } finally { if (!controller.signal.aborted) setContentLoading(false); }
+  }, [roomId]);
   useEffect(() => {
-    if (!isTeacher) return;
-    authFetch(`/api/courses/${roomId}/lessons`)
-      .then(async (res) => {
-        if (!res.ok) return;
-        const json = await res.json();
-        setCourseContent((json.data ?? []) as CourseContentItem[]);
-      })
-      .catch(() => {});
-  }, [isTeacher, roomId]);
+    if (isTeacher) void loadCourseContent();
+    return () => contentController.current?.abort();
+  }, [isTeacher, loadCourseContent]);
 
-  // ── Document sharing: teacher broadcasts a doc to share / stop sharing ────
   function openShareModal() {
-    setShareError('');
-    setManualUrl('');
-    setManualName('');
-    setHtmlContent('');
-    setShareTab('content');
-    setShowShareModal(true);
-    authFetch(`/api/courses/${roomId}/lessons`)
-      .then(async (res) => {
-        if (!res.ok) return;
-        const json = await res.json();
-        setCourseContent((json.data ?? []) as CourseContentItem[]);
-      })
-      .catch(() => {});
+    if (contentBusy) return;
+    setShareError(''); setManualUrl(''); setManualName(''); setHtmlContent('');
+    setShareTab('content'); setShowShareModal(true); void loadCourseContent();
   }
 
   async function shareDocument(url: string, name: string, docType: DocType, html = '') {
-    const ok = await saveState({ sharedDoc: { url, name, docType, ...(docType === 'html' ? { htmlContent: html } : {}) }, pdfPage: 1 });
-    if (ok) { setShowShareModal(false); setView('content'); }
-    else setShareError('تعذر حفظ المحتوى. تحقق من الاتصال ثم أعد المحاولة.');
+    if (shareInFlight.current) return;
+    shareInFlight.current = true; setSharing(true); setShareError('');
+    try {
+      const ok = await saveState({ sharedDoc: { url, name, docType, ...(docType === 'html' ? { htmlContent: html } : {}) }, pdfPage: 1 });
+      if (ok) { setShowShareModal(false); setView('content'); setContentNotice(`تمت مشاركة: ${name}`); }
+      else setShareError('تعذر مشاركة المحتوى. بياناتك باقية هنا؛ أعد المحاولة.');
+    } finally { shareInFlight.current = false; setSharing(false); }
   }
 
   function handleShareUrl() {
     const url = manualUrl.trim();
     try { if (!['http:', 'https:'].includes(new URL(url).protocol)) throw new Error(); } catch { setShareError('اكتب رابط HTTP أو HTTPS صالحًا'); return; }
-    shareDocument(url, manualName.trim() || 'Document', detectDocType(url));
+    shareDocument(url, manualName.trim() || 'محتوى الحصة', detectDocType(url));
   }
 
   async function uploadFile(file: File) {
@@ -380,10 +388,15 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
 
   function handleShareHtml() {
     if (!htmlContent.trim() || htmlContent.length > 32000) { setShareError('أضف HTML لا يتجاوز 32 ألف حرف'); return; }
-    shareDocument('', manualName.trim() || 'Interactive Lesson', 'html', htmlContent);
+    shareDocument('', manualName.trim() || 'نشاط تفاعلي', 'html', htmlContent);
   }
 
-  function stopSharing() { void saveState({ sharedDoc: null, pdfPage: 1 }); }
+  async function stopSharing() {
+    if (shareInFlight.current || uploading) return;
+    shareInFlight.current = true; setSharing(true);
+    try { if (await saveState({ sharedDoc: null, pdfPage: 1 })) setContentNotice('تم إيقاف عرض المحتوى للطلاب.'); }
+    finally { shareInFlight.current = false; setSharing(false); }
+  }
   function goPdfPage(page: number) { void saveState({ pdfPage: Math.max(1, page) }); }
 
   // ── Emoji reaction: broadcast to all, also show locally ──────────────────
@@ -533,7 +546,7 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
             if (!window.confirm('إنهاء الحصة لجميع المشاركين؟')) return;
             const res = await authFetch('/api/sessions/end', { method: 'POST', body: JSON.stringify({ roomName: roomId }) });
             if (!res.ok) { window.alert('تعذر إنهاء الحصة. أعد المحاولة.'); return; }
-            onLeave();
+            onEnd();
           }}>إنهاء الحصة</button>}
           <button className="rt-leave btn btn-sm" onClick={onLeave}>مغادرة</button>
         </div>
@@ -614,7 +627,7 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
             <div className="bb-left">
               {sharedDoc ? (
                 <>
-                  <span className="badge-live"><span className="dot"></span> Sharing</span>
+                  <span className="badge-live"><span className="dot"></span> معروض للطلاب</span>
                   <span className="bb-name">{sharedDoc.name}</span>
                   <span className="bb-by">
                     <span className="bb-avatar">{teacherName.charAt(0).toUpperCase()}</span>
@@ -627,7 +640,7 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
             </div>
 
             <div className="bb-right">
-              {isTeacher && sharedDoc && <button className="stop-content-share" onClick={stopSharing} title="إيقاف مشاركة المحتوى"><Icon name="close" /><span>إيقاف المشاركة</span></button>}
+              {isTeacher && sharedDoc && <button className="stop-content-share" disabled={contentBusy} onClick={() => void stopSharing()} title="إيقاف مشاركة المحتوى"><Icon name="close" /><span>إيقاف المشاركة</span></button>}
               {showZoom && (
                 <>
                   <button
@@ -650,7 +663,7 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
               {/* PDF page controls now live inside PdfViewer itself. */}
 
               {isTeacher && (
-                <button className="bb-chip" title="إضافة محتوى" onClick={openShareModal}>
+                <button className="bb-chip" title="إضافة محتوى" disabled={contentBusy} onClick={openShareModal}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>
                   إضافة محتوى
                 </button>
@@ -756,7 +769,7 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
                     </button>
                   );
                 })}
-                <button className="dock-add" title="إضافة محتوى" onClick={openShareModal}>
+                <button className="dock-add" title="إضافة محتوى" disabled={contentBusy} onClick={openShareModal}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
                 </button>
               </div>
@@ -765,10 +778,10 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
         </div>
 
         {/* Color palette + line width — right sidebar */}
-        <div className="wb-colors" aria-label="خصائص أداة السبورة"><span className="tool-caption">{tool === 'eraser' ? 'الممحاة' : tool === 'text' ? 'النص' : 'اللون والسُمك'}</span>
+        <div className="wb-colors" aria-label="خصائص أداة السبورة"><span className="tool-caption">{tool === 'eraser' ? 'الممحاة' : tool === 'text' ? 'النص' : tool === 'pen' ? 'القلم · اللون والسُمك' : tool === 'highlighter' ? 'التظليل · اللون والسُمك' : 'الشكل · اللون والسُمك'}</span>
           {tool === 'eraser' && <div className="eraser-options">
             <select aria-label="نوع الممحاة" value={eraserMode} onChange={e => setEraserMode(e.target.value as EraserMode)}>
-              <option value="object">حذف الشكل كامل</option><option value="partial">مسح جزء من الشكل</option>
+              <option value="object">مسح الشكل كاملًا</option><option value="partial">مسح جزء من الشكل</option>
             </select>
             {eraserMode === 'partial' && <input aria-label="حجم الممحاة" type="range" min="8" max="100" value={eraserSize} onChange={e => setEraserSize(Number(e.target.value))} />}
           </div>}
@@ -792,6 +805,7 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
       </div>
 
 
+      {contentNotice && <div className="classroom-notice" role="status"><Icon name="check" /><span>{contentNotice}</span><button aria-label="إغلاق إشعار المحتوى" onClick={() => setContentNotice('')}><Icon name="close" /></button></div>}
       {reconnecting && <div role="status" style={{ color: '#fbbf24', textAlign: 'center' }}>نعيد الاتصال بالحصة…</div>}
       {classError && <div role="alert" style={{ color: '#f87171', textAlign: 'center' }}>{classError} <button onClick={() => setClassError('')}>إغلاق</button></div>}
       <StartAudio className="classroom-start-audio" label="تشغيل صوت الحصة" />
@@ -855,23 +869,23 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
 
       {/* ── Share Document modal (teacher-only) ── */}
       {isTeacher && showShareModal && (
-        <div className="modal-bg" onClick={(e) => { if (e.target === e.currentTarget) setShowShareModal(false); }}>
-          <div className="modal">
+        <div className="modal-bg" onClick={(e) => { if (!contentBusy && e.target === e.currentTarget) setShowShareModal(false); }}>
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="share-modal-title">
             <div className="modal-head">
-              <div><h3>إضافة محتوى للحصة</h3></div>
-              <button className="modal-x" aria-label="إغلاق إضافة المحتوى" onClick={() => setShowShareModal(false)}>
+              <div><h3 id="share-modal-title">إضافة محتوى للحصة</h3></div>
+              <button className="modal-x" disabled={contentBusy} aria-label="إغلاق إضافة المحتوى" onClick={() => setShowShareModal(false)}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 6l12 12M18 6 6 18"/></svg>
               </button>
             </div>
 
             {/* Tab switcher */}
-            <div style={{ display: 'flex', gap: 8, padding: '14px 28px 0' }}>
+            <div className="share-tabs">
               {([['content', 'الدروس'], ['file', 'رفع ملف'], ['url', 'رابط / يوتيوب'], ['html', 'HTML']] as const).map(([key, label]) => (
                 <button
                   key={key}
                   type="button"
                   className={`btn btn-sm ${shareTab === key ? 'btn-gold' : 'btn-outline'}`}
-                  onClick={() => { setShareTab(key); setShareError(''); }}
+                  disabled={contentBusy} onClick={() => { setShareTab(key); setShareError(''); }}
                 >
                   {label}
                 </button>
@@ -882,7 +896,7 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
               {shareTab === 'content' && (
                 <div className="field">
                   <label>من دروس الدورة</label>
-                  {courseContent.length === 0 ? (
+                  {contentLoading ? <p role="status">جارٍ تحميل مواد الدورة…</p> : contentLoadError ? <div role="alert"><p>{contentLoadError}</p><button className="btn btn-outline btn-sm" onClick={() => void loadCourseContent()}>إعادة تحميل المواد</button></div> : courseContent.length === 0 ? (
                     <p style={{ fontSize: 13, color: 'var(--ink-3)' }}>لا توجد ملفات في الدورة بعد.</p>
                   ) : (
                     <div className="share-list">
@@ -890,7 +904,7 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
                         const docType = detectDocType(c.contentUrl);
                         const icon = docType === 'youtube' || docType === 'video' ? <><Icon name="video" /></> : docType === 'image' ? <><Icon name="file" /></> : <><Icon name="file" /></>;
                         return (
-                          <button key={c.id} type="button" className="share-list-item"
+                          <button key={c.id} type="button" className="share-list-item" disabled={contentBusy}
                             onClick={() => shareDocument(c.contentUrl, c.title, docType)}>
                             {icon} {c.title}
                           </button>
@@ -901,7 +915,7 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
                 </div>
               )}
 
-              {shareTab === 'file' && <div className="field"><label htmlFor="class-file">PDF أو صورة أو HTML</label><input id="class-file" type="file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.svg,.html,.htm" disabled={uploading} onChange={e => { const file = e.target.files?.[0]; if (file) void uploadFile(file); e.target.value = ''; }} /><p role="status">{uploading ? 'جارٍ رفع الملف ومشاركته…' : 'حتى 10 ميجابايت. HTML حتى 32 ألف حرف.'}</p></div>}
+              {shareTab === 'file' && <div className="field"><label htmlFor="class-file">PDF أو صورة أو HTML</label><input id="class-file" type="file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.svg,.html,.htm" disabled={contentBusy} onChange={e => { const file = e.target.files?.[0]; if (file) void uploadFile(file); e.target.value = ''; }} /><p role="status">{uploading ? 'جارٍ رفع الملف ومشاركته…' : 'حتى 10 ميجابايت. HTML حتى 32 ألف حرف.'}</p></div>}
               {shareTab === 'url' && (
                 <>
                   <div className="field">
@@ -941,16 +955,16 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave }: {
                 </>
               )}
 
-              {shareError && <div className="auth-error">{shareError}</div>}
+              {sharing && <p role="status">جارٍ مشاركة المحتوى مع الطلاب…</p>}{shareError && <div role="alert" className="auth-error">{shareError}</div>}
             </div>
 
             <div className="modal-foot">
-              <button className="btn btn-outline" type="button" onClick={() => setShowShareModal(false)}>إلغاء</button>
+              <button className="btn btn-outline" type="button" disabled={contentBusy} onClick={() => setShowShareModal(false)}>إلغاء</button>
               {shareTab === 'url' && (
-                <button className="btn btn-gold" type="button" onClick={handleShareUrl}>مشاركة</button>
+                <button className="btn btn-gold" type="button" disabled={contentBusy} onClick={handleShareUrl}>مشاركة</button>
               )}
               {shareTab === 'html' && (
-                <button className="btn btn-gold" type="button" onClick={handleShareHtml}>مشاركة</button>
+                <button className="btn btn-gold" type="button" disabled={contentBusy} onClick={handleShareHtml}>مشاركة</button>
               )}
             </div>
           </div>
@@ -986,9 +1000,10 @@ export default function ClassroomPage() {
   const [choices, setChoices] = useState<LocalUserChoices | null>(null);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const [exit, setExit] = useState<'left' | 'ended' | 'removed' | null>(null);
 
   useEffect(() => {
-    if (!choices) return;
+    if (!choices || exit) return;
     const appToken = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
 
 
@@ -1034,9 +1049,9 @@ export default function ClassroomPage() {
         setError('تعذر الاتصال بالخادم. تحقق من الإنترنت وأعد المحاولة.');
       });
     return () => { active = false; controller.abort(); };
-  }, [roomId, router, choices, attempt]);
+  }, [roomId, router, choices, attempt, exit]);
 
-  const handleLeave = useCallback(() => {
+  const goDashboard = useCallback(() => {
     const appToken = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
     if (appToken) {
       try {
@@ -1050,14 +1065,17 @@ export default function ClassroomPage() {
     router.push('/login');
   }, [router]);
 
+  const handleLeave = useCallback(() => setExit(value => value ?? 'left'), []);
+  const handleEnd = useCallback(() => setExit('ended'), []);
+
   function retryJoin() {
     setToken(null); setError(''); setAttempt(value => value + 1);
   }
 
   const handleDisconnected = useCallback((reason?: DisconnectReason) => {
-    if ([DisconnectReason.CLIENT_INITIATED, DisconnectReason.ROOM_DELETED, DisconnectReason.ROOM_CLOSED, DisconnectReason.PARTICIPANT_REMOVED].includes(reason ?? DisconnectReason.UNKNOWN_REASON)) {
-      handleLeave(); return;
-    }
+    if (reason === DisconnectReason.CLIENT_INITIATED) { handleLeave(); return; }
+    if (reason === DisconnectReason.ROOM_DELETED || reason === DisconnectReason.ROOM_CLOSED) { setExit('ended'); return; }
+    if (reason === DisconnectReason.PARTICIPANT_REMOVED) { setExit('removed'); return; }
     setError(reason === DisconnectReason.DUPLICATE_IDENTITY
       ? 'تم فتح الحصة بحسابك في جهاز أو نافذة أخرى. أغلقها هناك قبل إعادة الدخول.'
       : 'انقطع الاتصال بالحصة. تحقق من الإنترنت ثم أعد الدخول.');
@@ -1066,26 +1084,28 @@ export default function ClassroomPage() {
   const cameraCapture = useMemo(() => choices?.videoEnabled ? { deviceId: choices.videoDeviceId } : false, [choices?.videoEnabled, choices?.videoDeviceId]);
   const audioCapture = useMemo(() => choices?.audioEnabled ? { deviceId: choices.audioDeviceId } : false, [choices?.audioEnabled, choices?.audioDeviceId]);
 
+  if (exit) return <main className="midad classroom-lobby" dir="rtl"><section className="lobby-state classroom-exit"><div className="exit-icon"><Icon name={exit === 'removed' ? 'warning' : 'check'} size={30} /></div><h1>{exit === 'ended' ? 'انتهت الحصة' : exit === 'removed' ? 'تم إغلاق دخولك للحصة' : 'غادرت الحصة'}</h1><p>{exit === 'ended' ? 'شكرًا لمشاركتك. يمكنك متابعة مواد الدورة من لوحة التحكم.' : exit === 'removed' ? 'تواصل مع المعلم إذا كنت تحتاج العودة. يمكنك الرجوع إلى صفوفك الآن.' : 'تم قطع اتصالك بالكاميرا والميكروفون. يمكنك العودة ما دامت الحصة مستمرة.'}</p>{lesson && <strong>{lesson.title}</strong>}<div className="exit-actions"><button className="btn btn-gold" onClick={goDashboard}>الرجوع للوحة التحكم</button>{exit === 'left' && <button className="btn btn-outline" onClick={() => { setChoices(null); setToken(null); setError(''); setExit(null); }}>العودة لتجهيز الحصة</button>}<Link className="btn btn-outline" href={`/courses/${roomId}/lessons`}>مواد الدورة</Link></div></section></main>;
+
   if (error) {
     return (
       <div className="midad classroom-lobby" style={{ alignItems: 'center', justifyContent: 'center' }}>
         <div className="lobby-state">
           <p role="alert" dir="rtl" style={{ color: '#a83232', fontWeight: 600, marginBottom: 12 }}>{error}</p>
           <button className="btn btn-gold btn-sm" onClick={retryJoin}>إعادة دخول الحصة</button>
-          <button className="btn btn-ghost btn-sm" onClick={handleLeave}>الرجوع للوحة التحكم</button>
+          <button className="btn btn-ghost btn-sm" onClick={goDashboard}>الرجوع للوحة التحكم</button>
         </div>
       </div>
     );
   }
 
-  if (!choices) return <ClassroomLobby lesson={lesson} name={user?.name || 'مشارك'} onJoin={setChoices} onBack={handleLeave} />;
+  if (!choices) return <ClassroomLobby lesson={lesson} name={user?.name || 'مشارك'} onJoin={setChoices} onBack={goDashboard} />;
 
   if (!token) {
     return (
       <div className="midad classroom-lobby" style={{ alignItems: 'center', justifyContent: 'center' }}>
         <div className="lobby-state">
-          <div className="animate-spin" style={{ width: 32, height: 32, border: '2px solid rgba(255,255,255,.3)', borderTopColor: '#fff', borderRadius: '50%', margin: '0 auto 12px' }} />
-          <p style={{ fontSize: 14, color: '#60728a' }}>جارٍ دخول الحصة…</p>
+          <div aria-hidden="true" className="animate-spin" style={{ width: 32, height: 32, border: '2px solid #e7d8b9', borderTopColor: '#c9922a', borderRadius: '50%', margin: '0 auto 12px' }} />
+          <p style={{ fontSize: 14, color: '#60728a' }}>جارٍ دخول الحصة…</p><button className="btn btn-outline" onClick={() => { setChoices(null); setToken(null); setError(''); }}>العودة لتجهيز الأجهزة</button>
         </div>
       </div>
     );
@@ -1104,7 +1124,7 @@ export default function ClassroomPage() {
       onError={handleRoomError}
       style={{ height: '100dvh' }}
     >
-      <ClassroomContent title={lesson?.title} roomId={roomId} isTeacher={role === 'teacher'} onLeave={handleLeave} />
+      <ClassroomContent title={lesson?.title} roomId={roomId} isTeacher={role === 'teacher'} onLeave={handleLeave} onEnd={handleEnd} />
     </LiveKitRoom>
   );
 }

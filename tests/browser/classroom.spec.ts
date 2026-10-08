@@ -130,6 +130,9 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   await expect(teacher.getByRole('button', { name: 'إيقاف المشاركة', exact: true })).toHaveCount(0);
   await expectMovingVideo(teacher); await expectMovingVideo(student);
   await api('post', '/api/sessions/end' , teacherToken, { roomName: 'preview-arabic' });
+  await expect(student.getByRole('heading', { name: 'انتهت الحصة', exact: true })).toBeVisible();
+  await expect(student.locator('video')).toHaveCount(0);
+  await student.getByRole('button', { name: 'الرجوع للوحة التحكم', exact: true }).click();
   await expect(student).toHaveURL(/\/student/);
   expect(errors).toEqual([]);
   await teacherContext.close(); await studentContext.close();

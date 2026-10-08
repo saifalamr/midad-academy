@@ -99,70 +99,49 @@ export default function StudentDashboard() {
   const router = useRouter();
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [joiningId, setJoiningId] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
   const [error, setError] = useState('');
   const [userName, setUserName] = useState('Student');
   const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
   const [upcomingSessions, setUpcomingSessions] = useState<UpcomingSession[]>([]);
   const [stats, setStats] = useState<StudentStats | null>(null);
+  const [showProgress, setShowProgress] = useState(false);
 
   useEffect(() => {
     const payload = getTokenPayload();
     setUserName(payload.name ?? 'Student');
 
-    authFetch('/api/students/me')
-      .then(async (res) => {
-        if (!res.ok) return;
-        const json = await res.json();
-        setStats(json.data ?? null);
-      })
-      .catch(() => setError('Could not load your learning data. Please refresh to retry.'));
-
-    authFetch('/api/enrollments')
-      .then(async (res) => {
-        if (res.status === 401) { router.push('/login'); return; }
-        const json = await res.json();
-        setEnrollments(json.data ?? []);
-      })
-      .catch(() => setError('Could not load your courses. Please refresh to retry.'))
-      .finally(() => setLoading(false));
-
-    authFetch('/api/students/results')
-      .then(async (res) => {
-        if (!res.ok) return;
-        const json = await res.json();
-        setQuizResults(json.data ?? []);
-      })
-      .catch(() => setError('Could not load your learning data. Please refresh to retry.'));
-
-    authFetch('/api/sessions/upcoming')
-      .then(async (res) => {
-        if (!res.ok) return;
-        const json = await res.json();
-        setUpcomingSessions(json.data ?? []);
-      })
-      .catch(() => setError('Could not load your learning data. Please refresh to retry.'));
-  }, [router]);
-
-  async function handleJoinClass(courseId: string) {
-    setError('');
-    setJoiningId(courseId);
-    try {
-      const res = await authFetch('/api/sessions/join', {
-        method: 'POST',
-        body: JSON.stringify({ roomName: courseId }),
-      });
+    const controller = new AbortController();
+    setLoading(true); setError('');
+    const load = async <T,>(path: string, apply: (data: T) => void, fallback: T) => {
+      const res = await authFetch(path, { signal: controller.signal });
+      if (res.status === 401) { router.push('/login'); throw new Error('Unauthorized'); }
+      if (!res.ok) throw new Error('Unavailable');
       const json = await res.json();
-      if (!res.ok) { setError(json.error || 'Could not join class'); return; }
-      router.push(`/classroom/${courseId}`);
-    } catch {
-      setError('Could not connect to server');
-    } finally {
-      setJoiningId(null);
-    }
+      if (!controller.signal.aborted) apply(json.data ?? fallback);
+    };
+    void Promise.allSettled([
+      load<StudentStats | null>('/api/students/me', setStats, null),
+      load<Enrollment[]>('/api/enrollments', setEnrollments, []),
+      load<QuizResult[]>('/api/students/results', setQuizResults, []),
+      load<UpcomingSession[]>('/api/sessions/upcoming', setUpcomingSessions, []),
+    ]).then(results => {
+      if (controller.signal.aborted) return;
+      if (results.some(result => result.status === 'rejected')) setError('تعذر تحديث بعض بياناتك. يمكنك إعادة المحاولة؛ البيانات التي تم تحميلها تبقى متاحة.');
+      setLoading(false);
+    });
+    return () => controller.abort();
+  }, [router, reload]);
+
+  function handleJoinClass(courseId: string) {
+    router.push(`/classroom/${courseId}`);
   }
 
   const liveEnrollments = enrollments.filter((e) => e.isLive);
+
+  const nextSession = upcomingSessions.filter(session => session.status === 'LIVE' || session.status === 'SCHEDULED').sort((a, b) => (a.status === 'LIVE' ? 0 : 1) - (b.status === 'LIVE' ? 0 : 1) || Date.parse(a.scheduledAt) - Date.parse(b.scheduledAt))[0];
+
+  const activeCourseId = liveEnrollments[0]?.course.id ?? (nextSession?.status === 'LIVE' ? nextSession.course.id : null);
 
   // ── Real progress, derived from /api/students/me (falls back to 0 / empty) ──
   const totalPoints = stats?.totalPoints ?? 0;
@@ -216,30 +195,32 @@ export default function StudentDashboard() {
       {/* ── App bar ── */}
 
 
-      <main className="dash">
+      <main className="dash" aria-busy={loading}>
 
         {/* ── Hero banner ── */}
         <div className="dash-hero card">
           <div>
             <p className="dh-hi">Welcome back, <b>{userName}</b> <span className="ar dh-ar">أهلاً</span></p>
-            <h1 className="dh-title">Ready for today&apos;s lesson?</h1>
+            <h1 className="dh-title">خطوتك التالية</h1>
             <p className="dh-sub">
               {liveEnrollments.length > 0
                 ? <><b>{liveEnrollments.length} live class{liveEnrollments.length > 1 ? 'es' : ''}</b> waiting for you right now.</>
-                : 'Keep going — every lesson gets you closer to fluency!'}
+                : loading ? 'نجهّز حصصك وخطوتك التالية…' : nextSession ? 'موعد حصتك القادمة واضح هنا. تظهر لك دعوة الدخول عندما يبدأ المعلم.' : enrollments.length ? 'لا توجد حصة مباشرة الآن. تستطيع متابعة مواد دورتك.' : 'ابدأ باختيار دورة تناسبك، ثم تظهر حصصك وموادك هنا.'}
             </p>
-            {liveEnrollments.length > 0 && (
+            {!loading && activeCourseId && (
               <button
                 className="btn btn-gold"
                 style={{ marginTop: 16 }}
-                onClick={() => handleJoinClass(liveEnrollments[0].course.id)}
+                onClick={() => handleJoinClass(activeCourseId)}
               >
-                Join your live class
+                تجهيز ودخول الحصة
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
               </button>
             )}
+            {!loading && nextSession && <div className="student-next-session" dir="rtl"><span className="pill"><Icon name="calendar" />{nextSession.status === 'LIVE' ? 'حصة مباشرة الآن' : 'الحصة القادمة'}</span><h2>{nextSession.title}</h2><p>{nextSession.course.title} · {nextSession.teacherName}</p><p>{new Date(nextSession.scheduledAt).toLocaleString('ar', { weekday: 'long', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · {nextSession.durationMinutes} دقيقة</p><small>الموعد حسب توقيت جهازك</small></div>}
+            {!loading && !activeCourseId && <div className="learning-actions" style={{ marginTop: 16 }}><Link className="btn btn-gold" href={enrollments.length ? `/courses/${enrollments[0].course.id}/lessons` : '/courses'}>{enrollments.length ? 'متابعة مواد الدورة' : 'استكشف الدورات'}</Link>{enrollments.length > 0 && <a className="btn btn-outline" href="#student-agenda">مواعيد حصصي</a>}</div>}
           </div>
-          <div className="dh-level">
+          {stats && <div className="dh-level">
             <div className="lvl-ring" style={{ '--p': `${xpPct}%` } as React.CSSProperties}>
               <div className="lvl-in">
                 <b style={{ fontSize: 18, textTransform: 'capitalize' }}>{level}</b>
@@ -251,18 +232,18 @@ export default function StudentDashboard() {
               <div className="bar"><i style={{ width: `${xpPct}%` }}></i></div>
               <p className="lvl-note"><b>{xpToNext} XP</b> to next level</p>
             </div>
-          </div>
+          </div>}
         </div>
 
         {/* ── Stats row ── */}
-        <div className="stat-row">
+        {!loading && stats && <div className="stat-row">
           <div className="stat card"><div className="st-ic st-gold"><Icon name="star" /></div><div><b>{totalPoints}</b><span>Total XP</span></div></div>
           <div className="stat card"><div className="st-ic st-fire"><Icon name="flame" /></div><div><b>{streak} days</b><span>Current streak</span></div></div>
           <div className="stat card"><div className="st-ic st-navy"><Icon name="book" /></div><div><b>{lessonsCompleted}</b><span>Lessons done</span></div></div>
           <div className="stat card"><div className="st-ic st-green"><Icon name="check" /></div><div><b>{enrollments.length}</b><span>Enrolled classes</span></div></div>
-        </div>
+        </div>}
 
-        {error && <div className="auth-error" style={{ marginBottom: 18 }}>{error}</div>}
+        {error && <div className="auth-error student-data-error" role="alert" dir="rtl"><span>{error}</span><button className="btn btn-outline btn-sm" disabled={loading} onClick={() => setReload(value => value + 1)}>{loading ? 'جارٍ التحديث…' : 'إعادة المحاولة'}</button></div>}
 
         <div className="dash-grid">
 
@@ -289,7 +270,7 @@ export default function StudentDashboard() {
             ) : enrollments.length === 0 ? (
               <div className="card pad" style={{ textAlign: 'center' }}>
                 <p style={{ color: 'var(--ink-3)', fontSize: 14, marginBottom: 14 }}>
-                  You haven&apos;t enrolled in any classes yet.
+                  {error ? 'تعذر تأكيد صفوفك. أعد المحاولة أعلاه.' : 'لم تسجل في دورة بعد. اختر دورة لتبدأ رحلتك.'}
                 </p>
                 <Link href="/courses" className="btn btn-gold btn-sm">Browse courses</Link>
               </div>
@@ -317,7 +298,7 @@ export default function StudentDashboard() {
                           {course.teacherName}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                      <div className="student-class-actions">
                         <Link href={`/courses/${course.id}/lessons`} className="btn btn-sm btn-outline">
                           View Lessons
                         </Link>
@@ -325,14 +306,14 @@ export default function StudentDashboard() {
                           <button
                             className="btn btn-gold btn-sm"
                             onClick={() => handleJoinClass(course.id)}
-                            disabled={joiningId === course.id}
-                            style={{ opacity: joiningId === course.id ? 0.65 : 1 }}
+                            disabled={loading}
+
                           >
-                            {joiningId === course.id ? 'Joining…' : 'Join Class'}
+                            تجهيز ودخول الحصة
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
                           </button>
                         ) : (
-                          <span className="cc-soon">Scheduled</span>
+                          <span className="cc-soon">{upcomingSessions.some(session => session.course.id === course.id) ? 'الحصة لم تبدأ بعد' : 'لا يوجد موعد جديد'}</span>
                         )}
                       </div>
                     </div>
@@ -344,12 +325,12 @@ export default function StudentDashboard() {
 
           {/* ── Side column ── */}
           <div className="dash-col">
-            <div className="card pad">
+            <div id="student-agenda" className="card pad">
               <div className="col-head sm">
                 <h3>Upcoming Classes <span className="ar muted">الحصص القادمة</span></h3>
               </div>
               {upcomingSessions.length === 0 ? (
-                <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No classes scheduled yet.</p>
+                <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>{loading ? 'جارٍ تحميل مواعيدك…' : error ? 'تعذر تأكيد المواعيد. أعد المحاولة أعلاه.' : 'لم يحدد المعلم موعدًا جديدًا بعد. مواد دورتك متاحة في صفوفك.'}</p>
               ) : (
                 <ul className="agenda">
                   {upcomingSessions.map((session) => {
@@ -373,6 +354,7 @@ export default function StudentDashboard() {
               )}
             </div>
 
+            <details className="student-progress card" open={showProgress} onToggle={event => setShowProgress(event.currentTarget.open)}><summary>تقدمي وإنجازاتي <small>الأوسمة والأداء والحضور</small></summary>{showProgress && <div className="student-progress-content">
             <div className="card pad">
               <div className="col-head sm">
                 <h3>My Badges <span className="ar muted">أوسمتي</span></h3>
@@ -465,6 +447,8 @@ export default function StudentDashboard() {
                 </ResponsiveContainer>
               )}
             </div>
+
+            </div>}</details>
 
             {/* ── Quiz results feed ── */}
             <div className="card pad">
