@@ -17,12 +17,20 @@ test('student sees the next session, retries failed data and prepares devices be
   await page.getByRole('button', { name: 'إعادة المحاولة', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'تعلّم حرف الباء' })).toBeVisible();
   await expect(page.locator('.student-data-error')).toHaveCount(0);
-  for (const [width, height] of [[390, 844], [820, 1180], [1440, 900]]) {
+  for (const [width, height] of [[320, 700], [390, 844], [820, 1180], [1440, 900]]) {
     await page.setViewportSize({ width, height });
     await page.screenshot({ path: `test-results/student-journey-${width}.png`, fullPage: true });
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
     const overflow = await page.evaluate(() => [...document.querySelectorAll('main *')].filter(el => el.getBoundingClientRect().right > innerWidth + 2).map(el => ({ tag: el.tagName, class: el.className, right: Math.round(el.getBoundingClientRect().right), width: Math.round(el.getBoundingClientRect().width) })));
     expect(overflow).toEqual([]);
+    const levelFits = await page.locator('.lvl-in').evaluate(el => {
+      const circle = el.getBoundingClientRect();
+      return [...el.children].every(child => {
+        const text = child.getBoundingClientRect();
+        return text.left >= circle.left && text.right <= circle.right && text.top >= circle.top && text.bottom <= circle.bottom;
+      });
+    });
+    expect(levelFits).toBe(true);
   }
   await expect(page.getByRole('heading', { name: /My Badges/ })).toHaveCount(0);
   await page.locator('.student-progress summary').click();

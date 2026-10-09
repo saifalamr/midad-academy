@@ -402,12 +402,12 @@
 .midad .dh-title{font-size:30px;margin:6px 0 8px}
 .midad .dh-sub{color:var(--ink-2);font-size:15.5px;margin-bottom:20px}
 .midad .dh-sub b{color:var(--navy)}
-.midad .dh-level{display:flex;align-items:center;gap:18px;flex:none}
+.midad .dh-level{display:flex;align-items:center;gap:18px;min-width:0;max-width:100%;flex:0 1 340px}
 .midad .lvl-ring{width:104px;height:104px;border-radius:50%;display:grid;place-items:center;flex:none;background:conic-gradient(var(--gold) var(--p,0%),var(--line-2) 0)}
-.midad .lvl-in{width:80px;height:80px;border-radius:50%;background:#fff;display:grid;place-items:center;text-align:center;box-shadow:var(--sh-sm)}
-.midad .lvl-in b{font-size:30px;color:var(--navy);font-weight:900;line-height:1}
+.midad .lvl-in{width:80px;height:80px;border-radius:50%;background:#fff;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;padding:6px;text-align:center;box-shadow:var(--sh-sm)}
+.midad .lvl-in b{max-width:100%;font-size:13px;color:var(--navy);font-weight:800;line-height:1.3;text-transform:capitalize;overflow-wrap:anywhere}
 .midad .lvl-in span{font-size:11px;color:var(--ink-3);font-weight:700;letter-spacing:.08em;text-transform:uppercase}
-.midad .lvl-meta{width:200px}
+.midad .lvl-meta{width:200px;min-width:0;flex:1}
 .midad .lvl-row{display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:var(--ink-2);margin-bottom:7px}
 .midad .lvl-note{font-size:13px;color:var(--ink-3);margin-top:9px}
 .midad .lvl-note b{color:var(--navy)}
@@ -807,3 +807,10 @@
 .student-next-session{margin-top:18px;padding-top:18px;border-top:1px solid var(--line);text-align:start}.student-next-session h2{font-size:21px;margin:12px 0 6px;line-height:1.5}.student-next-session p{margin:5px 0;line-height:1.7;color:var(--ink-2)}.student-next-session small{display:block;color:var(--ink-3);margin-bottom:10px}.student-data-error{display:flex;align-items:center;gap:14px;justify-content:space-between;margin-bottom:18px}.student-class-actions{display:flex;gap:8px;flex-wrap:wrap}.student-class-actions .btn{white-space:normal;text-align:center}#student-agenda{scroll-margin-top:150px}@media(max-width:700px){.student-data-error{align-items:flex-start;flex-direction:column}.workspace-content .cc-body{flex-wrap:wrap;gap:12px}.student-class-actions{width:100%}.student-class-actions .btn{flex:1;min-width:120px}}
 
 .student-progress{min-width:0}.student-progress summary{padding:18px 20px;min-height:48px;cursor:pointer;color:var(--ink);font-weight:700;line-height:1.6}.student-progress summary small{display:block;font-size:12px;font-weight:400;color:var(--ink-3);margin-top:5px}.student-progress summary:focus-visible{outline:3px solid var(--gold);outline-offset:3px}.student-progress-content{display:flex;flex-direction:column;gap:14px;padding:0 12px 12px;min-width:0}
+
+/* The source logo has a stray fold outside the artwork at its lower right. */
+img[src*="midad-logo-transparent.png"]{clip-path:polygon(0 0,100% 0,100% 80%,70% 80%,70% 100%,0 100%)}
+.workspace-brand{min-width:0;flex-shrink:0}.workspace-brand b{white-space:nowrap}.workspace-account{flex-shrink:0}
+.workspace-content .dash-hero>div:first-child{min-width:0;max-width:100%}
+@media(max-width:1000px){.midad .dh-level{flex-basis:auto;width:100%}}
+@media(max-width:700px){.workspace-topbar{position:relative;height:auto;min-height:60px;padding-block:8px;flex-wrap:wrap}.workspace-nav{position:relative;top:auto}.workspace-content .col-head{gap:12px;flex-wrap:wrap}.workspace-content .col-head h2{min-width:0;line-height:1.4}.workspace-content .lvl-row{gap:8px;flex-wrap:wrap}.workspace-content .lvl-note{line-height:1.6}}

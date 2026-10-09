@@ -223,7 +223,7 @@ export default function StudentDashboard() {
           {stats && <div className="dh-level">
             <div className="lvl-ring" style={{ '--p': `${xpPct}%` } as React.CSSProperties}>
               <div className="lvl-in">
-                <b style={{ fontSize: 18, textTransform: 'capitalize' }}>{level}</b>
+                <b>{level}</b>
                 <span>Level</span>
               </div>
             </div>
