@@ -15,6 +15,17 @@ import { AuthProvider } from '@/components/AuthProvider';
 export const metadata: Metadata = {
   title: 'Midad Academy — مداد',
   description: 'Live Arabic classes for children aged 5–15',
+  applicationName: 'مداد أكاديمي',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: { capable: true, title: 'مداد', statusBarStyle: 'default' },
+  other: { 'apple-mobile-web-app-capable': 'yes' },
+  icons: {
+    apple: [{ url: '/apple-touch-icon.png?v=20261009', sizes: '180x180', type: 'image/png' }],
+    icon: [
+      { url: '/favicon-32.png?v=20261009', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon-16.png?v=20261009', sizes: '16x16', type: 'image/png' },
+    ],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

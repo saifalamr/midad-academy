@@ -24,6 +24,7 @@ import { sessionRoutes } from './routes/sessions';
 import { accountRoutes } from './routes/account';
 import { startWhiteboardWebSocketServer } from './ws-server';
 import { rateLimitKey } from './lib/rate-limit';
+import { prepareReview } from './lib/prepare-review';
 
 export async function buildApp() {
   validateConfig();
@@ -117,6 +118,9 @@ export async function buildApp() {
 }
 
 async function bootstrap() {
+  validateConfig();
+  const reviewSetup = await prepareReview(prisma);
+  if (reviewSetup.status !== 'disabled') console.log('Preview review preparation:', JSON.stringify(reviewSetup));
   const app = await buildApp();
   await app.listen({ port: config.PORT, host: config.HOST });
   const whiteboard = startWhiteboardWebSocketServer(app.server, app);
