@@ -10,8 +10,7 @@ export default function RegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('student');
-  const [inviteCode, setInviteCode] = useState('');
+  const [whatsappPhone, setWhatsappPhone] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -24,7 +23,7 @@ export default function RegisterPage() {
       const res = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, role, inviteCode: role === "teacher" ? inviteCode : undefined }),
+        body: JSON.stringify({ name, email, password, role: 'parent', whatsappPhone }),
       });
 
       const data = await res.json();
@@ -48,7 +47,11 @@ export default function RegisterPage() {
       <aside className="auth-side geo-navy">
         <Link className="brand" href="/">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/midad-logo-transparent.png" alt="Midad Academy" className="logo-full logo-white" />
+          <img
+            src="/midad-logo-transparent.png"
+            alt="Midad Academy"
+            className="logo-full logo-white"
+          />
         </Link>
 
         <div className="auth-side-body">
@@ -57,7 +60,7 @@ export default function RegisterPage() {
           <ul className="auth-perks">
             <li>Browse available courses before enrolling</li>
             <li>Live lessons with your course teacher</li>
-            <li>Free and paid courses clearly labelled</li>
+            <li>Monthly courses managed by the academy</li>
             <li>Parent dashboard for linked children</li>
           </ul>
         </div>
@@ -72,8 +75,10 @@ export default function RegisterPage() {
             Already a member? <Link href="/login">Log in</Link>
           </div>
 
-          <h1 className="auth-title">Create your account</h1>
-          <p className="auth-sub">A few details and you&apos;re in. <span className="ar">إنشاء حساب جديد</span></p>
+          <h1 className="auth-title">إنشاء حساب ولي الأمر</h1>
+          <p className="auth-sub">
+            بعد التسجيل والتواصل مع الأكاديمية، تضيف الإدارة أبناءك وتمنحهم حساباتهم الخاصة.
+          </p>
 
           {error && <div className="auth-error">{error}</div>}
 
@@ -126,26 +131,32 @@ export default function RegisterPage() {
               </div>
 
               <div className="field">
-                <label htmlFor="role">
-                  I am a… <span className="ar muted">الدور</span>
-                </label>
-                <select
-                  id="role"
+                <label htmlFor="whatsappPhone">رقم واتساب مع مفتاح الدولة</label>
+                <input
+                  id="whatsappPhone"
                   className="input"
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                >
-                  <option value="parent">Parent — وليّ أمر</option>
-                  <option value="student">Student — طالب</option>
-                  <option value="teacher">Teacher — معلّم</option>
-                </select>
+                  dir="ltr"
+                  type="tel"
+                  autoComplete="tel"
+                  required
+                  pattern="\+[1-9][0-9]{7,14}"
+                  placeholder="+9665XXXXXXXX"
+                  value={whatsappPhone}
+                  onChange={(e) => setWhatsappPhone(e.target.value.replace(/[\s()-]/g, ''))}
+                />
+                <small>مثال: +966 ثم الرقم، بدون صفر البداية.</small>
               </div>
             </div>
 
-            {role === 'teacher' && <label className="field">Teacher invitation code<input className="input" required value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} autoComplete="off" /></label>}
             <label className="check check-block">
-              <input type="checkbox" required />
-              I agree to the <Link href="/terms" className="link-gold">Terms</Link> &amp; <Link href="/privacy" className="link-gold">Privacy Policy</Link>
+              <input type="checkbox" required />I agree to the{' '}
+              <Link href="/terms" className="link-gold">
+                Terms
+              </Link>{' '}
+              &amp;{' '}
+              <Link href="/privacy" className="link-gold">
+                Privacy Policy
+              </Link>
             </label>
 
             <button

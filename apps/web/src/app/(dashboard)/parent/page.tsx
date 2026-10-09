@@ -4,9 +4,7 @@ import Icon from '@/components/Icon';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-} from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { API_URL } from '@/lib/config';
 
 type Session = {
@@ -35,7 +33,14 @@ type Child = {
   courseProgress: CourseProgress[];
   materialProgress: { courseId: string; title: string; total: number; completed: number }[];
   recentSessions: Session[];
-  quizResults: { id: string; quizTitle: string; score: number; passed: boolean; status: 'PENDING_REVIEW' | 'COMPLETE'; completedAt: string }[];
+  quizResults: {
+    id: string;
+    quizTitle: string;
+    score: number;
+    passed: boolean;
+    status: 'PENDING_REVIEW' | 'COMPLETE';
+    completedAt: string;
+  }[];
 };
 
 type Overview = {
@@ -43,7 +48,10 @@ type Overview = {
 };
 
 function authFetch(path: string) {
-  const token = typeof window !== 'undefined' ? (localStorage.getItem('token') ?? sessionStorage.getItem('token')) : null;
+  const token =
+    typeof window !== 'undefined'
+      ? (localStorage.getItem('token') ?? sessionStorage.getItem('token'))
+      : null;
   return fetch(`${API_URL}${path}`, {
     headers: {
       'Content-Type': 'application/json',
@@ -54,7 +62,7 @@ function authFetch(path: string) {
 
 function getTokenPayload(): { name?: string } {
   try {
-    const token = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
+    const token = localStorage.getItem('token') ?? sessionStorage.getItem('token');
     if (!token) return {};
     return JSON.parse(atob(token.split('.')[1]));
   } catch {
@@ -75,11 +83,6 @@ export default function ParentDashboard() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [userName, setUserName] = useState('Parent');
-  const [showLinkModal, setShowLinkModal] = useState(false);
-  const [childEmail, setChildEmail] = useState('');
-  const [linkCode, setLinkCode] = useState('');
-  const [linkError, setLinkError] = useState('');
-  const [linkLoading, setLinkLoading] = useState(false);
 
   useEffect(() => {
     const payload = getTokenPayload();
@@ -87,7 +90,10 @@ export default function ParentDashboard() {
 
     authFetch('/api/parent/overview')
       .then(async (res) => {
-        if (res.status === 401) { router.push('/login'); return; }
+        if (res.status === 401) {
+          router.push('/login');
+          return;
+        }
         if (!res.ok) throw new Error();
         const json = await res.json();
         setOverview(json.data ?? { children: [] });
@@ -107,110 +113,204 @@ export default function ParentDashboard() {
     .slice(0, 5);
 
   function downloadReport() {
-    const cell = (value: string | number | boolean) => '"' + String(value).replace(/^[=+@-]/, "'").replace(/"/g, '""') + '"';
-    const rows: (string | number | boolean)[][] = [['Child', 'Course', 'Session', 'Date', 'Attended']];
-    children.forEach((child) => child.recentSessions.forEach((session) => rows.push([child.name, session.courseTitle, session.lessonTitle, new Date(session.scheduledAt).toLocaleDateString(), session.attended])));
-    const url = URL.createObjectURL(new Blob(['\ufeff' + rows.map((row) => row.map(cell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' }));
-    const a = document.createElement('a'); a.href = url; a.download = 'midad-learning-report.csv'; a.click(); URL.revokeObjectURL(url);
+    const cell = (value: string | number | boolean) =>
+      '"' +
+      String(value)
+        .replace(/^[=+@-]/, "'")
+        .replace(/"/g, '""') +
+      '"';
+    const rows: (string | number | boolean)[][] = [
+      ['Child', 'Course', 'Session', 'Date', 'Attended'],
+    ];
+    children.forEach((child) =>
+      child.recentSessions.forEach((session) =>
+        rows.push([
+          child.name,
+          session.courseTitle,
+          session.lessonTitle,
+          new Date(session.scheduledAt).toLocaleDateString(),
+          session.attended,
+        ])
+      )
+    );
+    const url = URL.createObjectURL(
+      new Blob(['\ufeff' + rows.map((row) => row.map(cell).join(',')).join('\r\n')], {
+        type: 'text/csv;charset=utf-8',
+      })
+    );
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'midad-learning-report.csv';
+    a.click();
+    URL.revokeObjectURL(url);
   }
-
 
   return (
     <div className="midad" style={{ minHeight: '100vh', background: 'var(--cream)' }}>
-
       {/* ── App bar ── */}
 
-
       <main className="dash">
-        {loadError && <div className="auth-error" role="alert">{loadError}</div>}
+        {loadError && (
+          <div className="auth-error" role="alert">
+            {loadError}
+          </div>
+        )}
 
         {/* ── Page head ── */}
         <div className="page-head">
           <div>
-            <p className="dh-hi">Good morning, <b>{userName}</b> <span className="ar dh-ar">صباح الخير</span></p>
+            <p className="dh-hi">
+              Good morning, <b>{userName}</b> <span className="ar dh-ar">صباح الخير</span>
+            </p>
             <h1 className="dh-title">Your family&apos;s progress</h1>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button className="btn btn-gold" onClick={() => setShowLinkModal(true)}>+ Add Child</button>
-            <button className="btn btn-outline" onClick={downloadReport} disabled={!children.length}>Download learning report</button>
+            <button
+              className="btn btn-outline"
+              onClick={downloadReport}
+              disabled={!children.length}
+            >
+              Download learning report
+            </button>
           </div>
         </div>
 
         {/* ── Stats row ── */}
         <div className="stat-row" id="children">
-          <div className="stat card"><div className="st-ic st-navy"><Icon name="family" /></div><div><b>{loading ? '—' : children.length}</b><span>Children enrolled</span></div></div>
-          <div className="stat card"><div className="st-ic st-fire"><Icon name="calendar" /></div><div><b>{loading ? '—' : totalEnrolled}</b><span>Active classes</span></div></div>
-          <div className="stat card"><div className="st-ic st-gold"><Icon name="star" /></div><div><b>{loading ? '—' : familyXP}</b><span>Family XP</span></div></div>
-          <div className="stat card"><div className="st-ic st-green"><Icon name="check" /></div><div><b>{loading ? '—' : totalCompleted}</b><span>Lessons done</span></div></div>
+          <div className="stat card">
+            <div className="st-ic st-navy">
+              <Icon name="family" />
+            </div>
+            <div>
+              <b>{loading ? '—' : children.length}</b>
+              <span>Children enrolled</span>
+            </div>
+          </div>
+          <div className="stat card">
+            <div className="st-ic st-fire">
+              <Icon name="calendar" />
+            </div>
+            <div>
+              <b>{loading ? '—' : totalEnrolled}</b>
+              <span>Active classes</span>
+            </div>
+          </div>
+          <div className="stat card">
+            <div className="st-ic st-gold">
+              <Icon name="star" />
+            </div>
+            <div>
+              <b>{loading ? '—' : familyXP}</b>
+              <span>Family XP</span>
+            </div>
+          </div>
+          <div className="stat card">
+            <div className="st-ic st-green">
+              <Icon name="check" />
+            </div>
+            <div>
+              <b>{loading ? '—' : totalCompleted}</b>
+              <span>Lessons done</span>
+            </div>
+          </div>
         </div>
 
         {loading ? (
-          <div className="card pad" style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14 }}>
+          <div
+            className="card pad"
+            style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14 }}
+          >
             Loading dashboard…
           </div>
         ) : children.length === 0 ? (
           <div className="card pad" style={{ textAlign: 'center' }}>
-            <p style={{ color: 'var(--ink-3)', fontSize: 14, marginBottom: 14 }}>No children linked yet. Click &apos;+ Add Child&apos; to link your child&apos;s account.</p>
-            <button className="btn btn-gold btn-sm" onClick={() => setShowLinkModal(true)}>+ Add Child</button>
+            <p style={{ color: 'var(--ink-3)', fontSize: 14, marginBottom: 14 }}>
+              تضيف إدارة الأكاديمية أبناءك بعد التواصل معك، ثم تظهر حساباتهم ودوراتهم هنا.
+            </p>
           </div>
         ) : (
           <>
             {/* ── Children grid ── */}
             <div className="col-head" style={{ marginTop: 8 }}>
-              <h2>My Children <span className="ar muted">أبنائي</span></h2>
+              <h2>
+                My Children <span className="ar muted">أبنائي</span>
+              </h2>
             </div>
             <div className="child-grid">
               {children.map((child, idx) => {
                 const col = CHILD_COLORS[idx % CHILD_COLORS.length];
-                const pct = child.totalLessons > 0
-                  ? Math.round((child.lessonsCompleted / child.totalLessons) * 100)
-                  : 0;
+                const pct =
+                  child.totalLessons > 0
+                    ? Math.round((child.lessonsCompleted / child.totalLessons) * 100)
+                    : 0;
                 return (
                   <div key={child.id} className="child card">
                     <div className="ch-head">
-                      <span className="avatar ch-av" style={{ background: col.bg, color: col.color }}>
+                      <span
+                        className="avatar ch-av"
+                        style={{ background: col.bg, color: col.color }}
+                      >
                         {child.name.charAt(0)}
                       </span>
                       <div>
                         <div className="ch-name">{child.name}</div>
                         <div className="ch-meta capitalize">{child.level}</div>
                       </div>
-                      <span className="mini-chip"><span className="mc-ic"><Icon name="flame" /></span> {child.streak}</span>
-                      <button
-                        style={{ fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}
-                        onClick={async () => {
-                          if (!window.confirm('Unlink this child?')) return;
-                          const token = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
-                          await fetch(`${API_URL}/api/parent/unlink-child`, {
-                            method: 'DELETE',
-                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                            body: JSON.stringify({ childEmail: child.email }),
-                          });
-                          window.location.reload();
-                        }}
-                      >
-                        Unlink
-                      </button>
+                      <span className="mini-chip">
+                        <span className="mc-ic">
+                          <Icon name="flame" />
+                        </span>{' '}
+                        {child.streak}
+                      </span>
                     </div>
 
                     <div className="ch-xp">
-                      <div className="lvl-row"><span>{child.totalPoints} XP</span><span className="capitalize">{child.level}</span></div>
-                      <div className="bar"><i style={{ width: `${pct}%` }}></i></div>
+                      <div className="lvl-row">
+                        <span>{child.totalPoints} XP</span>
+                        <span className="capitalize">{child.level}</span>
+                      </div>
+                      <div className="bar">
+                        <i style={{ width: `${pct}%` }}></i>
+                      </div>
                     </div>
 
                     <div className="ch-stats">
-                      <div><b>{child.courseProgress.length}</b><span>Courses</span></div>
-                      <div><b>{child.lessonsCompleted}</b><span>Lessons done</span></div>
-                      <div><b>{child.streak}</b><span>Day streak</span></div>
+                      <div>
+                        <b>{child.courseProgress.length}</b>
+                        <span>Courses</span>
+                      </div>
+                      <div>
+                        <b>{child.lessonsCompleted}</b>
+                        <span>Lessons done</span>
+                      </div>
+                      <div>
+                        <b>{child.streak}</b>
+                        <span>Day streak</span>
+                      </div>
                     </div>
 
                     <div style={{ marginTop: 12 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-2)', marginBottom: 6 }}>Lesson Progress</div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: 'var(--ink-2)',
+                          marginBottom: 6,
+                        }}
+                      >
+                        Lesson Progress
+                      </div>
                       {child.courseProgress.length === 0 ? (
                         <p style={{ fontSize: 12, color: 'var(--ink-3)' }}>No courses yet.</p>
                       ) : (
                         <ResponsiveContainer width="100%" height={80}>
-                          <BarChart data={child.courseProgress.map((c) => ({ name: c.courseTitle?.slice(0, 8) ?? 'Course', completed: c.completed, total: c.total }))}>
+                          <BarChart
+                            data={child.courseProgress.map((c) => ({
+                              name: c.courseTitle?.slice(0, 8) ?? 'Course',
+                              completed: c.completed,
+                              total: c.total,
+                            }))}
+                          >
                             <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                             <YAxis hide />
                             <Tooltip />
@@ -221,10 +321,33 @@ export default function ParentDashboard() {
                       )}
                     </div>
 
-                    {child.materialProgress?.some(course => course.total > 0) && <div style={{ marginTop: 16 }} dir="rtl">
-                      <h3 style={{ fontSize: 14 }}>إنجاز مواد التعلم</h3><p className="muted" style={{ fontSize: 12 }}>إنجاز يسجله الطالب، مستقل عن الحضور والاختبارات.</p>
-                      {child.materialProgress.filter(course => course.total > 0).map(course => <div key={course.courseId} style={{ marginTop: 10 }}><small>{course.title} · {course.completed}/{course.total}</small><progress aria-label={`إنجاز مواد ${course.title} للطالب ${child.name}`} value={course.completed} max={course.total} style={{ display: 'block', width: '100%', accentColor: 'var(--gold)' }} /></div>)}
-                    </div>}
+                    {child.materialProgress?.some((course) => course.total > 0) && (
+                      <div style={{ marginTop: 16 }} dir="rtl">
+                        <h3 style={{ fontSize: 14 }}>إنجاز مواد التعلم</h3>
+                        <p className="muted" style={{ fontSize: 12 }}>
+                          إنجاز يسجله الطالب، مستقل عن الحضور والاختبارات.
+                        </p>
+                        {child.materialProgress
+                          .filter((course) => course.total > 0)
+                          .map((course) => (
+                            <div key={course.courseId} style={{ marginTop: 10 }}>
+                              <small>
+                                {course.title} · {course.completed}/{course.total}
+                              </small>
+                              <progress
+                                aria-label={`إنجاز مواد ${course.title} للطالب ${child.name}`}
+                                value={course.completed}
+                                max={course.total}
+                                style={{
+                                  display: 'block',
+                                  width: '100%',
+                                  accentColor: 'var(--gold)',
+                                }}
+                              />
+                            </div>
+                          ))}
+                      </div>
+                    )}
 
                     <div className="ch-next">
                       <span className="nx-dot"></span>
@@ -238,87 +361,139 @@ export default function ParentDashboard() {
             {/* ── Bottom grid ── */}
             <div className="dash-grid p-grid">
               <div className="dash-col">
-              <div className="card pad">
-                <div className="col-head sm">
-                  <h3>Attendance timeline <span className="ar muted">سجلّ الحضور</span></h3>
-                </div>
-                {allSessions.length === 0 ? (
-                  <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No sessions yet.</p>
-                ) : (
-                  <ul className="timeline">
-                    {allSessions.map((s) => {
-                      const date = new Date(s.scheduledAt);
-                      return (
-                        <li key={s.id}>
-                          <span className={`tl-dot ${s.attended ? 'ok' : 'miss'}`}></span>
-                          <div className="tl-body">
-                            <div className="tl-row">
-                              <b>{s.lessonTitle}</b>
-                              <span className={`tl-tag ${s.attended ? 'ok' : 'miss'}`}>
-                                {s.attended ? 'Attended' : 'Missed'}
+                <div className="card pad">
+                  <div className="col-head sm">
+                    <h3>
+                      Attendance timeline <span className="ar muted">سجلّ الحضور</span>
+                    </h3>
+                  </div>
+                  {allSessions.length === 0 ? (
+                    <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No sessions yet.</p>
+                  ) : (
+                    <ul className="timeline">
+                      {allSessions.map((s) => {
+                        const date = new Date(s.scheduledAt);
+                        return (
+                          <li key={s.id}>
+                            <span className={`tl-dot ${s.attended ? 'ok' : 'miss'}`}></span>
+                            <div className="tl-body">
+                              <div className="tl-row">
+                                <b>{s.lessonTitle}</b>
+                                <span className={`tl-tag ${s.attended ? 'ok' : 'miss'}`}>
+                                  {s.attended ? 'Attended' : 'Missed'}
+                                </span>
+                              </div>
+                              <span className="tl-sub">
+                                {children.length > 1 ? `${s.childName} · ` : ''}
+                                {s.courseTitle} ·{' '}
+                                {date.toLocaleDateString('en', { month: 'short', day: 'numeric' })}
                               </span>
                             </div>
-                            <span className="tl-sub">
-                              {children.length > 1 ? `${s.childName} · ` : ''}{s.courseTitle} · {date.toLocaleDateString('en', { month: 'short', day: 'numeric' })}
-                            </span>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
-
-              {/* ── Children progress overview: XP & streak comparison ── */}
-              <div className="card pad" style={{ marginTop: 16 }}>
-                <div className="col-head sm">
-                  <h3>XP Comparison <span className="ar muted">مقارنة النقاط</span></h3>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                 </div>
-                {children.length === 0 ? (
-                  <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No children linked yet.</p>
-                ) : (
-                  <ResponsiveContainer width="100%" height={180}>
-                    <BarChart data={children.map((c) => ({ name: c.name, xp: c.totalPoints, streak: c.streak }))}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" />
-                      <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                      <YAxis tick={{ fontSize: 11 }} />
-                      <Tooltip />
-                      <Bar dataKey="xp" name="Total XP" fill="#C9922A" radius={6} />
-                      <Bar dataKey="streak" name="Streak (days)" fill="#1B3A6B" radius={6} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
+
+                {/* ── Children progress overview: XP & streak comparison ── */}
+                <div className="card pad" style={{ marginTop: 16 }}>
+                  <div className="col-head sm">
+                    <h3>
+                      XP Comparison <span className="ar muted">مقارنة النقاط</span>
+                    </h3>
+                  </div>
+                  {children.length === 0 ? (
+                    <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No children linked yet.</p>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={180}>
+                      <BarChart
+                        data={children.map((c) => ({
+                          name: c.name,
+                          xp: c.totalPoints,
+                          streak: c.streak,
+                        }))}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" />
+                        <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                        <YAxis tick={{ fontSize: 11 }} />
+                        <Tooltip />
+                        <Bar dataKey="xp" name="Total XP" fill="#C9922A" radius={6} />
+                        <Bar dataKey="streak" name="Streak (days)" fill="#1B3A6B" radius={6} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
               </div>
 
               <div className="dash-col">
-                {children.filter(child => child.quizResults?.length > 0).map(child => <section key={child.id} className="card pad" dir="rtl" aria-label="نتائج اختبارات الطالب">
-                  <h3>نتائج اختبارات {child.name}</h3>
-                  <p className="muted">آخر 20 محاولة. النتيجة نهائية بعد اكتمال تصحيح الإجابات الكتابية.</p>
-                  <ul style={{ paddingInlineStart: 20 }}>{child.quizResults.map(result => <li key={result.id} style={{ marginBottom: 10 }}>
-                    <b>{result.quizTitle}</b> · {result.status === 'PENDING_REVIEW' ? 'بانتظار تصحيح المعلم' : `${result.score}% · ${result.passed ? 'ناجح' : 'لم يجتز'}`}
-                  </li>)}</ul>
-                </section>)}
+                {children
+                  .filter((child) => child.quizResults?.length > 0)
+                  .map((child) => (
+                    <section
+                      key={child.id}
+                      className="card pad"
+                      dir="rtl"
+                      aria-label="نتائج اختبارات الطالب"
+                    >
+                      <h3>نتائج اختبارات {child.name}</h3>
+                      <p className="muted">
+                        آخر 20 محاولة. النتيجة نهائية بعد اكتمال تصحيح الإجابات الكتابية.
+                      </p>
+                      <ul style={{ paddingInlineStart: 20 }}>
+                        {child.quizResults.map((result) => (
+                          <li key={result.id} style={{ marginBottom: 10 }}>
+                            <b>{result.quizTitle}</b> ·{' '}
+                            {result.status === 'PENDING_REVIEW'
+                              ? 'بانتظار تصحيح المعلم'
+                              : `${result.score}% · ${result.passed ? 'ناجح' : 'لم يجتز'}`}
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  ))}
 
                 <div className="card pad report-card" id="reports">
-                  <div className="col-head sm"><h3>Learning summary</h3></div>
+                  <div className="col-head sm">
+                    <h3>Learning summary</h3>
+                  </div>
                   <div className="rep-big">
                     <b>{totalCompleted}</b>
                     <span>lessons attended</span>
                   </div>
                   <div className="rep-rows">
-                    <div className="rep-row"><span>Total XP earned</span><b>{familyXP}</b></div>
-                    <div className="rep-row"><span>Lessons done</span><b>{totalCompleted} / {children.reduce((s, c) => s + c.totalLessons, 0)}</b></div>
-                    <div className="rep-row"><span>Active children</span><b>{children.length}</b></div>
+                    <div className="rep-row">
+                      <span>Total XP earned</span>
+                      <b>{familyXP}</b>
+                    </div>
+                    <div className="rep-row">
+                      <span>Lessons done</span>
+                      <b>
+                        {totalCompleted} / {children.reduce((s, c) => s + c.totalLessons, 0)}
+                      </b>
+                    </div>
+                    <div className="rep-row">
+                      <span>Active children</span>
+                      <b>{children.length}</b>
+                    </div>
                   </div>
-                  <p className="rep-note">Keep supporting your children&apos;s learning! <Icon name="star" /></p>
+                  <p className="rep-note">
+                    Keep supporting your children&apos;s learning! <Icon name="star" />
+                  </p>
                 </div>
 
                 <div className="card pad">
-                  <div className="col-head sm"><h3>Plan</h3></div>
+                  <div className="col-head sm">
+                    <h3>Plan</h3>
+                  </div>
                   <div className="pay-row">
-                    <div><b>Course enrollment</b><span>Browse available courses</span></div>
-                    <Link href="/courses" className="link-gold">Manage</Link>
+                    <div>
+                      <b>Course enrollment</b>
+                      <span>Browse available courses</span>
+                    </div>
+                    <Link href="/courses" className="link-gold">
+                      Manage
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -327,52 +502,6 @@ export default function ParentDashboard() {
         )}
 
         {/* ── Link-a-child modal ── */}
-        {showLinkModal && (
-          <div className="modal-bg" onClick={(e) => { if (e.target === e.currentTarget) setShowLinkModal(false); }}>
-            <div className="modal">
-              <div className="modal-head">
-                <h3>Link a Child</h3>
-                <button className="modal-x" aria-label="Close" onClick={() => setShowLinkModal(false)}><Icon name="close" /></button>
-              </div>
-              <div className="modal-body">
-                <p style={{ fontSize: 14, color: 'var(--ink-2)', marginBottom: 16 }}>
-                  Enter your child&apos;s email and the one-time code generated from their Account page.
-                </p>
-                <div className="field">
-                  <label>Child&apos;s email address</label>
-                  <input className="input" type="email" placeholder="child@example.com"
-                    value={childEmail} onChange={(e) => setChildEmail(e.target.value)} />
-                </div>
-                <label className="field">Linking code<input className="input" value={linkCode} onChange={(e) => setLinkCode(e.target.value)} placeholder="Code from the student account" /></label>
-                {linkError && <div className="auth-error">{linkError}</div>}
-              </div>
-              <div className="modal-foot">
-                <button className="btn btn-outline" onClick={() => setShowLinkModal(false)}>Cancel</button>
-                <button className="btn btn-gold" disabled={linkLoading}
-                  onClick={async () => {
-                    setLinkError('');
-                    setLinkLoading(true);
-                    try {
-                      const token = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
-                      const res = await fetch(`${API_URL}/api/parent/link-child`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                        body: JSON.stringify({ childEmail, linkCode }),
-                      });
-                      const data = await res.json();
-                      if (!res.ok) { setLinkError(data.error || 'Failed to link child'); return; }
-                      setShowLinkModal(false);
-                      setChildEmail(''); setLinkCode('');
-                      window.location.reload(); // refresh to show new child
-                    } catch { setLinkError('Could not connect to server'); }
-                    finally { setLinkLoading(false); }
-                  }}>
-                  {linkLoading ? 'Linking…' : 'Link Child'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </main>
     </div>
   );

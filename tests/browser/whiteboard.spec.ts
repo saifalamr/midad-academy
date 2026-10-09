@@ -1,27 +1,58 @@
 import { test, expect, type Page } from '@playwright/test';
-test('two participants keep concurrent drawings, undo only their edits, erase and restore a saved board', async ({ browser, request }) => {
-  const login = async (email: string) => (await (await request.post('http://127.0.0.1:4000/api/auth/login', { data: { email, password: 'MidadPreview2026!' } })).json()).data;
-  const teacherAuth = await login('teacher@preview.midad.test'); const studentAuth = await login('student@preview.midad.test');
-  await request.post('http://127.0.0.1:4000/api/payments/create-checkout', { headers: { Authorization: `Bearer ${studentAuth.token}` }, data: { courseId: 'preview-arabic' } });
-  const grant = await request.post('http://127.0.0.1:4000/api/sessions/drawing-permission', { headers: { Authorization: `Bearer ${teacherAuth.token}` }, data: { roomName: 'preview-arabic', studentId: studentAuth.user.id, canDraw: true } });
+test('two participants keep concurrent drawings, undo only their edits, erase and restore a saved board', async ({
+  browser,
+  request,
+}) => {
+  const login = async (email: string) =>
+    (
+      await (
+        await request.post('http://127.0.0.1:4000/api/auth/login', {
+          data: { email, password: 'MidadPreview2026!' },
+        })
+      ).json()
+    ).data;
+  const teacherAuth = await login('teacher@preview.midad.test');
+  const studentAuth = await login('student@preview.midad.test');
+  const grant = await request.post('http://127.0.0.1:4000/api/sessions/drawing-permission', {
+    headers: { Authorization: `Bearer ${teacherAuth.token}` },
+    data: { roomName: 'preview-arabic', studentId: studentAuth.user.id, canDraw: true },
+  });
   expect(grant.ok(), await grant.text()).toBeTruthy();
   const teacherContext = await browser.newContext({ viewport: { width: 1000, height: 900 } });
-  const studentContext = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
-  await teacherContext.addInitScript(token => localStorage.setItem('token', token), teacherAuth.token);
-  await studentContext.addInitScript(token => localStorage.setItem('token', token), studentAuth.token);
-  const teacher = await teacherContext.newPage(); const student = await studentContext.newPage();
-  const errors: string[] = []; [teacher,student].forEach(p => p.on('pageerror',e => errors.push(e.message)));
-  for (const page of [teacher, student]) { await page.goto('/courses/preview-arabic/board'); await expect(page.getByText('متزامنة', { exact: true })).toBeVisible(); }
+  const studentContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+  });
+  await teacherContext.addInitScript(
+    (token) => localStorage.setItem('token', token),
+    teacherAuth.token
+  );
+  await studentContext.addInitScript(
+    (token) => localStorage.setItem('token', token),
+    studentAuth.token
+  );
+  const teacher = await teacherContext.newPage();
+  const student = await studentContext.newPage();
+  const errors: string[] = [];
+  [teacher, student].forEach((p) => p.on('pageerror', (e) => errors.push(e.message)));
+  for (const page of [teacher, student]) {
+    await page.goto('/courses/preview-arabic/board');
+    await expect(page.getByText('متزامنة', { exact: true })).toBeVisible();
+  }
   const shape = async (page: Page, name: string, position: number) => {
     await page.getByRole('button', { name, exact: true }).click();
     const box = (await page.locator('canvas.upper-canvas').boundingBox())!;
-    await page.mouse.click(box.x+box.width*position,box.y+box.height*.5);
+    await page.mouse.click(box.x + box.width * position, box.y + box.height * 0.5);
   };
-  const ink = (page: Page) => page.locator('canvas.lower-canvas').evaluate((c: HTMLCanvasElement) => {
-    const a = c.getContext('2d')!.getImageData(0,0,c.width,c.height).data; let n=0;
-    for(let i=0;i<a.length;i+=4) if(a[i]<100&&a[i+1]<120&&a[i+2]>50&&a[i+3]>100)n++; return n;
-  });
-  await Promise.all([shape(teacher,'مستطيل',.25), shape(student,'دائرة',.75)]);
+  const ink = (page: Page) =>
+    page.locator('canvas.lower-canvas').evaluate((c: HTMLCanvasElement) => {
+      const a = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
+      let n = 0;
+      for (let i = 0; i < a.length; i += 4)
+        if (a[i] < 100 && a[i + 1] < 120 && a[i + 2] > 50 && a[i + 3] > 100) n++;
+      return n;
+    });
+  await Promise.all([shape(teacher, 'مستطيل', 0.25), shape(student, 'دائرة', 0.75)]);
   await expect.poll(() => ink(teacher)).toBeGreaterThan(100);
   await expect.poll(() => ink(student)).toBeGreaterThan(20);
   const withBoth = await ink(teacher);
@@ -30,75 +61,94 @@ test('two participants keep concurrent drawings, undo only their edits, erase an
   expect(await ink(teacher)).toBeGreaterThan(0); // Student's independent stroke survives teacher undo.
   await teacher.getByRole('button', { name: 'إعادة', exact: true }).click();
   await expect.poll(() => ink(teacher)).toBe(withBoth);
-  await student.reload(); await expect(student.getByText('متزامنة',{exact:true})).toBeVisible();
+  await student.reload();
+  await expect(student.getByText('متزامنة', { exact: true })).toBeVisible();
   await expect.poll(() => ink(student)).toBeGreaterThan(20);
-  teacher.once('dialog', d=>d.accept()); await teacher.getByRole('button',{name:'مسح',exact:true}).click();
+  teacher.once('dialog', (d) => d.accept());
+  await teacher.getByRole('button', { name: 'مسح', exact: true }).click();
   await expect.poll(() => ink(student)).toBe(0);
-  await teacher.getByRole('button',{name:'تراجع',exact:true}).click();
+  await teacher.getByRole('button', { name: 'تراجع', exact: true }).click();
   await expect.poll(() => ink(student)).toBeGreaterThan(20);
   const beforeErase = await ink(teacher);
-  await shape(teacher, 'ممحاة', .25);
+  await shape(teacher, 'ممحاة', 0.25);
   await expect.poll(() => ink(teacher)).toBeLessThan(beforeErase);
-  await teacher.getByRole('button',{name:'تراجع',exact:true}).click();
+  await teacher.getByRole('button', { name: 'تراجع', exact: true }).click();
   await expect.poll(() => ink(teacher)).toBe(beforeErase);
   // Partial erasing cuts two separate holes without deleting the rectangle.
-  await teacher.getByRole('button',{name:'ممحاة',exact:true}).click();
+  await teacher.getByRole('button', { name: 'ممحاة', exact: true }).click();
   await teacher.getByLabel('نوع الممحاة').selectOption('partial');
   const bounds = (await teacher.locator('canvas.upper-canvas').boundingBox())!;
-  const scale = Math.min(bounds.width/1000, bounds.height/520);
-  const eraseAt = async (offset: number) => teacher.mouse.click(bounds.x+bounds.width*.25, bounds.y+bounds.height*.5+offset*scale);
+  const scale = Math.min(bounds.width / 1000, bounds.height / 520);
+  const eraseAt = async (offset: number) =>
+    teacher.mouse.click(
+      bounds.x + bounds.width * 0.25,
+      bounds.y + bounds.height * 0.5 + offset * scale
+    );
   const full = await ink(teacher);
   await eraseAt(-40);
   await expect.poll(() => ink(teacher)).toBeLessThan(full);
-  const firstHole = await ink(teacher); expect(firstHole).toBeGreaterThan(full*.5);
+  const firstHole = await ink(teacher);
+  expect(firstHole).toBeGreaterThan(full * 0.5);
   await eraseAt(40);
   await expect.poll(() => ink(teacher)).toBeLessThan(firstHole);
-  const bothHoles = await ink(teacher); expect(bothHoles).toBeGreaterThan(full*.4);
-  await student.reload(); await expect(student.getByText('متزامنة',{exact:true})).toBeVisible();
+  const bothHoles = await ink(teacher);
+  expect(bothHoles).toBeGreaterThan(full * 0.4);
+  await student.reload();
+  await expect(student.getByText('متزامنة', { exact: true })).toBeVisible();
   const maskedOnStudent = await ink(student);
-  await teacher.getByRole('button',{name:'تراجع',exact:true}).click();
+  await teacher.getByRole('button', { name: 'تراجع', exact: true }).click();
   await expect.poll(() => ink(teacher)).toBe(firstHole);
   await expect.poll(() => ink(student)).toBeGreaterThan(maskedOnStudent);
-  await teacher.getByRole('button',{name:'تراجع',exact:true}).click();
+  await teacher.getByRole('button', { name: 'تراجع', exact: true }).click();
   await expect.poll(() => ink(teacher)).toBe(full);
   // The text editor must open and focus directly from a phone touch gesture.
-  await student.getByRole('button',{name:'نص',exact:true}).click();
+  await student.getByRole('button', { name: 'نص', exact: true }).click();
   const mobileBoard = (await student.locator('canvas.upper-canvas').boundingBox())!;
-  await student.touchscreen.tap(mobileBoard.x+mobileBoard.width*.4, mobileBoard.y+mobileBoard.height*.5);
+  await student.touchscreen.tap(
+    mobileBoard.x + mobileBoard.width * 0.4,
+    mobileBoard.y + mobileBoard.height * 0.5
+  );
   await expect(student.getByLabel('نص السبورة')).toBeFocused();
   await student.getByLabel('نص السبورة').fill('مرحباً يا سيف');
   const beforeText = await ink(teacher);
-  await student.getByRole('button',{name:'تثبيت النص',exact:true}).tap();
+  await student.getByRole('button', { name: 'تثبيت النص', exact: true }).tap();
   await expect(student.getByLabel('نص السبورة')).toHaveCount(0);
   await expect.poll(() => ink(teacher)).toBeGreaterThan(beforeText);
-  await student.reload(); await expect(student.getByText('متزامنة',{exact:true})).toBeVisible();
+  await student.reload();
+  await expect(student.getByText('متزامنة', { exact: true })).toBeVisible();
   await expect.poll(() => ink(student)).toBeGreaterThan(maskedOnStudent);
   // Erasing a dragged segment of a freehand stroke must leave the rest intact.
   const beforeLine = await ink(teacher);
-  await teacher.getByRole('button',{name:'قلم',exact:true}).click();
-  const y = bounds.y+bounds.height*.5-100*scale;
-  await teacher.mouse.move(bounds.x+bounds.width*.4,y); await teacher.mouse.down();
-  await teacher.mouse.move(bounds.x+bounds.width*.6,y,{steps:12}); await teacher.mouse.up();
+  await teacher.getByRole('button', { name: 'قلم', exact: true }).click();
+  const y = bounds.y + bounds.height * 0.5 - 100 * scale;
+  await teacher.mouse.move(bounds.x + bounds.width * 0.4, y);
+  await teacher.mouse.down();
+  await teacher.mouse.move(bounds.x + bounds.width * 0.6, y, { steps: 12 });
+  await teacher.mouse.up();
   await expect.poll(() => ink(teacher)).toBeGreaterThan(beforeLine);
   const withLine = await ink(teacher);
-  await teacher.getByRole('button',{name:'ممحاة',exact:true}).click();
-  await teacher.mouse.move(bounds.x+bounds.width*.5,y-25*scale); await teacher.mouse.down();
-  await teacher.mouse.move(bounds.x+bounds.width*.5,y+25*scale,{steps:8}); await teacher.mouse.up();
+  await teacher.getByRole('button', { name: 'ممحاة', exact: true }).click();
+  await teacher.mouse.move(bounds.x + bounds.width * 0.5, y - 25 * scale);
+  await teacher.mouse.down();
+  await teacher.mouse.move(bounds.x + bounds.width * 0.5, y + 25 * scale, { steps: 8 });
+  await teacher.mouse.up();
   await expect.poll(() => ink(teacher)).toBeLessThan(withLine);
   expect(await ink(teacher)).toBeGreaterThan(beforeLine);
-  await teacher.getByRole('button',{name:'تراجع',exact:true}).click();
+  await teacher.getByRole('button', { name: 'تراجع', exact: true }).click();
   await expect.poll(() => ink(teacher)).toBe(withLine);
   // A phone losing network must stop editing and receive missed teacher ink on reconnect.
   const beforeOffline = await ink(student);
   await studentContext.setOffline(true);
   await expect(student.getByText('الاتصال منقطع — الرسم متوقف', { exact: true })).toBeVisible();
-  await shape(teacher, 'مستطيل', .9);
+  await shape(teacher, 'مستطيل', 0.9);
   await expect.poll(() => ink(teacher)).toBeGreaterThan(withLine);
   await studentContext.setOffline(false);
   await expect(student.getByText('متزامنة', { exact: true })).toBeVisible();
   await expect.poll(() => ink(student)).toBeGreaterThan(beforeOffline);
-  const download = teacher.waitForEvent('download'); await teacher.getByRole('button',{name:'حفظ صورة',exact:true}).click();
+  const download = teacher.waitForEvent('download');
+  await teacher.getByRole('button', { name: 'حفظ صورة', exact: true }).click();
   expect((await download).suggestedFilename()).toMatch(/midad-board.*\.png/);
   expect(errors).toEqual([]);
-  await teacherContext.close(); await studentContext.close();
+  await teacherContext.close();
+  await studentContext.close();
 });

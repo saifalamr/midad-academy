@@ -1,6 +1,7 @@
 'use client';
 
 import Icon from '@/components/Icon';
+import { useAuth, dashboardPath } from '@/components/AuthProvider';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { API_URL } from '@/lib/config';
@@ -69,7 +70,10 @@ function buildQuestionPayload(q: DraftQuestion): Record<string, unknown> {
 const TYPE_ICON = { VIDEO: 'video', PDF: 'file', EXERCISE: 'edit' } as const;
 
 function authFetch(path: string, options: RequestInit = {}) {
-  const token = typeof window !== 'undefined' ? (localStorage.getItem('token') ?? sessionStorage.getItem('token')) : null;
+  const token =
+    typeof window !== 'undefined'
+      ? (localStorage.getItem('token') ?? sessionStorage.getItem('token'))
+      : null;
   return fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
@@ -82,6 +86,10 @@ function authFetch(path: string, options: RequestInit = {}) {
 
 export default function CourseContentPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  useEffect(() => {
+    if (user && user.role !== 'ADMIN') router.replace(dashboardPath(user.role));
+  }, [user, router]);
   const params = useParams();
   const courseId = params.id as string;
 
@@ -118,7 +126,10 @@ export default function CourseContentPage() {
   useEffect(() => {
     authFetch(`/api/courses/${courseId}/lessons`)
       .then(async (res) => {
-        if (res.status === 401) { router.push('/login'); return; }
+        if (res.status === 401) {
+          router.push('/login');
+          return;
+        }
         const json = await res.json();
         setLessons(json.data ?? []);
       })
@@ -142,10 +153,17 @@ export default function CourseContentPage() {
         }),
       });
       const json = await res.json();
-      if (!res.ok) { setFormError(json.error || 'Failed to add lesson'); return; }
+      if (!res.ok) {
+        setFormError(json.error || 'Failed to add lesson');
+        return;
+      }
       setLessons((prev) => [...prev, json.data]);
       setShowModal(false);
-      setTitle(''); setDescription(''); setType('VIDEO'); setContentUrl(''); setDuration('');
+      setTitle('');
+      setDescription('');
+      setType('VIDEO');
+      setContentUrl('');
+      setDuration('');
     } catch {
       setFormError('Could not connect to server');
     } finally {
@@ -166,7 +184,7 @@ export default function CourseContentPage() {
     setUploadError('');
     setUploading(true);
     try {
-      const token = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
+      const token = localStorage.getItem('token') ?? sessionStorage.getItem('token');
       const formData = new FormData();
       formData.append('file', file);
 
@@ -176,7 +194,10 @@ export default function CourseContentPage() {
         body: formData,
       });
       const json = await res.json();
-      if (!res.ok) { setUploadError(json.error || 'Failed to upload file'); return; }
+      if (!res.ok) {
+        setUploadError(json.error || 'Failed to upload file');
+        return;
+      }
 
       // Pre-fill the Add Lesson modal with the uploaded file's URL.
       setTitle('');
@@ -212,8 +233,14 @@ export default function CourseContentPage() {
     setLessons(reordered);
 
     await Promise.all([
-      authFetch(`/api/lessons/${a.id}`, { method: 'PATCH', body: JSON.stringify({ order: b.order }) }),
-      authFetch(`/api/lessons/${b.id}`, { method: 'PATCH', body: JSON.stringify({ order: a.order }) }),
+      authFetch(`/api/lessons/${a.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ order: b.order }),
+      }),
+      authFetch(`/api/lessons/${b.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ order: a.order }),
+      }),
     ]);
   }
 
@@ -245,7 +272,10 @@ export default function CourseContentPage() {
     try {
       const res = await authFetch(`/api/quiz/${lesson.quiz.id}`);
       const json = await res.json();
-      if (!res.ok) { setQuizError(json.error || 'Failed to load quiz'); return; }
+      if (!res.ok) {
+        setQuizError(json.error || 'Failed to load quiz');
+        return;
+      }
 
       const fetched: FetchedQuestion[] = json.data?.questions ?? [];
       const drafts: DraftQuestion[] = fetched.map((q) => ({
@@ -254,7 +284,9 @@ export default function CourseContentPage() {
         questionType: q.questionType ?? 'MCQ',
         options: Array.isArray(q.options)
           ? q.options.map(String)
-          : q.questionType === 'TRUE_FALSE' ? ['True', 'False'] : ['', ''],
+          : q.questionType === 'TRUE_FALSE'
+            ? ['True', 'False']
+            : ['', ''],
         correctAnswer: q.correctAnswer ?? '',
         points: String(q.points ?? 1),
       }));
@@ -275,28 +307,34 @@ export default function CourseContentPage() {
   }
 
   function updateOption(qIdx: number, oIdx: number, value: string) {
-    setQuestions((prev) => prev.map((q, i) => {
-      if (i !== qIdx) return q;
-      const options = [...q.options];
-      const oldValue = options[oIdx];
-      options[oIdx] = value;
-      // Keep correctAnswer in sync if it pointed at the option being edited.
-      const correctAnswer = q.correctAnswer === oldValue ? value : q.correctAnswer;
-      return { ...q, options, correctAnswer };
-    }));
+    setQuestions((prev) =>
+      prev.map((q, i) => {
+        if (i !== qIdx) return q;
+        const options = [...q.options];
+        const oldValue = options[oIdx];
+        options[oIdx] = value;
+        // Keep correctAnswer in sync if it pointed at the option being edited.
+        const correctAnswer = q.correctAnswer === oldValue ? value : q.correctAnswer;
+        return { ...q, options, correctAnswer };
+      })
+    );
   }
 
   function addOption(qIdx: number) {
-    setQuestions((prev) => prev.map((q, i) => (i === qIdx ? { ...q, options: [...q.options, ''] } : q)));
+    setQuestions((prev) =>
+      prev.map((q, i) => (i === qIdx ? { ...q, options: [...q.options, ''] } : q))
+    );
   }
 
   function removeOption(qIdx: number, oIdx: number) {
-    setQuestions((prev) => prev.map((q, i) => {
-      if (i !== qIdx) return q;
-      const removed = q.options[oIdx];
-      const options = q.options.filter((_, j) => j !== oIdx);
-      return { ...q, options, correctAnswer: q.correctAnswer === removed ? '' : q.correctAnswer };
-    }));
+    setQuestions((prev) =>
+      prev.map((q, i) => {
+        if (i !== qIdx) return q;
+        const removed = q.options[oIdx];
+        const options = q.options.filter((_, j) => j !== oIdx);
+        return { ...q, options, correctAnswer: q.correctAnswer === removed ? '' : q.correctAnswer };
+      })
+    );
   }
 
   function addQuestion() {
@@ -311,9 +349,15 @@ export default function CourseContentPage() {
     if (!quizLesson) return;
     setQuizError('');
 
-    if (!quizTitle.trim()) { setQuizError('Quiz title is required'); return; }
+    if (!quizTitle.trim()) {
+      setQuizError('Quiz title is required');
+      return;
+    }
     for (const [i, q] of questions.entries()) {
-      if (!q.text.trim()) { setQuizError(`Question ${i + 1}: text is required`); return; }
+      if (!q.text.trim()) {
+        setQuizError(`Question ${i + 1}: text is required`);
+        return;
+      }
       if (q.questionType === 'WRITTEN') continue;
       if (q.questionType === 'TRUE_FALSE') {
         if (q.correctAnswer !== 'True' && q.correctAnswer !== 'False') {
@@ -323,7 +367,10 @@ export default function CourseContentPage() {
         continue;
       }
       const opts = q.options.map((o) => o.trim()).filter(Boolean);
-      if (opts.length < 2) { setQuizError(`Question ${i + 1}: at least two options are required`); return; }
+      if (opts.length < 2) {
+        setQuizError(`Question ${i + 1}: at least two options are required`);
+        return;
+      }
       if (!q.correctAnswer.trim() || !opts.includes(q.correctAnswer.trim())) {
         setQuizError(`Question ${i + 1}: select the correct answer`);
         return;
@@ -349,7 +396,9 @@ export default function CourseContentPage() {
         const currentIds = new Set(questions.map((q) => q.id).filter(Boolean));
         const toDelete = originalQuestionIds.filter((id) => !currentIds.has(id));
         for (const qid of toDelete) {
-          const delRes = await authFetch(`/api/quiz/${editingQuizId}/questions/${qid}`, { method: 'DELETE' });
+          const delRes = await authFetch(`/api/quiz/${editingQuizId}/questions/${qid}`, {
+            method: 'DELETE',
+          });
           if (!delRes.ok && delRes.status !== 204) {
             setQuizError('Failed to remove a question');
             return;
@@ -360,8 +409,14 @@ export default function CourseContentPage() {
         for (const q of questions) {
           const payload = buildQuestionPayload(q);
           const res = q.id
-            ? await authFetch(`/api/quiz/${editingQuizId}/questions/${q.id}`, { method: 'PATCH', body: JSON.stringify(payload) })
-            : await authFetch(`/api/quiz/${editingQuizId}/questions`, { method: 'POST', body: JSON.stringify(payload) });
+            ? await authFetch(`/api/quiz/${editingQuizId}/questions/${q.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify(payload),
+              })
+            : await authFetch(`/api/quiz/${editingQuizId}/questions`, {
+                method: 'POST',
+                body: JSON.stringify(payload),
+              });
           if (!res.ok) {
             const j = await res.json();
             setQuizError(j.error || 'Failed to save a question');
@@ -369,11 +424,16 @@ export default function CourseContentPage() {
           }
         }
 
-        setLessons((prev) => prev.map((l) => (
-          l.id === quizLesson.id && l.quiz
-            ? { ...l, quiz: { ...l.quiz, title: quizTitle.trim(), passingScore: nextPassingScore } }
-            : l
-        )));
+        setLessons((prev) =>
+          prev.map((l) =>
+            l.id === quizLesson.id && l.quiz
+              ? {
+                  ...l,
+                  quiz: { ...l.quiz, title: quizTitle.trim(), passingScore: nextPassingScore },
+                }
+              : l
+          )
+        );
         setQuizLesson(null);
         return;
       }
@@ -384,7 +444,10 @@ export default function CourseContentPage() {
         body: JSON.stringify({ title: quizTitle, passingScore: nextPassingScore }),
       });
       const quizJson = await quizRes.json();
-      if (!quizRes.ok) { setQuizError(quizJson.error || 'Failed to create quiz'); return; }
+      if (!quizRes.ok) {
+        setQuizError(quizJson.error || 'Failed to create quiz');
+        return;
+      }
 
       const quizId = quizJson.data.id as string;
 
@@ -400,11 +463,13 @@ export default function CourseContentPage() {
         }
       }
 
-      setLessons((prev) => prev.map((l) => (
-        l.id === quizLesson.id
-          ? { ...l, quiz: { id: quizId, title: quizTitle, passingScore: nextPassingScore } }
-          : l
-      )));
+      setLessons((prev) =>
+        prev.map((l) =>
+          l.id === quizLesson.id
+            ? { ...l, quiz: { id: quizId, title: quizTitle, passingScore: nextPassingScore } }
+            : l
+        )
+      );
       setQuizLesson(null);
     } catch {
       setQuizError('Could not connect to server');
@@ -413,11 +478,17 @@ export default function CourseContentPage() {
     }
   }
 
+  if (user?.role !== 'ADMIN')
+    return <p role="status">هذه الصفحة لإدارة المنهج بواسطة الأكاديمية.</p>;
+
   return (
     <div className="midad" style={{ background: 'var(--paper)', minHeight: '100vh' }}>
-
       <div className="wrap" style={{ paddingTop: 32, paddingBottom: 48 }}>
-        <button className="btn btn-sm btn-outline" onClick={() => router.push('/teacher')} style={{ marginBottom: 16 }}>
+        <button
+          className="btn btn-sm btn-outline"
+          onClick={() => router.push('/admin')}
+          style={{ marginBottom: 16 }}
+        >
           <Icon name="left" /> Back to dashboard
         </button>
 
@@ -434,29 +505,55 @@ export default function CourseContentPage() {
               style={{ display: 'none' }}
               onChange={handleFileSelected}
             />
-            <button className="btn btn-outline btn-lg" onClick={handleUploadClick} disabled={uploading}
-              style={{ opacity: uploading ? 0.65 : 1 }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>
+            <button
+              className="btn btn-outline btn-lg"
+              onClick={handleUploadClick}
+              disabled={uploading}
+              style={{ opacity: uploading ? 0.65 : 1 }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+                <path d="M12 16V4M6 10l6-6 6 6M4 20h16" />
+              </svg>
               {uploading ? 'Uploading…' : 'Upload File'}
             </button>
-            <button className="btn btn-gold btn-lg" onClick={() => {
-              setTitle(''); setDescription(''); setType('VIDEO'); setContentUrl(''); setDuration(''); setFormError('');
-              setShowModal(true);
-            }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M12 5v14M5 12h14"/></svg>
+            <button
+              className="btn btn-gold btn-lg"
+              onClick={() => {
+                setTitle('');
+                setDescription('');
+                setType('VIDEO');
+                setContentUrl('');
+                setDuration('');
+                setFormError('');
+                setShowModal(true);
+              }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
               Add Lesson
             </button>
           </div>
         </div>
 
-        {uploadError && <div className="auth-error" style={{ marginBottom: 16 }}>{uploadError}</div>}
+        {uploadError && (
+          <div className="auth-error" style={{ marginBottom: 16 }}>
+            {uploadError}
+          </div>
+        )}
 
         {loading ? (
-          <div className="card pad" style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14 }}>
+          <div
+            className="card pad"
+            style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14 }}
+          >
             Loading lessons…
           </div>
         ) : lessons.length === 0 ? (
-          <div className="card pad" style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14 }}>
+          <div
+            className="card pad"
+            style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14 }}
+          >
             No lessons yet — click &quot;Add Lesson&quot; to create your first one.
           </div>
         ) : (
@@ -469,7 +566,8 @@ export default function CourseContentPage() {
                   alignItems: 'center',
                   gap: 16,
                   padding: '16px 20px',
-                  borderBottom: idx < lessons.length - 1 ? '1px solid var(--line, #e5e7eb)' : 'none',
+                  borderBottom:
+                    idx < lessons.length - 1 ? '1px solid var(--line, #e5e7eb)' : 'none',
                 }}
               >
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -493,7 +591,9 @@ export default function CourseContentPage() {
                   </button>
                 </div>
 
-                <div style={{ fontSize: 24 }}><Icon name={TYPE_ICON[lesson.type]} size={26} /></div>
+                <div style={{ fontSize: 24 }}>
+                  <Icon name={TYPE_ICON[lesson.type]} size={26} />
+                </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700 }}>{lesson.title}</div>
@@ -501,11 +601,20 @@ export default function CourseContentPage() {
                 </div>
 
                 <span className="pill pill-navy">{lesson.type}</span>
-                <span style={{ fontSize: 13, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{lesson.duration} min</span>
+                <span style={{ fontSize: 13, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
+                  {lesson.duration} min
+                </span>
 
                 {lesson.quiz ? (
                   <>
-                    <span className="pill" style={{ background: 'rgba(27,58,107,.08)', color: 'var(--navy)', whiteSpace: 'nowrap' }}>
+                    <span
+                      className="pill"
+                      style={{
+                        background: 'rgba(27,58,107,.08)',
+                        color: 'var(--navy)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
                       <Icon name="check" /> Quiz added
                     </span>
                     <button className="btn btn-sm btn-outline" onClick={() => openEditQuiz(lesson)}>
@@ -533,35 +642,61 @@ export default function CourseContentPage() {
 
       {/* ── Add lesson modal ── */}
       {showModal && (
-        <div className="modal-bg" onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}>
+        <div
+          className="modal-bg"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowModal(false);
+          }}
+        >
           <div className="modal">
             <div className="modal-head">
-              <div><h3>Add Lesson</h3></div>
+              <div>
+                <h3>Add Lesson</h3>
+              </div>
               <button className="modal-x" onClick={() => setShowModal(false)}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 6l12 12M18 6 6 18"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M6 6l12 12M18 6 6 18" />
+                </svg>
               </button>
             </div>
 
             <form ref={formRef} onSubmit={handleAddLesson} className="modal-body">
               <div className="field">
                 <label htmlFor="l-title">Title</label>
-                <input id="l-title" className="input" type="text" required
+                <input
+                  id="l-title"
+                  className="input"
+                  type="text"
+                  required
                   placeholder="e.g. Introduction to Arabic Letters"
-                  value={title} onChange={(e) => setTitle(e.target.value)} />
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
               </div>
 
               <div className="field">
                 <label htmlFor="l-desc">Description</label>
-                <textarea id="l-desc" className="input" rows={3} required
+                <textarea
+                  id="l-desc"
+                  className="input"
+                  rows={3}
+                  required
                   placeholder="What does this lesson cover?"
-                  value={description} onChange={(e) => setDescription(e.target.value)}
-                  style={{ height: 78, padding: '12px 16px' }} />
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  style={{ height: 78, padding: '12px 16px' }}
+                />
               </div>
 
               <div className="grid-2">
                 <div className="field">
                   <label htmlFor="l-type">Type</label>
-                  <select id="l-type" className="input" value={type} onChange={(e) => setType(e.target.value as ContentType)}>
+                  <select
+                    id="l-type"
+                    className="input"
+                    value={type}
+                    onChange={(e) => setType(e.target.value as ContentType)}
+                  >
                     <option value="VIDEO">Video</option>
                     <option value="PDF">PDF</option>
                     <option value="EXERCISE">Exercise</option>
@@ -569,26 +704,46 @@ export default function CourseContentPage() {
                 </div>
                 <div className="field">
                   <label htmlFor="l-duration">Duration (minutes)</label>
-                  <input id="l-duration" className="input" type="number" min="0" step="1" placeholder="0"
-                    value={duration} onChange={(e) => setDuration(e.target.value)} />
+                  <input
+                    id="l-duration"
+                    className="input"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="0"
+                    value={duration}
+                    onChange={(e) => setDuration(e.target.value)}
+                  />
                 </div>
               </div>
 
               <div className="field">
                 <label htmlFor="l-url">Content URL</label>
-                <input id="l-url" className="input" type="text" required
+                <input
+                  id="l-url"
+                  className="input"
+                  type="text"
+                  required
                   placeholder="https://…"
-                  value={contentUrl} onChange={(e) => setContentUrl(e.target.value)} />
+                  value={contentUrl}
+                  onChange={(e) => setContentUrl(e.target.value)}
+                />
               </div>
 
               {formError && <div className="auth-error">{formError}</div>}
             </form>
 
             <div className="modal-foot">
-              <button className="btn btn-outline" type="button" onClick={() => setShowModal(false)}>Cancel</button>
-              <button className="btn btn-gold" type="button" disabled={submitting}
+              <button className="btn btn-outline" type="button" onClick={() => setShowModal(false)}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-gold"
+                type="button"
+                disabled={submitting}
                 style={{ opacity: submitting ? 0.65 : 1 }}
-                onClick={() => formRef.current?.requestSubmit()}>
+                onClick={() => formRef.current?.requestSubmit()}
+              >
                 {submitting ? 'Adding…' : 'Add Lesson'}
               </button>
             </div>
@@ -598,157 +753,267 @@ export default function CourseContentPage() {
 
       {/* ── Add quiz modal ── */}
       {quizLesson && (
-        <div className="modal-bg" onClick={(e) => { if (e.target === e.currentTarget) setQuizLesson(null); }}>
+        <div
+          className="modal-bg"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setQuizLesson(null);
+          }}
+        >
           <div className="modal" style={{ maxWidth: 640 }}>
             <div className="modal-head">
               <div>
                 <h3>{quizMode === 'edit' ? 'Edit Quiz' : 'Add Quiz'}</h3>
-                <p className="muted" style={{ fontSize: 13, margin: '4px 0 0' }}>For lesson: {quizLesson.title}</p>
+                <p className="muted" style={{ fontSize: 13, margin: '4px 0 0' }}>
+                  For lesson: {quizLesson.title}
+                </p>
               </div>
               <button className="modal-x" onClick={() => setQuizLesson(null)}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 6l12 12M18 6 6 18"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M6 6l12 12M18 6 6 18" />
+                </svg>
               </button>
             </div>
 
             {quizLoading ? (
-              <div className="modal-body" style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14, padding: '32px 28px' }}>
+              <div
+                className="modal-body"
+                style={{
+                  textAlign: 'center',
+                  color: 'var(--ink-3)',
+                  fontSize: 14,
+                  padding: '32px 28px',
+                }}
+              >
                 Loading quiz…
               </div>
             ) : (
-            <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-              <div className="grid-2">
-                <div className="field">
-                  <label htmlFor="q-title">Quiz title</label>
-                  <input id="q-title" className="input" type="text" required
-                    value={quizTitle} onChange={(e) => setQuizTitle(e.target.value)} />
+              <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                <div className="grid-2">
+                  <div className="field">
+                    <label htmlFor="q-title">Quiz title</label>
+                    <input
+                      id="q-title"
+                      className="input"
+                      type="text"
+                      required
+                      value={quizTitle}
+                      onChange={(e) => setQuizTitle(e.target.value)}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="q-pass">Passing score (%)</label>
+                    <input
+                      id="q-pass"
+                      className="input"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={passingScore}
+                      onChange={(e) => setPassingScore(e.target.value)}
+                    />
+                  </div>
                 </div>
-                <div className="field">
-                  <label htmlFor="q-pass">Passing score (%)</label>
-                  <input id="q-pass" className="input" type="number" min="0" max="100" step="1"
-                    value={passingScore} onChange={(e) => setPassingScore(e.target.value)} />
-                </div>
-              </div>
 
-              {questions.map((q, qIdx) => (
-                <div key={qIdx} className="card pad" style={{ marginTop: 16, background: 'var(--paper)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <b style={{ fontSize: 14 }}>Question {qIdx + 1}</b>
-                    {questions.length > 1 && (
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-outline"
-                        style={{ color: '#dc2626', boxShadow: 'inset 0 0 0 1.5px #dc2626', padding: '2px 10px' }}
-                        onClick={() => removeQuestion(qIdx)}
+                {questions.map((q, qIdx) => (
+                  <div
+                    key={qIdx}
+                    className="card pad"
+                    style={{ marginTop: 16, background: 'var(--paper)' }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: 8,
+                      }}
+                    >
+                      <b style={{ fontSize: 14 }}>Question {qIdx + 1}</b>
+                      {questions.length > 1 && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline"
+                          style={{
+                            color: '#dc2626',
+                            boxShadow: 'inset 0 0 0 1.5px #dc2626',
+                            padding: '2px 10px',
+                          }}
+                          onClick={() => removeQuestion(qIdx)}
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="field">
+                      <label>Question text</label>
+                      <input
+                        className="input"
+                        type="text"
+                        value={q.text}
+                        onChange={(e) => updateQuestion(qIdx, { text: e.target.value })}
+                        placeholder="e.g. What is the Arabic letter for 'B'?"
+                      />
+                    </div>
+
+                    <div className="field">
+                      <label>Question type</label>
+                      <select
+                        className="input"
+                        value={q.questionType}
+                        onChange={(e) => {
+                          const questionType = e.target.value as QuestionType;
+                          if (questionType === 'TRUE_FALSE') {
+                            updateQuestion(qIdx, {
+                              questionType,
+                              options: ['True', 'False'],
+                              correctAnswer: '',
+                            });
+                          } else if (questionType === 'WRITTEN') {
+                            updateQuestion(qIdx, { questionType, options: [], correctAnswer: '' });
+                          } else {
+                            updateQuestion(qIdx, {
+                              questionType,
+                              options: ['', ''],
+                              correctAnswer: '',
+                            });
+                          }
+                        }}
                       >
-                        Remove
-                      </button>
+                        <option value="MCQ">Multiple choice</option>
+                        <option value="TRUE_FALSE">True / False</option>
+                        <option value="WRITTEN">Written (open-ended)</option>
+                      </select>
+                    </div>
+
+                    {q.questionType === 'MCQ' && (
+                      <div className="field">
+                        <label>Options &amp; correct answer</label>
+                        {q.options.map((opt, oIdx) => (
+                          <div
+                            key={oIdx}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              marginBottom: 6,
+                            }}
+                          >
+                            <input
+                              type="radio"
+                              name={`correct-${qIdx}`}
+                              checked={!!opt && q.correctAnswer === opt}
+                              onChange={() => updateQuestion(qIdx, { correctAnswer: opt })}
+                              aria-label={`Mark option ${oIdx + 1} as correct`}
+                            />
+                            <input
+                              className="input"
+                              type="text"
+                              style={{ flex: 1 }}
+                              value={opt}
+                              placeholder={`Option ${oIdx + 1}`}
+                              onChange={(e) => updateOption(qIdx, oIdx, e.target.value)}
+                            />
+                            {q.options.length > 2 && (
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline"
+                                style={{ padding: '4px 10px' }}
+                                onClick={() => removeOption(qIdx, oIdx)}
+                                aria-label="Remove option"
+                              >
+                                <Icon name="close" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline"
+                          onClick={() => addOption(qIdx)}
+                        >
+                          + Add option
+                        </button>
+                      </div>
                     )}
-                  </div>
 
-                  <div className="field">
-                    <label>Question text</label>
-                    <input className="input" type="text" value={q.text}
-                      onChange={(e) => updateQuestion(qIdx, { text: e.target.value })}
-                      placeholder="e.g. What is the Arabic letter for 'B'?" />
-                  </div>
+                    {q.questionType === 'TRUE_FALSE' && (
+                      <div className="field">
+                        <label>Correct answer</label>
+                        {(['True', 'False'] as const).map((opt) => (
+                          <label
+                            key={opt}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              marginBottom: 6,
+                              fontSize: 14,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <input
+                              type="radio"
+                              name={`correct-${qIdx}`}
+                              checked={q.correctAnswer === opt}
+                              onChange={() => updateQuestion(qIdx, { correctAnswer: opt })}
+                            />
+                            {opt}
+                          </label>
+                        ))}
+                      </div>
+                    )}
 
-                  <div className="field">
-                    <label>Question type</label>
-                    <select className="input" value={q.questionType}
-                      onChange={(e) => {
-                        const questionType = e.target.value as QuestionType;
-                        if (questionType === 'TRUE_FALSE') {
-                          updateQuestion(qIdx, { questionType, options: ['True', 'False'], correctAnswer: '' });
-                        } else if (questionType === 'WRITTEN') {
-                          updateQuestion(qIdx, { questionType, options: [], correctAnswer: '' });
-                        } else {
-                          updateQuestion(qIdx, { questionType, options: ['', ''], correctAnswer: '' });
-                        }
-                      }}>
-                      <option value="MCQ">Multiple choice</option>
-                      <option value="TRUE_FALSE">True / False</option>
-                      <option value="WRITTEN">Written (open-ended)</option>
-                    </select>
-                  </div>
+                    {q.questionType === 'WRITTEN' && (
+                      <p className="muted" style={{ fontSize: 13 }}>
+                        Students will type a free-text answer. You&apos;ll review and grade it
+                        manually.
+                      </p>
+                    )}
 
-                  {q.questionType === 'MCQ' && (
-                    <div className="field">
-                      <label>Options &amp; correct answer</label>
-                      {q.options.map((opt, oIdx) => (
-                        <div key={oIdx} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                          <input
-                            type="radio"
-                            name={`correct-${qIdx}`}
-                            checked={!!opt && q.correctAnswer === opt}
-                            onChange={() => updateQuestion(qIdx, { correctAnswer: opt })}
-                            aria-label={`Mark option ${oIdx + 1} as correct`}
-                          />
-                          <input
-                            className="input"
-                            type="text"
-                            style={{ flex: 1 }}
-                            value={opt}
-                            placeholder={`Option ${oIdx + 1}`}
-                            onChange={(e) => updateOption(qIdx, oIdx, e.target.value)}
-                          />
-                          {q.options.length > 2 && (
-                            <button type="button" className="btn btn-sm btn-outline" style={{ padding: '4px 10px' }}
-                              onClick={() => removeOption(qIdx, oIdx)} aria-label="Remove option">
-                              <Icon name="close" />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                      <button type="button" className="btn btn-sm btn-outline" onClick={() => addOption(qIdx)}>
-                        + Add option
-                      </button>
+                    <div className="field" style={{ maxWidth: 140 }}>
+                      <label>Points</label>
+                      <input
+                        className="input"
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={q.points}
+                        onChange={(e) => updateQuestion(qIdx, { points: e.target.value })}
+                      />
                     </div>
-                  )}
-
-                  {q.questionType === 'TRUE_FALSE' && (
-                    <div className="field">
-                      <label>Correct answer</label>
-                      {(['True', 'False'] as const).map((opt) => (
-                        <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 14, cursor: 'pointer' }}>
-                          <input
-                            type="radio"
-                            name={`correct-${qIdx}`}
-                            checked={q.correctAnswer === opt}
-                            onChange={() => updateQuestion(qIdx, { correctAnswer: opt })}
-                          />
-                          {opt}
-                        </label>
-                      ))}
-                    </div>
-                  )}
-
-                  {q.questionType === 'WRITTEN' && (
-                    <p className="muted" style={{ fontSize: 13 }}>
-                      Students will type a free-text answer. You&apos;ll review and grade it manually.
-                    </p>
-                  )}
-
-                  <div className="field" style={{ maxWidth: 140 }}>
-                    <label>Points</label>
-                    <input className="input" type="number" min="1" step="1" value={q.points}
-                      onChange={(e) => updateQuestion(qIdx, { points: e.target.value })} />
                   </div>
-                </div>
-              ))}
+                ))}
 
-              <button type="button" className="btn btn-outline" style={{ marginTop: 16 }} onClick={addQuestion}>
-                + Add Question
-              </button>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  style={{ marginTop: 16 }}
+                  onClick={addQuestion}
+                >
+                  + Add Question
+                </button>
 
-              {quizError && <div className="auth-error" style={{ marginTop: 16 }}>{quizError}</div>}
-            </div>
+                {quizError && (
+                  <div className="auth-error" style={{ marginTop: 16 }}>
+                    {quizError}
+                  </div>
+                )}
+              </div>
             )}
 
             <div className="modal-foot">
-              <button className="btn btn-outline" type="button" onClick={() => setQuizLesson(null)}>Cancel</button>
-              <button className="btn btn-gold" type="button" disabled={quizSubmitting || quizLoading}
+              <button className="btn btn-outline" type="button" onClick={() => setQuizLesson(null)}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-gold"
+                type="button"
+                disabled={quizSubmitting || quizLoading}
                 style={{ opacity: quizSubmitting || quizLoading ? 0.65 : 1 }}
-                onClick={handleSaveQuiz}>
+                onClick={handleSaveQuiz}
+              >
                 {quizSubmitting ? 'Saving…' : quizMode === 'edit' ? 'Save Changes' : 'Save Quiz'}
               </button>
             </div>

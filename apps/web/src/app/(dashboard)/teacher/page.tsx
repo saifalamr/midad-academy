@@ -1,485 +1,171 @@
 'use client';
-
-import Icon from '@/components/Icon';
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import PaymentReviewNotice from '@/components/PaymentReviewNotice';
+import { useRouter } from 'next/navigation';
 import { API_URL } from '@/lib/config';
-
-type Lesson = {
-  id: string;
-  title: string;
-  scheduledAt: string;
-  durationMinutes: number;
-};
-
+import { useAuth } from '@/components/AuthProvider';
+import Icon from '@/components/Icon';
 type Course = {
   id: string;
   title: string;
   description: string;
+  month: string | null;
   ageGroup: string;
-  price: number;
-  currency: string;
   _count: { enrollments: number };
-  lessons: Lesson[];
 };
-
-type ClassSession = {
+type Session = {
   id: string;
   courseId: string;
   title: string;
   scheduledAt: string;
-  durationMinutes: number;
   status: string;
-  course: { id: string; title: string };
+  course: { title: string };
 };
-
-const AGE_GROUPS = ['5–7', '8–10', '11–13', '14–15'];
-const THUMBS = ['th-1', 'th-2', 'th-3', 'th-4', 'th-5', 'th-6'];
-
-function authFetch(path: string, options: RequestInit = {}) {
-  const token = typeof window !== 'undefined' ? (localStorage.getItem('token') ?? sessionStorage.getItem('token')) : null;
-  return fetch(`${API_URL}${path}`, {
-    ...options,
+async function api(path: string, method = 'GET') {
+  const res = await fetch(`${API_URL}${path}`, {
+    method,
+    cache: 'no-store',
     headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
+      Authorization: `Bearer ${localStorage.getItem('token') ?? sessionStorage.getItem('token')}`,
     },
   });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'تعذر تحميل البيانات');
+  return json.data;
 }
-
-function getTokenPayload(): { name?: string } {
-  try {
-    const token = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
-    if (!token) return {};
-    return JSON.parse(atob(token.split('.')[1]));
-  } catch {
-    return {};
-  }
-}
-
 export default function TeacherDashboard() {
+  const { user } = useAuth();
   const router = useRouter();
   const [courses, setCourses] = useState<Course[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
-  const [reviewCount, setReviewCount] = useState<number | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [userName, setUserName] = useState('Teacher');
-  const formRef = useRef<HTMLFormElement>(null);
-
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [ageGroup, setAgeGroup] = useState(AGE_GROUPS[0]);
-  const [price, setPrice] = useState('');
-  const [maxStudents, setMaxStudents] = useState('10');
-  const [formError, setFormError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  // ── Scheduling state ──
-  const [sessions, setSessions] = useState<ClassSession[]>([]);
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [scheduleCourse, setScheduleCourse] = useState<Course | null>(null);
-  const [sessionTitle, setSessionTitle] = useState('');
-  const [sessionDescription, setSessionDescription] = useState('');
-  const [scheduledAt, setScheduledAt] = useState('');
-  const [durationMinutes, setDurationMinutes] = useState('60');
-  const [scheduleError, setScheduleError] = useState('');
-  const [scheduling, setScheduling] = useState(false);
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
-  const [startingId, setStartingId] = useState<string | null>(null);
-  const scheduleFormRef = useRef<HTMLFormElement>(null);
-
+  const [error, setError] = useState('');
+  const [starting, setStarting] = useState('');
   useEffect(() => {
-    const payload = getTokenPayload();
-    setUserName(payload.name ?? 'Teacher');
-
-    authFetch('/api/courses')
-      .then(async (res) => {
-        if (res.status === 401) { router.push('/login'); return; }
-        const json = await res.json();
-        setCourses(json.data ?? []);
+    let active = true;
+    Promise.all([api('/api/courses'), api('/api/sessions/upcoming')])
+      .then(([c, s]) => {
+        if (active) {
+          setCourses(c);
+          setSessions(s);
+        }
       })
-      .catch(() => setFormError('Could not load your courses. Please refresh to retry.'))
-      .finally(() => setLoading(false));
-
-    authFetch('/api/teacher/pending-reviews').then(async (res) => { if (!res.ok) throw new Error(); const json = await res.json(); setReviewCount(json.data.length); }).catch(() => setFormError('Could not load pending reviews. Please refresh to retry.'));
-
-    authFetch('/api/sessions/upcoming')
-      .then(async (res) => {
-        if (!res.ok) { const data = await res.json(); setFormError(data.error || 'Could not update session'); return; }
-        const json = await res.json();
-        setSessions(json.data ?? []);
+      .catch((e) => {
+        if (active) setError(e.message);
       })
-      .catch(() => setFormError('Could not load your classes. Please refresh to retry.'));
-  }, [router]);
-
-  function openScheduleModal(course: Course) {
-    setScheduleCourse(course);
-    setSessionTitle('');
-    setSessionDescription('');
-    setScheduledAt('');
-    setDurationMinutes('60');
-    setScheduleError('');
-    setShowScheduleModal(true);
-  }
-
-  async function handleScheduleSession(e: React.FormEvent) {
-    e.preventDefault();
-    if (!scheduleCourse) return;
-    setScheduleError('');
-    setScheduling(true);
-    try {
-      const res = await authFetch('/api/sessions/schedule', {
-        method: 'POST',
-        body: JSON.stringify({
-          courseId: scheduleCourse.id,
-          title: sessionTitle,
-          description: sessionDescription || undefined,
-          scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
-          durationMinutes: parseInt(durationMinutes, 10) || 60,
-        }),
+      .finally(() => {
+        if (active) setLoading(false);
       });
-      const json = await res.json();
-      if (!res.ok) { setScheduleError(json.error || 'Failed to schedule class'); return; }
-      setSessions((prev) => [...prev, { ...json.data, course: { id: scheduleCourse.id, title: scheduleCourse.title } }]
-        .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()));
-      setShowScheduleModal(false);
-    } catch {
-      setScheduleError('Could not connect to server');
-    } finally {
-      setScheduling(false);
-    }
-  }
-
-  async function handleCancelSession(sessionId: string) {
-    setCancellingId(sessionId);
+    return () => {
+      active = false;
+    };
+  }, []);
+  async function start(s: Session) {
+    if (starting) return;
+    setStarting(s.id);
+    setError('');
     try {
-      const res = await authFetch(`/api/sessions/${sessionId}/cancel`, { method: 'PATCH', body: '{}' });
-      if (!res.ok) { const data = await res.json(); setFormError(data.error || 'Could not update session'); return; }
-      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-    } catch {
-      // ignore
-    } finally {
-      setCancellingId(null);
+      if (s.status !== 'LIVE') await api(`/api/sessions/${s.id}/start`, 'PATCH');
+      router.push(`/classroom/${s.courseId}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'تعذر فتح الحصة');
+      setStarting('');
     }
   }
-
-  async function handleStartSession(session: ClassSession) {
-    setStartingId(session.id);
-    try {
-      const res = await authFetch(`/api/sessions/${session.id}/start`, { method: 'PATCH', body: '{}' });
-      if (!res.ok) { const data = await res.json(); setFormError(data.error || 'Could not update session'); return; }
-      router.push(`/classroom/${session.courseId}`);
-    } catch {
-      // ignore
-    } finally {
-      setStartingId(null);
-    }
-  }
-
-  async function handleCreateCourse(e: React.FormEvent) {
-    e.preventDefault();
-    setFormError('');
-    setSubmitting(true);
-    try {
-      const res = await authFetch('/api/courses', {
-        method: 'POST',
-        body: JSON.stringify({ title, description, ageGroup, price: parseFloat(price) || 0, maxStudents: Number(maxStudents) }),
-      });
-      const json = await res.json();
-      if (!res.ok) { setFormError(json.error || 'Failed to create course'); return; }
-      setCourses((prev) => [json.data, ...prev]);
-      setShowModal(false);
-      setTitle(''); setDescription(''); setAgeGroup(AGE_GROUPS[0]); setPrice(''); setMaxStudents('10');
-    } catch {
-      setFormError('Could not connect to server');
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  const totalStudents = courses.reduce((sum, c) => sum + c._count.enrollments, 0);
-
   return (
-    <div className="midad" style={{ minHeight: '100vh', background: 'var(--cream)' }}>
-
-      {/* ── App bar ── */}
-
-
-      <main className="dash">
-
-        {/* ── Page head ── */}
-        <div className="page-head">
-          <div>
-            <p className="dh-hi">Welcome back, <b>{userName}</b> <span className="ar dh-ar">أهلاً</span></p>
-            <h1 className="dh-title">Your teaching, at a glance</h1>
-          </div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Link href="/teacher/review-answers" className="btn btn-outline btn-lg">
-              <Icon name="edit" /> Review Answers
-            </Link>
-            <button className="btn btn-gold btn-lg" onClick={() => setShowModal(true)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M12 5v14M5 12h14"/></svg>
-              Create New Class
-            </button>
-          </div>
+    <main className="wrap" style={{ padding: '32px 24px' }}>
+      <header className="dash-head">
+        <div>
+          <p className="dh-hi">
+            أهلاً، <b>{user?.name}</b>
+          </p>
+          <h1 className="dh-title">دوراتي وحصصي</h1>
+          <p>الإدارة تعيّن دوراتك وتجهّز المنهج والمواعيد. من هنا تبدأ الحصة وتتابع الطلاب.</p>
         </div>
-
-        <PaymentReviewNotice />
-        {formError && <p className="auth-error" role="alert">{formError}</p>}
-        {/* ── Stats row ── */}
-        <div className="stat-row">
-          <div className="stat card"><div className="st-ic st-navy"><Icon name="book" /></div><div><b>{courses.length}</b><span>Active courses</span></div></div>
-          <div className="stat card"><div className="st-ic st-gold"><Icon name="graduate" /></div><div><b>{totalStudents}</b><span>Students</span></div></div>
-          <div className="stat card"><div className="st-ic st-fire"><Icon name="calendar" /></div><div><b>{sessions.length}</b><span>Lessons scheduled</span></div></div>
-          <div className="stat card"><div className="st-ic st-green"><Icon name="star" /></div><div><b>{reviewCount ?? '…'}</b><span>Reviews to grade</span></div></div>
-        </div>
-
-        <div className="dash-grid t-grid">
-
-          {/* ── Courses column ── */}
-          <div className="dash-col" id="teacher-courses">
-            <div className="col-head">
-              <h2>My Classes <span className="ar muted">صفوفي</span></h2>
-            </div>
-
-            {loading ? (
-              <div className="card pad" style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14 }}>
-                Loading courses…
-              </div>
-            ) : (
-              <div className="tc-grid">
-                {courses.map((course, idx) => (
-                  <div key={course.id} className="tclass card">
-                    <div className="tc-top">
-                      <span className="tc-when">Ages {course.ageGroup}</span>
-                      <span className="tc-lvl">{course.price === 0 ? 'Free' : `$${course.price}`}</span>
-                    </div>
-                    <div className={`tc-thumb ${THUMBS[idx % THUMBS.length]}`}>
-                      <span>{course.title.slice(0, 4)}</span>
-                    </div>
-                    <div className="tc-name">{course.title}</div>
-                    <div className="tc-en">{course.description?.slice(0, 60) ?? ''}</div>
-                    <div className="tc-foot">
-                      <span className="tc-students">
-                        <span className="dotrow">
-                          {Array.from({ length: Math.min(course._count.enrollments, 3) }).map((_, i) => <i key={i}></i>)}
-                        </span>
-                        {course._count.enrollments} student{course._count.enrollments !== 1 ? 's' : ''}
-                      </span>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <button
-                          className="btn btn-sm btn-outline"
-                          onClick={() => router.push(`/courses/${course.id}/content`)}
-                        >
-                          Manage Content
-                        </button>
-                        <button
-                          className="btn btn-sm btn-outline"
-                          onClick={() => openScheduleModal(course)}
-                        >
-                          Schedule Class
-                        </button>
-                        <button
-                          className="btn btn-sm btn-gold"
-                          onClick={() => { const session = sessions.find((s) => s.courseId === course.id && ['SCHEDULED', 'LIVE'].includes(s.status)); if (session) void handleStartSession(session); else openScheduleModal(course); }}
-                        >
-                          Start Class
-                        </button>
-                      </div>
-                    </div>
+        <Link className="btn btn-outline" href="/teacher/review-answers">
+          <Icon name="edit" /> مراجعة الإجابات
+        </Link>
+      </header>
+      {error && (
+        <p className="auth-error" role="alert">
+          {error}
+        </p>
+      )}
+      {loading ? (
+        <p role="status">جارٍ تحميل دوراتك…</p>
+      ) : (
+        <>
+          <section className="card pad" style={{ marginBottom: 24 }}>
+            <h2>الحصص القادمة والمباشرة</h2>
+            {sessions.length ? (
+              sessions.map((s) => (
+                <div
+                  key={s.id}
+                  style={{
+                    display: 'flex',
+                    gap: 16,
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    padding: '18px 0',
+                    borderBottom: '1px solid var(--line)',
+                  }}
+                >
+                  <div>
+                    <b>{s.title}</b>
+                    <p>
+                      {s.course.title} · {new Date(s.scheduledAt).toLocaleString('ar')}
+                    </p>
                   </div>
-                ))}
-
-                {/* Add new class card */}
-                <button className="tclass card tclass-add" onClick={() => setShowModal(true)}>
-                  <span className="add-plus">+</span>
-                  <b>Create New Class</b>
-                  <span>Set up a course, level &amp; schedule</span>
-                </button>
-              </div>
+                  <button
+                    className="btn btn-gold"
+                    disabled={!!starting}
+                    onClick={() => void start(s)}
+                  >
+                    {starting === s.id
+                      ? 'جارٍ فتح الحصة…'
+                      : s.status === 'LIVE'
+                        ? 'العودة للحصة'
+                        : 'بدء الحصة'}
+                  </button>
+                </div>
+              ))
+            ) : (
+              <p>لم تحدد الإدارة مواعيد قادمة بعد.</p>
             )}
+          </section>
+          <div className="col-head">
+            <h2>الدورات الشهرية ({courses.length})</h2>
           </div>
-
-          {/* ── Side column ── */}
-          <div className="dash-col">
-            <div className="card pad">
-              <div className="col-head sm"><h3>Upcoming Sessions <span className="ar muted">الجلسات القادمة</span></h3></div>
-              {sessions.length === 0 ? (
-                <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No classes scheduled yet.</p>
-              ) : (
-                <ul className="agenda">
-                  {sessions.map((session) => {
-                    const dt = new Date(session.scheduledAt);
-                    return (
-                      <li key={session.id}>
-                        <span className="ag-time">
-                          {dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                          <br />
-                          {dt.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-                        </span>
-                        <div style={{ flex: 1 }}>
-                          <b>{session.title}</b>
-                          <span>{session.course.title} · {session.durationMinutes} min</span>
-                          <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                            <button
-                              className="btn btn-sm btn-gold"
-                              disabled={startingId === session.id}
-                              style={{ opacity: startingId === session.id ? 0.65 : 1 }}
-                              onClick={() => handleStartSession(session)}
-                            >
-                              {startingId === session.id ? 'Starting…' : 'Start Class'}
-                            </button>
-                            <button
-                              className="btn btn-sm btn-outline"
-                              disabled={cancellingId === session.id}
-                              style={{ opacity: cancellingId === session.id ? 0.65 : 1 }}
-                              onClick={() => handleCancelSession(session.id)}
-                            >
-                              {cancellingId === session.id ? 'Cancelling…' : 'Cancel'}
-                            </button>
-                          </div>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-
-            <div className="card pad">
-              <div className="col-head sm"><h3>Today’s sessions</h3></div>
-              {sessions.filter((session) => new Date(session.scheduledAt).toDateString() === new Date().toDateString()).length === 0 ? (
-                <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No sessions scheduled today.</p>
-              ) : (
-                <ul className="agenda">
-                  {sessions.filter((session) => new Date(session.scheduledAt).toDateString() === new Date().toDateString()).map((session) => (
-                    <li key={session.id}>
-                      <span className="ag-time">{new Date(session.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      <div><b>{session.title}</b><span>{session.course.title}</span></div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,300px),1fr))',
+              gap: 20,
+            }}
+          >
+            {courses.map((c) => (
+              <article className="card pad" key={c.id}>
+                <span className="tag">
+                  {c.month || 'دورة سابقة'} · الأعمار {c.ageGroup}
+                </span>
+                <h3 style={{ fontSize: 23, margin: '16px 0' }}>{c.title}</h3>
+                <p>{c.description}</p>
+                <p>{c._count.enrollments} طلاب مسجلين</p>
+                <Link className="btn btn-outline" href={`/courses/${c.id}/lessons`}>
+                  <Icon name="book" /> عرض المنهج
+                </Link>
+              </article>
+            ))}
           </div>
-
-        </div>
-      </main>
-
-      {/* ── Create class modal ── */}
-      {showModal && (
-        <div className="modal-bg" onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}>
-          <div className="modal">
-            <div className="modal-head">
-              <div><h3>Create New Class</h3><p className="ar muted" style={{ fontSize: 14 }}>إنشاء صفّ جديد</p></div>
-              <button className="modal-x" onClick={() => setShowModal(false)}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 6l12 12M18 6 6 18"/></svg>
-              </button>
-            </div>
-
-            <form ref={formRef} onSubmit={handleCreateCourse} className="modal-body">
-              <div className="field">
-                <label htmlFor="c-title">Class name <span className="ar muted">اسم الصفّ</span></label>
-                <input id="c-title" className="input" type="text" required
-                  placeholder="e.g. Arabic Letters — الحروف الهجائية"
-                  value={title} onChange={(e) => setTitle(e.target.value)} />
-              </div>
-
-              <div className="field">
-                <label htmlFor="c-desc">Description</label>
-                <textarea id="c-desc" className="input" rows={3} required minLength={10}
-                  placeholder="What will students learn in this class?"
-                  value={description} onChange={(e) => setDescription(e.target.value)}
-                  style={{ height: 78, padding: '12px 16px' }} />
-              </div>
-
-              <div className="grid-2">
-                <div className="field">
-                  <label htmlFor="c-age">Age group</label>
-                  <select id="c-age" className="input" value={ageGroup} onChange={(e) => setAgeGroup(e.target.value)}>
-                    {AGE_GROUPS.map((g) => <option key={g} value={g}>{g} years</option>)}
-                  </select>
-                </div>
-                <div className="field">
-                  <label htmlFor="c-price">Price (USD)</label>
-                  <input id="c-price" className="input" type="number" min="0" step="0.01" placeholder="0"
-                    value={price} onChange={(e) => setPrice(e.target.value)} />
-                </div>
-              </div>
-
-              <div className="field"><label htmlFor="c-capacity">الحد الأقصى للطلاب</label><input id="c-capacity" className="input" type="number" min="1" max="100" required value={maxStudents} onChange={event => setMaxStudents(event.target.value)} /></div>
-              {formError && <div className="auth-error">{formError}</div>}
-            </form>
-
-            <div className="modal-foot">
-              <button className="btn btn-outline" type="button" onClick={() => setShowModal(false)}>Cancel</button>
-              <button className="btn btn-gold" type="button" disabled={submitting}
-                style={{ opacity: submitting ? 0.65 : 1 }}
-                onClick={() => formRef.current?.requestSubmit()}>
-                {submitting ? 'Creating…' : 'Create Class'}
-              </button>
-            </div>
-          </div>
-        </div>
+          {!courses.length && (
+            <section className="card pad">
+              <h2>لا توجد دورات معيّنة لك بعد</h2>
+              <p>ستظهر دورتك هنا بمجرد أن تعيّنها الإدارة لك.</p>
+            </section>
+          )}
+        </>
       )}
-
-      {/* ── Schedule class modal ── */}
-      {showScheduleModal && scheduleCourse && (
-        <div className="modal-bg" onClick={(e) => { if (e.target === e.currentTarget) setShowScheduleModal(false); }}>
-          <div className="modal">
-            <div className="modal-head">
-              <div><h3>Schedule Class</h3><p className="ar muted" style={{ fontSize: 14 }}>{scheduleCourse.title}</p></div>
-              <button className="modal-x" onClick={() => setShowScheduleModal(false)}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 6l12 12M18 6 6 18"/></svg>
-              </button>
-            </div>
-
-            <form ref={scheduleFormRef} onSubmit={handleScheduleSession} className="modal-body">
-              <div className="field">
-                <label htmlFor="s-title">Session title</label>
-                <input id="s-title" className="input" type="text" required
-                  placeholder="e.g. Weekly conversation practice"
-                  value={sessionTitle} onChange={(e) => setSessionTitle(e.target.value)} />
-              </div>
-
-              <div className="field">
-                <label htmlFor="s-desc">Description</label>
-                <textarea id="s-desc" className="input" rows={3}
-                  placeholder="What will this session cover?"
-                  value={sessionDescription} onChange={(e) => setSessionDescription(e.target.value)}
-                  style={{ height: 78, padding: '12px 16px' }} />
-              </div>
-
-              <div className="grid-2">
-                <div className="field">
-                  <label htmlFor="s-when">Date &amp; time</label>
-                  <input id="s-when" className="input" type="datetime-local" required
-                    value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
-                </div>
-                <div className="field">
-                  <label htmlFor="s-duration">Duration (minutes)</label>
-                  <input id="s-duration" className="input" type="number" min="1" step="1"
-                    value={durationMinutes} onChange={(e) => setDurationMinutes(e.target.value)} />
-                </div>
-              </div>
-
-              {scheduleError && <div className="auth-error">{scheduleError}</div>}
-            </form>
-
-            <div className="modal-foot">
-              <button className="btn btn-outline" type="button" onClick={() => setShowScheduleModal(false)}>Cancel</button>
-              <button className="btn btn-gold" type="button" disabled={scheduling}
-                style={{ opacity: scheduling ? 0.65 : 1 }}
-                onClick={() => scheduleFormRef.current?.requestSubmit()}>
-                {scheduling ? 'Scheduling…' : 'Schedule Class'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </main>
   );
 }

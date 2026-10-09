@@ -13,6 +13,7 @@ datasource db {
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
 enum UserRole {
+  ADMIN
   TEACHER
   STUDENT
   PARENT
@@ -73,6 +74,8 @@ enum PaymentStatus {
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
+  username     String?  @unique
+  whatsappPhone String?
   passwordHash String
   tokenVersion Int      @default(0)
   name         String
@@ -147,6 +150,9 @@ model Course {
   price         Float
   currency      String   @default("USD")
   maxStudents   Int      @default(10)
+  month         String?
+  billingPeriod String   @default("MONTHLY")
+  timeZone      String   @default("Europe/Istanbul")
   coverImageUrl String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

@@ -24,6 +24,8 @@ import { sessionRoutes } from './routes/sessions';
 import { accountRoutes } from './routes/account';
 import { startWhiteboardWebSocketServer } from './ws-server';
 import { rateLimitKey } from './lib/rate-limit';
+import { adminRoutes } from './routes/admin';
+import { bootstrapAdmin } from './lib/bootstrap-admin';
 import { prepareReview } from './lib/prepare-review';
 
 export async function buildApp() {
@@ -51,7 +53,12 @@ export async function buildApp() {
     // browser stacks (some Edge/Safari/SmartTV builds) don't choke on it.
     optionsSuccessStatus: 200,
   });
-  await app.register(rateLimit, { max: 100, timeWindow: '1 minute', keyGenerator: request => rateLimitKey(request, token => app.jwt.verify<{ id: string }>(token)) });
+  await app.register(rateLimit, {
+    max: 100,
+    timeWindow: '1 minute',
+    keyGenerator: (request) =>
+      rateLimitKey(request, (token) => app.jwt.verify<{ id: string }>(token)),
+  });
   await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024 } });
 
   // ── JWT ─────────────────────────────────────────────────────────────────
@@ -62,21 +69,24 @@ export async function buildApp() {
   });
 
   // Reusable preHandler — attach to any route that needs authentication.
-  app.decorate(
-    'authenticate',
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      try {
-        await request.jwtVerify();
-      } catch {
-        return void reply.status(401).send({ error: 'Unauthorized — invalid or missing token' });
-      }
-      // A database outage is a server error, not a reason to invalidate a valid login.
-      const user = await prisma.user.findUnique({ where: { id: request.user.id } });
-      if (!user || user.role !== request.user.role || user.tokenVersion !== (request.user.version ?? 0)) {
-        return void reply.status(401).send({ error: 'Your session has expired. Please log in again.' });
-      }
+  app.decorate('authenticate', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      await request.jwtVerify();
+    } catch {
+      return void reply.status(401).send({ error: 'Unauthorized — invalid or missing token' });
     }
-  );
+    // A database outage is a server error, not a reason to invalidate a valid login.
+    const user = await prisma.user.findUnique({ where: { id: request.user.id } });
+    if (
+      !user ||
+      user.role !== request.user.role ||
+      user.tokenVersion !== (request.user.version ?? 0)
+    ) {
+      return void reply
+        .status(401)
+        .send({ error: 'Your session has expired. Please log in again.' });
+    }
+  });
 
   // ── Global error handler ────────────────────────────────────────────────
   // Turns Zod validation failures into 400 responses with field-level detail.
@@ -92,15 +102,24 @@ export async function buildApp() {
     }
     app.log.error(error);
     const failure = error as { statusCode?: number; message?: string; code?: string };
-    if (failure.code === 'P2002') return void reply.status(409).send({ error: 'This record already exists' });
+    if (failure.code === 'P2002')
+      return void reply.status(409).send({ error: 'This record already exists' });
     const statusCode = failure.statusCode ?? 500;
-    reply.status(statusCode).send({ error: statusCode >= 500 ? 'An unexpected server error occurred' : failure.message ?? 'Invalid request' });
+    reply
+      .status(statusCode)
+      .send({
+        error:
+          statusCode >= 500
+            ? 'An unexpected server error occurred'
+            : (failure.message ?? 'Invalid request'),
+      });
   });
 
   // ── Routes ───────────────────────────────────────────────────────────────
   await app.register(healthRoutes, { prefix: '/api' });
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(accountRoutes, { prefix: '/api/account' });
+  await app.register(adminRoutes, { prefix: '/api/admin' });
   await app.register(courseRoutes, { prefix: '/api/courses' });
   await app.register(lessonRoutes, { prefix: '/api/lessons' });
   await app.register(learningRoutes, { prefix: '/api/learning' });
@@ -119,14 +138,28 @@ export async function buildApp() {
 
 async function bootstrap() {
   validateConfig();
+  await bootstrapAdmin(prisma);
   const reviewSetup = await prepareReview(prisma);
-  if (reviewSetup.status !== 'disabled') console.log('Preview review preparation:', JSON.stringify(reviewSetup));
+  if (reviewSetup.status !== 'disabled')
+    console.log('Preview review preparation:', JSON.stringify(reviewSetup));
   const app = await buildApp();
   await app.listen({ port: config.PORT, host: config.HOST });
   const whiteboard = startWhiteboardWebSocketServer(app.server, app);
-  const shutdown = async () => { await whiteboard.close(); await app.close(); await prisma.$disconnect(); };
-  process.once('SIGTERM', () => { void shutdown(); });
-  process.once('SIGINT', () => { void shutdown(); });
+  const shutdown = async () => {
+    await whiteboard.close();
+    await app.close();
+    await prisma.$disconnect();
+  };
+  process.once('SIGTERM', () => {
+    void shutdown();
+  });
+  process.once('SIGINT', () => {
+    void shutdown();
+  });
 }
 
-if (require.main === module) bootstrap().catch((err) => { console.error(err.message); process.exit(1); });
+if (require.main === module)
+  bootstrap().catch((err) => {
+    console.error(err.message);
+    process.exit(1);
+  });

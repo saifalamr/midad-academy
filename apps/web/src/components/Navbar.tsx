@@ -6,12 +6,13 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from './AuthProvider';
 
-type CurrentUser = { name: string; role: 'TEACHER' | 'STUDENT' | 'PARENT' };
+type CurrentUser = { name: string; role: 'TEACHER' | 'STUDENT' | 'PARENT' | 'ADMIN' };
 
 const DASHBOARD_PATH: Record<CurrentUser['role'], string> = {
   TEACHER: '/teacher',
   STUDENT: '/student',
   PARENT: '/parent',
+  ADMIN: '/admin',
 };
 
 const NAV_LINKS = [
@@ -19,7 +20,6 @@ const NAV_LINKS = [
   { href: '/courses', label: 'Courses' },
   { href: '/#pricing-anchor', label: 'Pricing' },
 ];
-
 
 export default function Navbar() {
   const router = useRouter();
@@ -29,8 +29,6 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-
-
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -63,14 +61,23 @@ export default function Navbar() {
               {link.label}
             </Link>
           ))}
-          <Link className={pathname === dashboardHref ? 'on' : ''} href={dashboardHref}>Dashboard</Link>
+          <Link className={pathname === dashboardHref ? 'on' : ''} href={dashboardHref}>
+            Dashboard
+          </Link>
         </nav>
 
         <div className="nav-cta">
           {user ? (
             <div className="nav-user" ref={menuRef}>
-              <button className="nav-user-btn" aria-expanded={menuOpen} aria-label="قائمة الحساب" onClick={() => setMenuOpen((o) => !o)}>
-                <span className="avatar" style={{ width: 34, height: 34 }}>{user.name.charAt(0).toUpperCase()}</span>
+              <button
+                className="nav-user-btn"
+                aria-expanded={menuOpen}
+                aria-label="قائمة الحساب"
+                onClick={() => setMenuOpen((o) => !o)}
+              >
+                <span className="avatar" style={{ width: 34, height: 34 }}>
+                  {user.name.charAt(0).toUpperCase()}
+                </span>
                 <span className="name">{user.name}</span>
                 <Icon name="right" size={14} />
               </button>
@@ -80,36 +87,81 @@ export default function Navbar() {
                     <b>{user.name}</b>
                     <span>{user.role.toLowerCase()}</span>
                   </div>
-                  <Link href={dashboardHref} onClick={() => setMenuOpen(false)}><Icon name="dashboard" /> My Dashboard</Link>
-                  <button className="logout" onClick={handleLogout}><Icon name="logout" /> Log out</button>
+                  <Link href={dashboardHref} onClick={() => setMenuOpen(false)}>
+                    <Icon name="dashboard" /> My Dashboard
+                  </Link>
+                  <button className="logout" onClick={handleLogout}>
+                    <Icon name="logout" /> Log out
+                  </button>
                 </div>
               )}
             </div>
-          ) : status !== 'ready' ? <span role="status">جارٍ تحميل الحساب…</span> : (
+          ) : status !== 'ready' ? (
+            <span role="status">جارٍ تحميل الحساب…</span>
+          ) : (
             <>
-              <Link className="btn btn-sm btn-outline" href="/login">Log in</Link>
-              <Link className="btn btn-sm btn-gold" href="/register">Get Started</Link>
+              <Link className="btn btn-sm btn-outline" href="/login">
+                Log in
+              </Link>
+              <Link className="btn btn-sm btn-gold" href="/register">
+                Get Started
+              </Link>
             </>
           )}
         </div>
 
-        <button className="nav-burger" aria-label="Toggle menu" aria-expanded={mobileOpen} onClick={() => setMobileOpen((o) => !o)}>
-          <span style={{ fontSize: 20 }}>{mobileOpen ? <><Icon name="close" /></> : <><Icon name="menu" /></>}</span>
+        <button
+          className="nav-burger"
+          aria-label="Toggle menu"
+          aria-expanded={mobileOpen}
+          onClick={() => setMobileOpen((o) => !o)}
+        >
+          <span style={{ fontSize: 20 }}>
+            {mobileOpen ? (
+              <>
+                <Icon name="close" />
+              </>
+            ) : (
+              <>
+                <Icon name="menu" />
+              </>
+            )}
+          </span>
         </button>
       </div>
 
       <div className={`nav-mobile${mobileOpen ? ' open' : ''}`}>
         {NAV_LINKS.map((link) => (
-          <Link key={link.href} href={link.href} onClick={() => setMobileOpen(false)}>{link.label}</Link>
+          <Link key={link.href} href={link.href} onClick={() => setMobileOpen(false)}>
+            {link.label}
+          </Link>
         ))}
-        <Link href={dashboardHref} onClick={() => setMobileOpen(false)}>Dashboard</Link>
+        <Link href={dashboardHref} onClick={() => setMobileOpen(false)}>
+          Dashboard
+        </Link>
 
         {user ? (
-          <button className="logout" onClick={handleLogout}><Icon name="logout" /> Log out ({user.name})</button>
-        ) : status !== 'ready' ? <span role="status">جارٍ تحميل الحساب…</span> : (
+          <button className="logout" onClick={handleLogout}>
+            <Icon name="logout" /> Log out ({user.name})
+          </button>
+        ) : status !== 'ready' ? (
+          <span role="status">جارٍ تحميل الحساب…</span>
+        ) : (
           <div className="nm-cta">
-            <Link className="btn btn-sm btn-outline" href="/login" onClick={() => setMobileOpen(false)}>Log in</Link>
-            <Link className="btn btn-sm btn-gold" href="/register" onClick={() => setMobileOpen(false)}>Get Started</Link>
+            <Link
+              className="btn btn-sm btn-outline"
+              href="/login"
+              onClick={() => setMobileOpen(false)}
+            >
+              Log in
+            </Link>
+            <Link
+              className="btn btn-sm btn-gold"
+              href="/register"
+              onClick={() => setMobileOpen(false)}
+            >
+              Get Started
+            </Link>
           </div>
         )}
       </div>

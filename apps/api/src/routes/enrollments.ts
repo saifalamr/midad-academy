@@ -1,13 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { RoomServiceClient } from 'livekit-server-sdk';
-import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { config } from '../config';
-import { enrollFree } from '../lib/enrollment';
-
-const createEnrollmentSchema = z.object({
-  courseId: z.string().min(1, 'Course id is required'),
-});
 
 // LiveKit's RoomServiceClient needs an HTTP(S) URL, not WSS.
 function toHttpUrl(wsUrl: string) {
@@ -18,22 +12,11 @@ export async function enrollmentRoutes(app: FastifyInstance) {
   // ── POST /api/enrollments ─────────────────────────────────────────────────
   // Enrolls the authenticated student in a course.
   app.post('/', { preHandler: [app.authenticate] }, async (request, reply) => {
-    const { id: userId, role } = request.user;
-
-    if (role !== 'STUDENT') {
-      return reply.status(403).send({ error: 'Only students can enroll in courses' });
-    }
-
-    const { courseId } = createEnrollmentSchema.parse(request.body);
-
-    const studentProfile = await prisma.studentProfile.findUnique({ where: { userId } });
-    if (!studentProfile) {
-      return reply.status(404).send({ error: 'Student profile not found' });
-    }
-
-    const enrollment = await enrollFree(courseId, studentProfile.id);
-    return reply.status(201).send({ data: enrollment });
-
+    return reply
+      .status(403)
+      .send({
+        error: 'تسجيل الطلاب في الدورات يتم بواسطة إدارة الأكاديمية بعد التواصل مع ولي الأمر.',
+      });
   });
 
   // ── GET /api/enrollments ──────────────────────────────────────────────────
@@ -70,7 +53,7 @@ export async function enrollmentRoutes(app: FastifyInstance) {
         const roomService = new RoomServiceClient(
           toHttpUrl(config.LIVEKIT_URL),
           config.LIVEKIT_API_KEY,
-          config.LIVEKIT_API_SECRET,
+          config.LIVEKIT_API_SECRET
         );
         const rooms = await roomService.listRooms();
         liveRoomNames = new Set(rooms.map((r) => r.name));
@@ -80,8 +63,15 @@ export async function enrollmentRoutes(app: FastifyInstance) {
       }
     }
 
-    const liveSessions = await prisma.classSession.findMany({ where: { courseId: { in: enrollments.map(e => e.courseId) }, status: 'LIVE' }, select: { courseId: true, liveKitRoomId: true } });
-    const liveCourses = new Set(liveSessions.filter(s => s.liveKitRoomId && liveRoomNames.has(s.liveKitRoomId)).map(s => s.courseId));
+    const liveSessions = await prisma.classSession.findMany({
+      where: { courseId: { in: enrollments.map((e) => e.courseId) }, status: 'LIVE' },
+      select: { courseId: true, liveKitRoomId: true },
+    });
+    const liveCourses = new Set(
+      liveSessions
+        .filter((s) => s.liveKitRoomId && liveRoomNames.has(s.liveKitRoomId))
+        .map((s) => s.courseId)
+    );
     return reply.send({
       data: enrollments.map((e) => ({
         id: e.id,

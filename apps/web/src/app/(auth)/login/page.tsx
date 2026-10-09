@@ -33,12 +33,14 @@ export default function LoginPage() {
         return;
       }
 
-      localStorage.removeItem('token'); sessionStorage.removeItem('token');
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
       (remember ? localStorage : sessionStorage).setItem('token', json.data.token);
       window.dispatchEvent(new Event('midad-auth'));
 
       const role: string = json.data.user?.role?.toLowerCase() ?? '';
-      if (role === 'teacher') router.push('/teacher');
+      if (role === 'admin') router.push('/admin');
+      else if (role === 'teacher') router.push('/teacher');
       else if (role === 'parent') router.push('/parent');
       else router.push('/student');
     } catch {
@@ -54,14 +56,22 @@ export default function LoginPage() {
       <aside className="auth-side geo-navy">
         <Link className="brand" href="/">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/midad-logo-transparent.png" alt="Midad Academy" className="logo-full logo-white" />
+          <img
+            src="/midad-logo-transparent.png"
+            alt="Midad Academy"
+            className="logo-full logo-white"
+          />
         </Link>
 
         <div className="auth-side-body">
           <h2 className="auth-head">Welcome back to the academy.</h2>
           <p className="ar auth-head-ar">أهلاً بعودتك إلى مداد</p>
-          <p className="auth-side-p">Pick up right where you left off — your classes, progress and badges are waiting.</p>
-          <div className="card-glass auth-quote"><p>Learn, practise and follow your progress — one lesson at a time.</p></div>
+          <p className="auth-side-p">
+            Pick up right where you left off — your classes, progress and badges are waiting.
+          </p>
+          <div className="card-glass auth-quote">
+            <p>Learn, practise and follow your progress — one lesson at a time.</p>
+          </div>
         </div>
 
         <div className="auth-side-foot">© 2026 Midad Academy</div>
@@ -75,21 +85,24 @@ export default function LoginPage() {
           </div>
 
           <h1 className="auth-title">Log in</h1>
-          <p className="auth-sub">Enter your details to continue. <span className="ar">تسجيل الدخول</span></p>
+          <p className="auth-sub">
+            Enter your details to continue. <span className="ar">تسجيل الدخول</span>
+          </p>
 
           {error && <div className="auth-error">{error}</div>}
 
           <form onSubmit={handleSubmit}>
             <div className="field">
               <label htmlFor="email">
-                Email address <span className="ar muted">البريد الإلكتروني</span>
+                Email or username <span className="ar muted">البريد أو اسم المستخدم</span>
               </label>
               <input
                 id="email"
                 className="input"
-                type="email"
+                type="text"
+                autoComplete="username"
                 required
-                placeholder="you@example.com"
+                placeholder="البريد الإلكتروني أو اسم المستخدم"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -110,11 +123,23 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   style={{ paddingRight: 44 }}
                 />
-                <button type="button" className="eye" aria-label="Toggle password" onClick={() => setShowPw((v) => !v)}>
+                <button
+                  type="button"
+                  className="eye"
+                  aria-label="Toggle password"
+                  onClick={() => setShowPw((v) => !v)}
+                >
                   {showPw ? (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
                   ) : (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M1 12S5 4 12 4s11 8 11 8-4 8-11 8S1 12 1 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                      <path d="M1 12S5 4 12 4s11 8 11 8-4 8-11 8S1 12 1 12Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
                   )}
                 </button>
               </div>
@@ -122,9 +147,16 @@ export default function LoginPage() {
 
             <div className="auth-row">
               <label className="check">
-                <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> Remember me
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                />{' '}
+                Remember me
               </label>
-              <Link className="link-gold" href="/forgot-password">Forgot password?</Link>
+              <Link className="link-gold" href="/forgot-password">
+                Forgot password?
+              </Link>
             </div>
 
             <button
@@ -136,12 +168,25 @@ export default function LoginPage() {
               {loading ? 'Signing in…' : 'Log in'}
             </button>
           </form>
-
-
         </div>
       </div>
 
-      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, textAlign: 'center', padding: '8px', fontSize: '12px', color: '#fff', background: 'rgba(16,30,52,0.9)', backdropFilter: 'blur(4px)', zIndex: 50, borderTop: '1px solid var(--line)' }}>
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          textAlign: 'center',
+          padding: '8px',
+          fontSize: '12px',
+          color: '#fff',
+          background: 'rgba(16,30,52,0.9)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 50,
+          borderTop: '1px solid var(--line)',
+        }}
+      >
         By Yousef Al-Omari
       </div>
     </div>

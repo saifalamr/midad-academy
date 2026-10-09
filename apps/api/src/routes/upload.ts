@@ -29,7 +29,7 @@ function uploadToCloudinary(buffer: Buffer): Promise<UploadApiResponse> {
           return;
         }
         resolve(result);
-      },
+      }
     );
     stream.end(buffer);
   });
@@ -41,11 +41,15 @@ export async function uploadRoutes(app: FastifyInstance) {
   // and returns its secure URL. Only teachers may upload.
   app.post('/', { preHandler: [app.authenticate] }, async (request, reply) => {
     const { role } = request.user;
-    if (role !== 'TEACHER') {
+    if (role !== 'TEACHER' && role !== 'ADMIN') {
       return reply.status(403).send({ error: 'Only teachers can upload files' });
     }
 
-    if (!config.CLOUDINARY_CLOUD_NAME || !config.CLOUDINARY_API_KEY || !config.CLOUDINARY_API_SECRET) {
+    if (
+      !config.CLOUDINARY_CLOUD_NAME ||
+      !config.CLOUDINARY_API_KEY ||
+      !config.CLOUDINARY_API_SECRET
+    ) {
       request.log.error('Cloudinary credentials are not configured');
       return reply.status(500).send({ error: 'File storage is not configured' });
     }

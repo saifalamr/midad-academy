@@ -1,4 +1,4 @@
-export type UserRole = 'TEACHER' | 'STUDENT' | 'PARENT';
+export type UserRole = 'ADMIN' | 'TEACHER' | 'STUDENT' | 'PARENT';
 
 export type ArabicLevel = 'beginner' | 'intermediate' | 'advanced';
 
