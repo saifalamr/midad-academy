@@ -30,7 +30,7 @@ export async function courseRoutes(app: FastifyInstance) {
         maxStudents: true,
         teacher: { select: { user: { select: { name: true } } } },
         classSessions: {
-          where: { status: 'SCHEDULED' },
+          where: { status: 'SCHEDULED', scheduledAt: { gte: new Date() } },
           select: { scheduledAt: true, durationMinutes: true },
           orderBy: { scheduledAt: 'asc' },
           take: 3,
@@ -72,9 +72,17 @@ export async function courseRoutes(app: FastifyInstance) {
           ? { enrollments: { some: { status: 'ACTIVE', student: { userId: request.user.id } } } }
           : request.user.role === 'TEACHER'
             ? { teacher: { userId: request.user.id } }
-            : {},
+            : request.user.role === 'PARENT'
+              ? { month: { gte: new Date().toISOString().slice(0, 7) } }
+              : {},
       include: {
         teacher: { include: { user: { select: { name: true } } } },
+        classSessions: {
+          where: { status: 'SCHEDULED', scheduledAt: { gte: new Date() } },
+          select: { scheduledAt: true, durationMinutes: true },
+          orderBy: { scheduledAt: 'asc' },
+          take: 3,
+        },
         _count: {
           select: { enrollments: { where: { status: 'ACTIVE' } }, seatReservations: true },
         },
@@ -91,6 +99,8 @@ export async function courseRoutes(app: FastifyInstance) {
         price: c.price,
         month: c.month,
         billingPeriod: c.billingPeriod,
+        timeZone: c.timeZone,
+        sessions: c.classSessions,
         currency: c.currency,
         teacherName: c.teacher.user.name,
         studentCount: c._count.enrollments,

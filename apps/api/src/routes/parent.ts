@@ -44,7 +44,7 @@ export async function parentRoutes(app: FastifyInstance) {
           include: {
             user: { select: { name: true, email: true } },
             quizResults: {
-              include: { quiz: { select: { title: true } } },
+              include: { quiz: { select: { id: true, title: true } } },
               orderBy: { completedAt: 'desc' },
               take: 20,
             },
@@ -59,10 +59,36 @@ export async function parentRoutes(app: FastifyInstance) {
               include: {
                 course: {
                   select: {
+                    id: true,
                     title: true,
-                    lessons: {
-                      select: { id: true, title: true, scheduledAt: true, status: true },
-                      orderBy: { scheduledAt: 'desc' },
+                    month: true,
+                    timeZone: true,
+                    teacher: { select: { user: { select: { name: true } } } },
+                    classSessions: {
+                      where: {
+                        OR: [
+                          { status: 'LIVE' },
+                          { status: 'SCHEDULED', scheduledAt: { gte: new Date() } },
+                        ],
+                      },
+                      select: {
+                        id: true,
+                        title: true,
+                        scheduledAt: true,
+                        durationMinutes: true,
+                        status: true,
+                      },
+                      orderBy: { scheduledAt: 'asc' },
+                      take: 3,
+                    },
+                    content: {
+                      where: { quiz: { isNot: null } },
+                      orderBy: [{ order: 'asc' }, { id: 'asc' }],
+                      select: {
+                        id: true,
+                        title: true,
+                        quiz: { select: { id: true, title: true } },
+                      },
                     },
                   },
                 },
@@ -84,7 +110,36 @@ export async function parentRoutes(app: FastifyInstance) {
         const { totalLessons, lessonsCompleted, courseProgress, recentSessions, materialProgress } =
           await studentProgress(child.id);
 
+        const attempts = await prisma.studentQuizResult.findMany({
+          where: {
+            studentId: child.id,
+            quiz: { content: { courseId: { in: child.enrollments.map((e) => e.courseId) } } },
+          },
+          select: { quizId: true, score: true, status: true, completedAt: true },
+          orderBy: { completedAt: 'desc' },
+        });
+        const latest = new Map<string, (typeof attempts)[number]>();
+        for (const attempt of attempts)
+          if (!latest.has(attempt.quizId)) latest.set(attempt.quizId, attempt);
         return {
+          courses: child.enrollments.map(({ course }) => ({
+            id: course.id,
+            title: course.title,
+            month: course.month,
+            timeZone: course.timeZone,
+            teacherName: course.teacher.user.name,
+            upcomingSessions: course.classSessions,
+            exercises: course.content.map((item) => {
+              const attempt = item.quiz ? latest.get(item.quiz.id) : undefined;
+              return {
+                id: item.id,
+                title: item.quiz?.title ?? item.title,
+                status: attempt?.status ?? 'NOT_SUBMITTED',
+                score: attempt?.status === 'COMPLETE' ? attempt.score : null,
+                submittedAt: attempt?.completedAt ?? null,
+              };
+            }),
+          })),
           id: child.id,
           name: child.user.name,
           email: child.user.email,

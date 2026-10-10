@@ -1,0 +1,272 @@
+.family-dashboard {
+  max-width: 1180px;
+  margin: auto;
+  padding: 28px 20px 48px;
+  display: grid;
+  gap: 22px;
+}
+.family-dashboard h1 {
+  font-size: clamp(28px, 4vw, 40px);
+  color: var(--navy);
+  margin: 6px 0 10px;
+}
+.family-dashboard h2 {
+  font-size: 22px;
+  color: var(--navy);
+  margin: 8px 0;
+}
+.family-dashboard h3 {
+  font-size: 20px;
+  color: var(--navy);
+  margin: 14px 0 8px;
+}
+.family-dashboard p {
+  line-height: 1.8;
+  margin: 8px 0;
+}
+.family-heading,
+.family-section-title,
+.family-support {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.family-heading .btn,
+.family-support .btn {
+  white-space: normal;
+  text-align: center;
+}
+.family-children {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.family-child {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px 16px;
+  cursor: pointer;
+  text-align: right;
+  color: var(--navy);
+  font: inherit;
+  max-width: 100%;
+}
+.family-child.selected {
+  background: #f4e8cf;
+  border-color: var(--gold);
+}
+.family-child small {
+  display: block;
+  color: var(--ink-3);
+  margin-top: 5px;
+}
+.family-child .avatar {
+  flex: none;
+  background: #e6ebf3;
+}
+.family-next {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  background: #f0f3f9;
+  border-inline-start: 4px solid var(--gold);
+}
+.family-next svg {
+  flex: none;
+  color: var(--navy);
+  margin-top: 8px;
+}
+.family-next small {
+  color: var(--ink-3);
+}
+.family-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.family-stats section {
+  display: grid;
+  gap: 8px;
+}
+.family-stats svg {
+  color: var(--gold);
+}
+.family-stats b {
+  font-size: 28px;
+  color: var(--navy);
+}
+.family-stats span {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+.family-courses {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.family-course-summary {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.family-course-summary span {
+  background: #f5f6f8;
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+.family-course-summary b {
+  margin-inline-start: 8px;
+  color: var(--navy);
+}
+.family-note,
+.family-materials small {
+  font-size: 12px;
+  color: var(--ink-3);
+  line-height: 1.7;
+  display: block;
+}
+.family-materials {
+  margin: 18px 0;
+}
+.family-materials label {
+  font-size: 14px;
+}
+.family-materials progress {
+  display: block;
+  width: 100%;
+  height: 10px;
+  accent-color: var(--gold);
+  margin: 8px 0;
+}
+.family-course details {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  margin-top: 18px;
+}
+.family-course summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--navy);
+  line-height: 1.8;
+}
+.family-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+.family-list li {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 7px;
+  overflow-wrap: anywhere;
+}
+.family-list li:last-child {
+  border-bottom: 0;
+}
+.family-list b {
+  color: var(--navy);
+}
+.family-list small,
+.family-list li div span {
+  display: block;
+  color: var(--ink-3);
+  line-height: 1.7;
+}
+.family-status {
+  border-radius: 8px;
+  background: #f5ebd7;
+  color: #825d1b;
+  padding: 7px 10px;
+  justify-self: start;
+  font-size: 13px;
+}
+.family-status.complete {
+  background: #e2f0e8;
+  color: #276445;
+}
+.family-status.missed {
+  background: #fbe8e5;
+  color: #993d32;
+}
+.family-attendance li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+.family-attendance .family-status {
+  flex: none;
+}
+.family-empty {
+  text-align: center;
+}
+.family-empty svg {
+  color: var(--gold);
+}
+.family-dashboard .card {
+  min-width: 0;
+}
+.family-dashboard .btn-outline {
+  border: 1px solid var(--navy);
+}
+.course-times {
+  margin: 16px 0;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.course-times ul {
+  padding-inline-start: 20px;
+}
+.course-times small {
+  color: var(--ink-3);
+}
+@media (max-width: 650px) {
+  .family-courses {
+    grid-template-columns: 1fr;
+  }
+  .family-heading .btn {
+    width: 100%;
+  }
+  .family-dashboard {
+    padding: 22px 14px 40px;
+    gap: 18px;
+  }
+  .family-stats .pad {
+    padding: 14px;
+  }
+  .family-stats span {
+    font-size: 12px;
+  }
+  .family-child {
+    flex: 1;
+    min-width: min(100%, 180px);
+  }
+  .family-section-title {
+    gap: 4px;
+  }
+  .family-section-title .muted {
+    font-size: 12px;
+  }
+  .family-support .btn {
+    width: 100%;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .family-child {
+    transition: background 0.15s;
+  }
+}
+.family-child:focus-visible,
+.family-course summary:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 4px;
+}

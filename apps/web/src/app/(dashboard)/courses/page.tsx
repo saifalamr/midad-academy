@@ -1,8 +1,10 @@
 'use client';
+import '@/components/course-times.css';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { API_URL } from '@/lib/config';
 import { useAuth } from '@/components/AuthProvider';
+import { courseInquiryUrl, sessionDate } from '@/lib/academy-contact';
 import Icon from '@/components/Icon';
 type Course = {
   id: string;
@@ -14,6 +16,8 @@ type Course = {
   month: string | null;
   teacherName: string;
   availableSeats: number;
+  timeZone: string;
+  sessions: { scheduledAt: string; durationMinutes: number }[];
 };
 export default function CoursesPage() {
   const { user } = useAuth();
@@ -108,6 +112,23 @@ export default function CoursesPage() {
                 <p>{c.description}</p>
                 <p>{c.teacherName}</p>
                 {user?.role === 'PARENT' && (
+                  <div className="course-times">
+                    <strong>المواعيد القادمة</strong>
+                    {c.sessions.length ? (
+                      <ul>
+                        {c.sessions.map((s) => (
+                          <li key={s.scheduledAt}>
+                            {sessionDate(s.scheduledAt, c.timeZone)} · {s.durationMinutes} دقيقة
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p>تحدد الأكاديمية المواعيد قريبًا.</p>
+                    )}
+                    <small>توقيت {c.timeZone}</small>
+                  </div>
+                )}
+                {user?.role === 'PARENT' && (
                   <p>
                     {c.availableSeats} مقاعد متاحة ·{' '}
                     {new Intl.NumberFormat('en', {
@@ -118,9 +139,14 @@ export default function CoursesPage() {
                   </p>
                 )}
                 {user?.role === 'PARENT' ? (
-                  <Link className="btn btn-outline" href="/contact">
-                    التواصل مع الأكاديمية للتسجيل
-                  </Link>
+                  <a
+                    className="btn btn-gold"
+                    href={courseInquiryUrl(c)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {c.availableSeats > 0 ? 'طلب التسجيل عبر واتساب' : 'استفسر عن قائمة الانتظار'}
+                  </a>
                 ) : (
                   <Link
                     className="btn btn-gold"

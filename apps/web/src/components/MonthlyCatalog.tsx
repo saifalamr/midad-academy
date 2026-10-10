@@ -1,7 +1,9 @@
 'use client';
+import '@/components/course-times.css';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { API_URL } from '@/lib/config';
+import { courseInquiryUrl, sessionDate } from '@/lib/academy-contact';
 import Icon from './Icon';
 type Course = {
   id: string;
@@ -13,6 +15,8 @@ type Course = {
   currency: string;
   teacherName: string;
   availableSeats: number;
+  timeZone: string;
+  sessions: { scheduledAt: string; durationMinutes: number }[];
 };
 export default function MonthlyCatalog() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -74,7 +78,30 @@ export default function MonthlyCatalog() {
                 </b>{' '}
                 / شهر
               </p>
-              <Link className="btn btn-gold" href="/register">
+              <div className="course-times">
+                <strong>المواعيد القادمة</strong>
+                {c.sessions.length ? (
+                  <ul>
+                    {c.sessions.map((s) => (
+                      <li key={s.scheduledAt}>
+                        {sessionDate(s.scheduledAt, c.timeZone)} · {s.durationMinutes} دقيقة
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>تحدد الأكاديمية المواعيد قريبًا.</p>
+                )}
+                <small>توقيت {c.timeZone}</small>
+              </div>
+              <a
+                className="btn btn-gold"
+                href={courseInquiryUrl(c)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {c.availableSeats > 0 ? 'طلب التسجيل عبر واتساب' : 'استفسر عن قائمة الانتظار'}
+              </a>
+              <Link className="btn btn-outline" style={{ marginTop: 12 }} href="/register">
                 <Icon name="family" /> إنشاء حساب ولي الأمر
               </Link>
             </article>

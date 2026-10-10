@@ -11,11 +11,9 @@ test('mobile student login, enrollment, quiz and account linking code', async ({
   await expect(
     page.getByText('Arabic Foundations · أساسيات العربية', { exact: true })
   ).toBeVisible();
-  const card = page
-    .getByRole('article')
-    .filter({
-      has: page.getByRole('heading', { name: 'Arabic Foundations · أساسيات العربية', exact: true }),
-    });
+  const card = page.getByRole('article').filter({
+    has: page.getByRole('heading', { name: 'Arabic Foundations · أساسيات العربية', exact: true }),
+  });
   await expect(card.getByRole('link', { name: 'عرض المواد' })).toBeVisible();
   await expect(card.getByRole('button', { name: /Enroll/ })).toHaveCount(0);
   await page.goto('/courses/preview-arabic/lessons');
@@ -108,7 +106,7 @@ test('parent dashboard and report navigation work on mobile', async ({ page }) =
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
   await expect(page).toHaveURL(/\/parent$/);
   await expect(page.getByRole('button', { name: '+ Add Child' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Download learning report' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'تحميل سجل الحضور الأخير' })).toBeVisible();
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)
   ).toBeTruthy();
@@ -181,9 +179,7 @@ test('parent browses courses without student checkout controls', async ({ page }
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
   await expect(page).toHaveURL(/parent$/);
   await page.goto('/courses');
-  await expect(
-    page.getByRole('link', { name: 'التواصل مع الأكاديمية للتسجيل' }).first()
-  ).toBeVisible();
+  await expect(page.getByRole('link', { name: 'طلب التسجيل عبر واتساب' }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: /Enroll/ })).toHaveCount(0);
 });
 
@@ -313,7 +309,9 @@ test('mobile quiz delivery retries one saved attempt, teacher feedback and final
   expect(parentData.data.children[0].quizResults, JSON.stringify(parentData)).toEqual(
     expect.arrayContaining([expect.objectContaining({ quizTitle: 'Mobile feedback quiz' })])
   );
-  const familyResults = parentPage.getByRole('region', { name: 'نتائج اختبارات الطالب' });
+  const familyResults = parentPage
+    .locator('.family-course')
+    .filter({ has: parentPage.getByText('Mobile feedback quiz', { exact: true }) });
   await expect(familyResults.getByText('Mobile feedback quiz', { exact: true })).toBeVisible();
   await expect(familyResults).toContainText('بانتظار تصحيح المعلم');
   await teacherPage.goto('/teacher/review-answers');
@@ -336,7 +334,7 @@ test('mobile quiz delivery retries one saved attempt, teacher feedback and final
   await expect(ownResult).toContainText('Score: 100%');
   await expect(ownResult).toContainText('أحسنت، جملة واضحة');
   await parentPage.reload();
-  await expect(familyResults).toContainText('100% · ناجح');
+  await expect(familyResults).toContainText('الدرجة النهائية: 100%');
   expect(
     await teacherPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)
   ).toBeTruthy();

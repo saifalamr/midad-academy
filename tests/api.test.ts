@@ -739,6 +739,7 @@ test('course counters include active students only and full courses expose zero 
     data: {
       teacherId: teacher.id,
       title: 'Counter fixture',
+      month: new Date().toISOString().slice(0, 7),
       description: 'Counts test',
       ageGroup: '8-10',
       level: 'beginner',
@@ -1619,4 +1620,154 @@ test('monthly dates, teacher conflicts, capacity edits and reassignment are enfo
       .statusCode,
     409
   );
+});
+
+test('family overview scopes children, upcoming classes and latest exercise grades to the parent', async () => {
+  const teacher = await prisma.teacherProfile.findUniqueOrThrow({
+    where: { userId: actors.teacher.id },
+  });
+  const parent = await prisma.user.create({
+    data: {
+      name: 'Isolated family',
+      email: 'family-only@midad.test',
+      passwordHash: 'fixture',
+      role: 'PARENT',
+      parentProfile: { create: {} },
+    },
+    include: { parentProfile: true },
+  });
+  const child = await prisma.user.create({
+    data: {
+      name: 'Family child',
+      email: 'family-child@midad.test',
+      passwordHash: 'fixture',
+      role: 'STUDENT',
+      studentProfile: { create: { age: 8, parentId: parent.parentProfile.id } },
+    },
+    include: { studentProfile: true },
+  });
+  const course = await prisma.course.create({
+    data: {
+      title: 'Family monthly course',
+      description: 'Family test',
+      level: 'BEGINNER',
+      ageGroup: '8–10',
+      teacherId: teacher.id,
+      price: 10,
+      month: '2099-01',
+      timeZone: 'Africa/Cairo',
+    },
+  });
+  await prisma.enrollment.create({
+    data: {
+      courseId: course.id,
+      studentId: child.studentProfile.id,
+      enrolledAt: new Date('2020-01-01'),
+    },
+  });
+  const completed = await prisma.classSession.create({
+    data: {
+      courseId: course.id,
+      teacherId: teacher.id,
+      title: 'Attended',
+      status: 'COMPLETED',
+      scheduledAt: new Date('2025-01-01'),
+    },
+  });
+  await prisma.sessionAttendance.create({
+    data: { sessionId: completed.id, studentId: child.studentProfile.id },
+  });
+  await prisma.classSession.create({
+    data: {
+      courseId: course.id,
+      teacherId: teacher.id,
+      title: 'Missed',
+      status: 'COMPLETED',
+      scheduledAt: new Date('2025-01-02'),
+    },
+  });
+  const next = await prisma.classSession.create({
+    data: {
+      courseId: course.id,
+      teacherId: teacher.id,
+      title: 'Next class',
+      scheduledAt: new Date('2099-01-01'),
+    },
+  });
+  await prisma.classSession.create({
+    data: {
+      courseId: course.id,
+      teacherId: teacher.id,
+      title: 'Cancelled',
+      status: 'CANCELLED',
+      scheduledAt: new Date('2025-01-03'),
+    },
+  });
+  const quiz = await prisma.courseContent.create({
+    data: {
+      courseId: course.id,
+      title: 'Exercise',
+      description: '',
+      order: 0,
+      type: 'EXERCISE',
+      contentUrl: 'https://example.com',
+      duration: 5,
+      quiz: { create: { title: 'Family exercise' } },
+    },
+    include: { quiz: true },
+  });
+  await prisma.studentQuizResult.create({
+    data: {
+      studentId: child.studentProfile.id,
+      quizId: quiz.quiz.id,
+      score: 95,
+      passed: true,
+      answers: { private: 'must not leak' },
+      completedAt: new Date('2025-01-01'),
+    },
+  });
+  await prisma.studentQuizResult.create({
+    data: {
+      studentId: child.studentProfile.id,
+      quizId: quiz.quiz.id,
+      score: 30,
+      passed: false,
+      status: 'PENDING_REVIEW',
+      answers: { private: 'must not leak' },
+      completedAt: new Date('2025-01-02'),
+    },
+  });
+  const token = app.jwt.sign({
+    id: parent.id,
+    email: parent.email,
+    name: parent.name,
+    role: parent.role,
+    version: 0,
+  });
+  const res = await app.inject({
+    method: 'GET',
+    url: '/api/parent/overview',
+    headers: { authorization: `Bearer ${token}` },
+    remoteAddress,
+  });
+  assert.equal(res.statusCode, 200, res.body);
+  const data = res.json().data.children;
+  assert.equal(data.length, 1);
+  assert.equal(data[0].id, child.studentProfile.id);
+  assert.equal(data[0].totalLessons, 2);
+  assert.equal(data[0].lessonsCompleted, 1);
+  assert.equal(data[0].courses[0].upcomingSessions[0].id, next.id);
+  assert.equal(data[0].courses[0].exercises[0].status, 'PENDING_REVIEW');
+  assert.equal(data[0].courses[0].exercises[0].score, null);
+  assert.equal(data[0].recentSessions[0].timeZone, 'Africa/Cairo');
+  assert.ok(!res.body.includes('must not leak'));
+  const other = (await call('GET', '/api/parent/overview', 'parent')).json().data.children;
+  assert.ok(other.every((c) => c.id !== child.studentProfile.id));
+  for (const role of ['teacher', 'student', 'admin'])
+    assert.equal((await call('GET', '/api/parent/overview', role)).statusCode, 403);
+  const catalog = (await call('GET', '/api/courses/browse', 'parent'))
+    .json()
+    .data.find((c) => c.id === course.id);
+  assert.equal(catalog.sessions[0].scheduledAt, next.scheduledAt.toISOString());
+  assert.equal(catalog.timeZone, 'Africa/Cairo');
 });

@@ -41,6 +41,8 @@ async function main() {
       id: 'preview-arabic',
       teacherId: teacher.id,
       title: 'Arabic Foundations · أساسيات العربية',
+      month: new Date().toISOString().slice(0, 7),
+      timeZone: 'Africa/Cairo',
       description: 'Practice Arabic letters, words and simple sentences with your teacher.',
       level: 'beginner',
       ageGroup: '8–10',

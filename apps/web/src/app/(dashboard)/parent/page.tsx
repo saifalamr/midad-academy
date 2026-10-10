@@ -1,508 +1,370 @@
 'use client';
-
-import Icon from '@/components/Icon';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { useAuth } from '@/components/AuthProvider';
+import Icon from '@/components/Icon';
 import { API_URL } from '@/lib/config';
+import { academyContactUrl, sessionDate } from '@/lib/academy-contact';
+import './parent.css';
 
 type Session = {
   id: string;
   courseTitle: string;
+  timeZone: string;
   lessonTitle: string;
   scheduledAt: string;
   attended: boolean;
 };
-
-type CourseProgress = {
-  courseTitle: string;
-  total: number;
-  completed: number;
+type Course = {
+  id: string;
+  title: string;
+  month: string | null;
+  timeZone: string;
+  teacherName: string;
+  upcomingSessions: {
+    id: string;
+    title: string;
+    scheduledAt: string;
+    durationMinutes: number;
+    status: string;
+  }[];
+  exercises: {
+    id: string;
+    title: string;
+    status: string;
+    score: number | null;
+    submittedAt: string | null;
+  }[];
 };
-
 type Child = {
   id: string;
   name: string;
-  email: string;
   level: string;
   totalPoints: number;
-  streak: number;
   lessonsCompleted: number;
   totalLessons: number;
-  courseProgress: CourseProgress[];
-  materialProgress: { courseId: string; title: string; total: number; completed: number }[];
+  courses: Course[];
+  courseProgress: { courseId: string; total: number; completed: number }[];
+  materialProgress: { courseId: string; total: number; completed: number }[];
   recentSessions: Session[];
-  quizResults: {
-    id: string;
-    quizTitle: string;
-    score: number;
-    passed: boolean;
-    status: 'PENDING_REVIEW' | 'COMPLETE';
-    completedAt: string;
-  }[];
 };
-
-type Overview = {
-  children: Child[];
-};
-
-function authFetch(path: string) {
-  const token =
-    typeof window !== 'undefined'
-      ? (localStorage.getItem('token') ?? sessionStorage.getItem('token'))
-      : null;
-  return fetch(`${API_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-}
-
-function getTokenPayload(): { name?: string } {
-  try {
-    const token = localStorage.getItem('token') ?? sessionStorage.getItem('token');
-    if (!token) return {};
-    return JSON.parse(atob(token.split('.')[1]));
-  } catch {
-    return {};
-  }
-}
-
-const CHILD_COLORS = [
-  { bg: '#dce6f4', color: 'var(--navy)' },
-  { bg: '#e3efe6', color: '#2a6d49' },
-  { bg: '#f4dede', color: '#b3463b' },
-  { bg: '#f3e8d4', color: '#8a5a1a' },
-];
 
 export default function ParentDashboard() {
-  const router = useRouter();
-  const [overview, setOverview] = useState<Overview | null>(null);
+  const { user } = useAuth();
+  const [children, setChildren] = useState<Child[]>([]);
+  const [selected, setSelected] = useState('');
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
-  const [userName, setUserName] = useState('Parent');
-
+  const [error, setError] = useState('');
+  const [reload, setReload] = useState(0);
   useEffect(() => {
-    const payload = getTokenPayload();
-    setUserName(payload.name ?? 'Parent');
-
-    authFetch('/api/parent/overview')
-      .then(async (res) => {
-        if (res.status === 401) {
-          router.push('/login');
-          return;
-        }
-        if (!res.ok) throw new Error();
-        const json = await res.json();
-        setOverview(json.data ?? { children: [] });
+    const controller = new AbortController();
+    setLoading(true);
+    setError('');
+    const token = localStorage.getItem('token') ?? sessionStorage.getItem('token');
+    fetch(`${API_URL}/api/parent/overview`, {
+      signal: controller.signal,
+      cache: 'no-store',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error();
+        return r.json();
       })
-      .catch(() => setLoadError('Could not load your family report. Please refresh to retry.'))
-      .finally(() => setLoading(false));
-  }, [router]);
-
-  const children = overview?.children ?? [];
-  const totalCompleted = children.reduce((s, c) => s + c.lessonsCompleted, 0);
-  const totalEnrolled = children.reduce((s, c) => s + c.courseProgress.length, 0);
-  const familyXP = children.reduce((s, c) => s + c.totalPoints, 0);
-
-  const allSessions = children
-    .flatMap((c) => c.recentSessions.map((s) => ({ ...s, childName: c.name })))
-    .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime())
-    .slice(0, 5);
-
+      .then((j) => setChildren(j.data.children))
+      .catch((e) => {
+        if (e.name !== 'AbortError') setError('تعذر تحميل بيانات أبنائك. حاول مرة أخرى.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [reload]);
+  const child = children.find((c) => c.id === selected) ?? children[0];
+  const next = child?.courses
+    .flatMap((course) => course.upcomingSessions.map((s) => ({ ...s, course })))
+    .sort((a, b) =>
+      a.status === 'LIVE'
+        ? -1
+        : b.status === 'LIVE'
+          ? 1
+          : new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
+    )[0];
   function downloadReport() {
-    const cell = (value: string | number | boolean) =>
+    const cell = (value: string | boolean) =>
       '"' +
       String(value)
         .replace(/^[=+@-]/, "'")
         .replace(/"/g, '""') +
       '"';
-    const rows: (string | number | boolean)[][] = [
-      ['Child', 'Course', 'Session', 'Date', 'Attended'],
-    ];
-    children.forEach((child) =>
-      child.recentSessions.forEach((session) =>
-        rows.push([
-          child.name,
-          session.courseTitle,
-          session.lessonTitle,
-          new Date(session.scheduledAt).toLocaleDateString(),
-          session.attended,
+    const rows = [
+      ['الطفل', 'الدورة', 'الحصة', 'الموعد', 'الحضور'],
+      ...children.flatMap((c) =>
+        c.recentSessions.map((s) => [
+          c.name,
+          s.courseTitle,
+          s.lessonTitle,
+          sessionDate(s.scheduledAt, s.timeZone),
+          s.attended ? 'حضر' : 'غاب',
         ])
-      )
-    );
+      ),
+    ];
     const url = URL.createObjectURL(
       new Blob(['\ufeff' + rows.map((row) => row.map(cell).join(',')).join('\r\n')], {
         type: 'text/csv;charset=utf-8',
       })
     );
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'midad-learning-report.csv';
-    a.click();
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'midad-recent-attendance.csv';
+    link.click();
     URL.revokeObjectURL(url);
   }
-
   return (
-    <div className="midad" style={{ minHeight: '100vh', background: 'var(--cream)' }}>
-      {/* ── App bar ── */}
-
-      <main className="dash">
-        {loadError && (
-          <div className="auth-error" role="alert">
-            {loadError}
-          </div>
-        )}
-
-        {/* ── Page head ── */}
-        <div className="page-head">
-          <div>
-            <p className="dh-hi">
-              Good morning, <b>{userName}</b> <span className="ar dh-ar">صباح الخير</span>
-            </p>
-            <h1 className="dh-title">Your family&apos;s progress</h1>
-          </div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button
-              className="btn btn-outline"
-              onClick={downloadReport}
-              disabled={!children.length}
-            >
-              Download learning report
-            </button>
-          </div>
+    <main className="dash family-dashboard" dir="rtl">
+      <header className="family-heading">
+        <div>
+          <p className="eyebrow">مرحبًا {user?.name}</p>
+          <h1>متابعة أبنائك</h1>
+          <p className="muted">الدورات والمواعيد والحضور والتمارين، في مكان واحد.</p>
         </div>
-
-        {/* ── Stats row ── */}
-        <div className="stat-row" id="children">
-          <div className="stat card">
-            <div className="st-ic st-navy">
-              <Icon name="family" />
-            </div>
-            <div>
-              <b>{loading ? '—' : children.length}</b>
-              <span>Children enrolled</span>
-            </div>
-          </div>
-          <div className="stat card">
-            <div className="st-ic st-fire">
-              <Icon name="calendar" />
-            </div>
-            <div>
-              <b>{loading ? '—' : totalEnrolled}</b>
-              <span>Active classes</span>
-            </div>
-          </div>
-          <div className="stat card">
-            <div className="st-ic st-gold">
-              <Icon name="star" />
-            </div>
-            <div>
-              <b>{loading ? '—' : familyXP}</b>
-              <span>Family XP</span>
-            </div>
-          </div>
-          <div className="stat card">
-            <div className="st-ic st-green">
-              <Icon name="check" />
-            </div>
-            <div>
-              <b>{loading ? '—' : totalCompleted}</b>
-              <span>Lessons done</span>
-            </div>
-          </div>
-        </div>
-
-        {loading ? (
-          <div
-            className="card pad"
-            style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14 }}
+        <Link href="/courses" className="btn btn-gold">
+          <Icon name="book" />
+          استعرض الدورات الشهرية
+        </Link>
+      </header>
+      {loading ? (
+        <section className="card pad" role="status">
+          جارٍ تحميل بيانات الأسرة…
+        </section>
+      ) : error ? (
+        <section className="card pad" role="alert">
+          <p>{error}</p>
+          <button className="btn btn-outline" onClick={() => setReload((v) => v + 1)}>
+            إعادة المحاولة
+          </button>
+        </section>
+      ) : !child ? (
+        <section className="card pad family-empty">
+          <Icon name="family" size={42} />
+          <h2>لنبدأ رحلة أبنائك</h2>
+          <p>تضيف الأكاديمية حسابات أبنائك وتربطها بك بعد التواصل وإكمال التسجيل.</p>
+          <a
+            className="btn btn-gold"
+            href={academyContactUrl}
+            target="_blank"
+            rel="noopener noreferrer"
           >
-            Loading dashboard…
-          </div>
-        ) : children.length === 0 ? (
-          <div className="card pad" style={{ textAlign: 'center' }}>
-            <p style={{ color: 'var(--ink-3)', fontSize: 14, marginBottom: 14 }}>
-              تضيف إدارة الأكاديمية أبناءك بعد التواصل معك، ثم تظهر حساباتهم ودوراتهم هنا.
-            </p>
-          </div>
-        ) : (
-          <>
-            {/* ── Children grid ── */}
-            <div className="col-head" style={{ marginTop: 8 }}>
-              <h2>
-                My Children <span className="ar muted">أبنائي</span>
-              </h2>
+            تواصل مع الأكاديمية
+          </a>
+        </section>
+      ) : (
+        <>
+          <nav className="family-children" aria-label="اختيار الطفل" id="children">
+            {children.map((c) => (
+              <button
+                key={c.id}
+                className={`family-child${child.id === c.id ? ' selected' : ''}`}
+                aria-pressed={child.id === c.id}
+                onClick={() => setSelected(c.id)}
+              >
+                <span className="avatar">{c.name.charAt(0)}</span>
+                <span>
+                  {c.name}
+                  <small>{c.courses.length} دورات مسجل فيها</small>
+                </span>
+              </button>
+            ))}
+          </nav>
+          <section className="family-next card pad" aria-label="الحصة القادمة">
+            <Icon name="calendar" size={32} />
+            <div>
+              <span className="eyebrow">
+                {next?.status === 'LIVE' ? 'حصة جارية الآن' : 'الحصة القادمة'}
+              </span>
+              <h2>{next ? next.title : 'لا توجد حصة قادمة بعد'}</h2>
+              <p>
+                {next
+                  ? `${next.course.title} · ${sessionDate(next.scheduledAt, next.course.timeZone)}`
+                  : 'ستظهر هنا المواعيد التي تضيفها الأكاديمية لدورات طفلك.'}
+              </p>
+              {next && (
+                <small>
+                  {next.durationMinutes} دقيقة · توقيت {next.course.timeZone}
+                </small>
+              )}
             </div>
-            <div className="child-grid">
-              {children.map((child, idx) => {
-                const col = CHILD_COLORS[idx % CHILD_COLORS.length];
-                const pct =
-                  child.totalLessons > 0
-                    ? Math.round((child.lessonsCompleted / child.totalLessons) * 100)
-                    : 0;
+          </section>
+          <div className="family-stats">
+            <section className="card pad">
+              <Icon name="book" />
+              <b>{child.courses.length}</b>
+              <span>الدورات المسجل فيها</span>
+            </section>
+            <section className="card pad">
+              <Icon name="check" />
+              <b>{child.lessonsCompleted}</b>
+              <span>حصص حضرها</span>
+            </section>
+            <section className="card pad">
+              <Icon name="calendar" />
+              <b>{child.totalLessons - child.lessonsCompleted}</b>
+              <span>حصص غاب عنها</span>
+            </section>
+          </div>
+          <div className="family-section-title">
+            <h2>دورات {child.name}</h2>
+            <span className="muted">الحضور مستقل عن إنجاز المواد والدرجات</span>
+          </div>
+          {!child.courses.length ? (
+            <section className="card pad">
+              <p>لم تسجل الأكاديمية طفلك في دورة بعد.</p>
+              <Link href="/courses" className="link-gold">
+                اختر دورة وتواصل لطلب التسجيل
+              </Link>
+            </section>
+          ) : (
+            <div className="family-courses">
+              {child.courses.map((course) => {
+                const attendance = child.courseProgress.find((c) => c.courseId === course.id);
+                const materials = child.materialProgress.find((c) => c.courseId === course.id);
+                const attended = attendance?.completed ?? 0,
+                  total = attendance?.total ?? 0;
                 return (
-                  <div key={child.id} className="child card">
-                    <div className="ch-head">
-                      <span
-                        className="avatar ch-av"
-                        style={{ background: col.bg, color: col.color }}
-                      >
-                        {child.name.charAt(0)}
+                  <article key={course.id} className="card pad family-course">
+                    <span className="tag">
+                      {course.month ? `دورة شهر ${course.month}` : 'دورة مسجل فيها'}
+                    </span>
+                    <h3>{course.title}</h3>
+                    <p className="muted">المعلم: {course.teacherName}</p>
+                    <div className="family-course-summary">
+                      <span>
+                        الحضور{' '}
+                        <b>
+                          {attended} من {total}
+                        </b>
                       </span>
-                      <div>
-                        <div className="ch-name">{child.name}</div>
-                        <div className="ch-meta capitalize">{child.level}</div>
-                      </div>
-                      <span className="mini-chip">
-                        <span className="mc-ic">
-                          <Icon name="flame" />
-                        </span>{' '}
-                        {child.streak}
+                      <span>
+                        الغياب <b>{total - attended}</b>
                       </span>
                     </div>
-
-                    <div className="ch-xp">
-                      <div className="lvl-row">
-                        <span>{child.totalPoints} XP</span>
-                        <span className="capitalize">{child.level}</span>
-                      </div>
-                      <div className="bar">
-                        <i style={{ width: `${pct}%` }}></i>
-                      </div>
-                    </div>
-
-                    <div className="ch-stats">
-                      <div>
-                        <b>{child.courseProgress.length}</b>
-                        <span>Courses</span>
-                      </div>
-                      <div>
-                        <b>{child.lessonsCompleted}</b>
-                        <span>Lessons done</span>
-                      </div>
-                      <div>
-                        <b>{child.streak}</b>
-                        <span>Day streak</span>
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: 12 }}>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: 'var(--ink-2)',
-                          marginBottom: 6,
-                        }}
-                      >
-                        Lesson Progress
-                      </div>
-                      {child.courseProgress.length === 0 ? (
-                        <p style={{ fontSize: 12, color: 'var(--ink-3)' }}>No courses yet.</p>
-                      ) : (
-                        <ResponsiveContainer width="100%" height={80}>
-                          <BarChart
-                            data={child.courseProgress.map((c) => ({
-                              name: c.courseTitle?.slice(0, 8) ?? 'Course',
-                              completed: c.completed,
-                              total: c.total,
-                            }))}
-                          >
-                            <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                            <YAxis hide />
-                            <Tooltip />
-                            <Bar dataKey="total" fill="#1B3A6B" opacity={0.2} radius={4} />
-                            <Bar dataKey="completed" fill="#C9922A" radius={4} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      )}
-                    </div>
-
-                    {child.materialProgress?.some((course) => course.total > 0) && (
-                      <div style={{ marginTop: 16 }} dir="rtl">
-                        <h3 style={{ fontSize: 14 }}>إنجاز مواد التعلم</h3>
-                        <p className="muted" style={{ fontSize: 12 }}>
-                          إنجاز يسجله الطالب، مستقل عن الحضور والاختبارات.
-                        </p>
-                        {child.materialProgress
-                          .filter((course) => course.total > 0)
-                          .map((course) => (
-                            <div key={course.courseId} style={{ marginTop: 10 }}>
-                              <small>
-                                {course.title} · {course.completed}/{course.total}
-                              </small>
-                              <progress
-                                aria-label={`إنجاز مواد ${course.title} للطالب ${child.name}`}
-                                value={course.completed}
-                                max={course.total}
-                                style={{
-                                  display: 'block',
-                                  width: '100%',
-                                  accentColor: 'var(--gold)',
-                                }}
-                              />
-                            </div>
-                          ))}
+                    <p className="family-note">
+                      تُحسب الحصص المكتملة منذ تسجيل الطفل؛ الحصص الملغاة والقادمة لا تُحسب غيابًا.
+                    </p>
+                    {materials && materials.total > 0 && (
+                      <div className="family-materials">
+                        <label htmlFor={`progress-${child.id}-${course.id}`}>
+                          إنجاز المواد: {materials.completed} من {materials.total}
+                        </label>
+                        <progress
+                          id={`progress-${child.id}-${course.id}`}
+                          value={materials.completed}
+                          max={materials.total}
+                        />
+                        <small>إنجاز يسجله الطالب؛ لا يمثل تقييم المعلم لمستواه.</small>
                       </div>
                     )}
-
-                    <div className="ch-next">
-                      <span className="nx-dot"></span>
-                      <b>Progress:</b> {child.lessonsCompleted} of {child.totalLessons} lessons
-                    </div>
-                  </div>
+                    <details>
+                      <summary>المواعيد القادمة ({course.upcomingSessions.length})</summary>
+                      {course.upcomingSessions.length ? (
+                        <ul className="family-list">
+                          {course.upcomingSessions.map((s) => (
+                            <li key={s.id}>
+                              <b>{s.title}</b>
+                              <span>{sessionDate(s.scheduledAt, course.timeZone)}</span>
+                              <small>
+                                {s.durationMinutes} دقيقة ·{' '}
+                                {s.status === 'LIVE' ? 'جارية الآن' : 'مجدولة'} · {course.timeZone}
+                              </small>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p>لا توجد مواعيد قادمة.</p>
+                      )}
+                    </details>
+                    <details open>
+                      <summary>تمارين الدورة والدرجات ({course.exercises.length})</summary>
+                      <p className="family-note">
+                        آخر تسليم لكل تمرين، وتظهر الدرجة النهائية بعد اكتمال التصحيح.
+                      </p>
+                      {course.exercises.length ? (
+                        <ul className="family-list">
+                          {course.exercises.map((e) => (
+                            <li key={e.id}>
+                              <b>{e.title}</b>
+                              <span
+                                className={`family-status ${e.status === 'COMPLETE' ? 'complete' : ''}`}
+                              >
+                                {e.status === 'NOT_SUBMITTED'
+                                  ? 'لم تُسلّم'
+                                  : e.status === 'PENDING_REVIEW'
+                                    ? 'بانتظار تصحيح المعلم'
+                                    : `الدرجة النهائية: ${e.score}%`}
+                              </span>
+                              {e.submittedAt && (
+                                <small>
+                                  آخر تسليم: {sessionDate(e.submittedAt, course.timeZone)}
+                                </small>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p>لم تضف الإدارة تمارين لهذه الدورة بعد.</p>
+                      )}
+                    </details>
+                  </article>
                 );
               })}
             </div>
-
-            {/* ── Bottom grid ── */}
-            <div className="dash-grid p-grid">
-              <div className="dash-col">
-                <div className="card pad">
-                  <div className="col-head sm">
-                    <h3>
-                      Attendance timeline <span className="ar muted">سجلّ الحضور</span>
-                    </h3>
-                  </div>
-                  {allSessions.length === 0 ? (
-                    <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No sessions yet.</p>
-                  ) : (
-                    <ul className="timeline">
-                      {allSessions.map((s) => {
-                        const date = new Date(s.scheduledAt);
-                        return (
-                          <li key={s.id}>
-                            <span className={`tl-dot ${s.attended ? 'ok' : 'miss'}`}></span>
-                            <div className="tl-body">
-                              <div className="tl-row">
-                                <b>{s.lessonTitle}</b>
-                                <span className={`tl-tag ${s.attended ? 'ok' : 'miss'}`}>
-                                  {s.attended ? 'Attended' : 'Missed'}
-                                </span>
-                              </div>
-                              <span className="tl-sub">
-                                {children.length > 1 ? `${s.childName} · ` : ''}
-                                {s.courseTitle} ·{' '}
-                                {date.toLocaleDateString('en', { month: 'short', day: 'numeric' })}
-                              </span>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-
-                {/* ── Children progress overview: XP & streak comparison ── */}
-                <div className="card pad" style={{ marginTop: 16 }}>
-                  <div className="col-head sm">
-                    <h3>
-                      XP Comparison <span className="ar muted">مقارنة النقاط</span>
-                    </h3>
-                  </div>
-                  {children.length === 0 ? (
-                    <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No children linked yet.</p>
-                  ) : (
-                    <ResponsiveContainer width="100%" height={180}>
-                      <BarChart
-                        data={children.map((c) => ({
-                          name: c.name,
-                          xp: c.totalPoints,
-                          streak: c.streak,
-                        }))}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" />
-                        <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                        <YAxis tick={{ fontSize: 11 }} />
-                        <Tooltip />
-                        <Bar dataKey="xp" name="Total XP" fill="#C9922A" radius={6} />
-                        <Bar dataKey="streak" name="Streak (days)" fill="#1B3A6B" radius={6} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )}
-                </div>
-              </div>
-
-              <div className="dash-col">
-                {children
-                  .filter((child) => child.quizResults?.length > 0)
-                  .map((child) => (
-                    <section
-                      key={child.id}
-                      className="card pad"
-                      dir="rtl"
-                      aria-label="نتائج اختبارات الطالب"
-                    >
-                      <h3>نتائج اختبارات {child.name}</h3>
-                      <p className="muted">
-                        آخر 20 محاولة. النتيجة نهائية بعد اكتمال تصحيح الإجابات الكتابية.
-                      </p>
-                      <ul style={{ paddingInlineStart: 20 }}>
-                        {child.quizResults.map((result) => (
-                          <li key={result.id} style={{ marginBottom: 10 }}>
-                            <b>{result.quizTitle}</b> ·{' '}
-                            {result.status === 'PENDING_REVIEW'
-                              ? 'بانتظار تصحيح المعلم'
-                              : `${result.score}% · ${result.passed ? 'ناجح' : 'لم يجتز'}`}
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
-                  ))}
-
-                <div className="card pad report-card" id="reports">
-                  <div className="col-head sm">
-                    <h3>Learning summary</h3>
-                  </div>
-                  <div className="rep-big">
-                    <b>{totalCompleted}</b>
-                    <span>lessons attended</span>
-                  </div>
-                  <div className="rep-rows">
-                    <div className="rep-row">
-                      <span>Total XP earned</span>
-                      <b>{familyXP}</b>
-                    </div>
-                    <div className="rep-row">
-                      <span>Lessons done</span>
-                      <b>
-                        {totalCompleted} / {children.reduce((s, c) => s + c.totalLessons, 0)}
-                      </b>
-                    </div>
-                    <div className="rep-row">
-                      <span>Active children</span>
-                      <b>{children.length}</b>
-                    </div>
-                  </div>
-                  <p className="rep-note">
-                    Keep supporting your children&apos;s learning! <Icon name="star" />
-                  </p>
-                </div>
-
-                <div className="card pad">
-                  <div className="col-head sm">
-                    <h3>Plan</h3>
-                  </div>
-                  <div className="pay-row">
-                    <div>
-                      <b>Course enrollment</b>
-                      <span>Browse available courses</span>
-                    </div>
-                    <Link href="/courses" className="link-gold">
-                      Manage
-                    </Link>
-                  </div>
-                </div>
-              </div>
+          )}
+          <section className="card pad" id="reports">
+            <div className="family-section-title">
+              <h2>آخر الحصص المكتملة</h2>
+              <button
+                className="btn btn-outline"
+                onClick={downloadReport}
+                disabled={!children.some((c) => c.recentSessions.length)}
+              >
+                تحميل سجل الحضور الأخير
+              </button>
             </div>
-          </>
-        )}
-
-        {/* ── Link-a-child modal ── */}
-      </main>
-    </div>
+            {!child.recentSessions.length ? (
+              <p className="muted">سيظهر سجل الحضور بعد اكتمال الحصص.</p>
+            ) : (
+              <ul className="family-list family-attendance">
+                {child.recentSessions.map((s) => (
+                  <li key={s.id}>
+                    <div>
+                      <b>{s.lessonTitle}</b>
+                      <span>
+                        {s.courseTitle} · {sessionDate(s.scheduledAt, s.timeZone)}
+                      </span>
+                    </div>
+                    <span className={`family-status ${s.attended ? 'complete' : 'missed'}`}>
+                      {s.attended ? 'حضر' : 'غاب'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <footer className="card pad family-support">
+            <div>
+              <h3>تحتاج تعديل حساب أو تسجيل دورة؟</h3>
+              <p>تتولى الأكاديمية إدارة حسابات الأبناء وتسجيلهم.</p>
+            </div>
+            <a
+              className="btn btn-outline"
+              href={academyContactUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              تواصل عبر واتساب
+            </a>
+          </footer>
+        </>
+      )}
+    </main>
   );
 }
