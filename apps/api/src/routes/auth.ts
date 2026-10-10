@@ -132,6 +132,32 @@ export async function authRoutes(app: FastifyInstance) {
   });
 
   app.post(
+    '/change-password',
+    { preHandler: [app.authenticate], config: { rateLimit: { max: 5, timeWindow: '15 minutes' } } },
+    async (request, reply) => {
+      const { currentPassword, password } = z.object({
+        currentPassword: z.string().min(1).max(128),
+        password: z.string().min(10).max(128),
+      }).parse(request.body);
+      const user = await prisma.user.findUnique({ where: { id: request.user.id } });
+      if (!user || !(await bcrypt.compare(currentPassword, user.passwordHash)))
+        return reply.status(401).send({ error: 'Invalid credentials' });
+      const hash = await bcrypt.hash(password, 12);
+      const changed = await prisma.$transaction(async (tx) => {
+        const result = await tx.user.updateMany({
+          where: { id: user.id, passwordHash: user.passwordHash },
+          data: { passwordHash: hash, tokenVersion: { increment: 1 } },
+        });
+        if (result.count !== 1) return false;
+        await tx.passwordReset.deleteMany({ where: { userId: user.id } });
+        return true;
+      });
+      if (!changed) return reply.status(409).send({ error: 'Please log in again and retry' });
+      return reply.send({ message: 'Password updated. Log in with your new password.' });
+    }
+  );
+
+  app.post(
     '/forgot-password',
     { config: { rateLimit: { max: 5, timeWindow: '15 minutes' } } },
     async (request, reply) => {
