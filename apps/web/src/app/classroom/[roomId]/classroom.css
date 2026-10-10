@@ -42,3 +42,6 @@
 .lobby-join-summary{text-align:center;font-size:13px;color:var(--ink-2);margin:12px 0}.classroom-exit{margin:auto;padding:32px!important;max-width:540px;text-align:center;line-height:1.8}.classroom-exit h1{font-size:28px;margin:16px 0}.classroom-exit p{color:#60728a;margin:12px 0}.exit-icon{display:grid;place-items:center;width:64px;height:64px;border-radius:50%;background:#edf4ed;color:#26734b;margin:auto}.exit-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:24px}.share-tabs{display:flex;flex-wrap:wrap;gap:8px;padding:14px 28px 0}.classroom-notice{display:flex;align-items:center;justify-content:center;gap:10px;background:#edf4ed;color:#215c40;padding:8px 14px;font-size:13px;flex-shrink:0}.classroom-notice button{background:transparent;border:0;color:inherit;padding:6px;cursor:pointer}@media(max-width:600px){.classroom-exit{margin:24px 14px;padding:24px!important}.exit-actions>*{width:100%;min-height:44px}.share-tabs{padding:14px 18px 0}.share-tabs .btn{flex:1;min-width:100px}}
 
 .classroom-notice span{min-width:0;overflow-wrap:anywhere}.classroom-notice button{flex-shrink:0}
+
+.observer-notice{color:#1b3a6b;font-size:13px;line-height:1.7;flex:1;text-align:center}
+.midad.classroom-observer .board-wrap{grid-template-rows:minmax(0,1fr)}.midad.classroom-observer .board-stage{grid-row:1}

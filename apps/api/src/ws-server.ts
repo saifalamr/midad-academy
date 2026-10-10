@@ -2,7 +2,7 @@ import type { IncomingMessage, Server } from 'http';
 import type { FastifyInstance } from 'fastify';
 import type { Duplex } from 'node:stream';
 import { prisma } from './lib/prisma';
-import { canAccessCourse } from './lib/access';
+import { canReadClassroom } from './lib/access';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as Y from 'yjs';
 import * as syncProtocol from 'y-protocols/sync';
@@ -147,7 +147,7 @@ async function setupConnection(conn: WebSocket, req: IncomingMessage, actor: { i
   const roomName = decodeURIComponent((req.url ?? '/').slice(1).split('?')[0]) || 'default';
   const courseId = roomName.replace(/^whiteboard-/, '');
   const stored = await prisma.drawingPermission.findUnique({ where: { courseId_userId: { courseId, userId: actor.id } } });
-  if (actor.role !== 'TEACHER') setDrawingPermission(courseId, actor.id, !!stored);
+  if (actor.role !== 'TEACHER') setDrawingPermission(courseId, actor.id, actor.role === 'STUDENT' && !!stored);
   const room = await getRoom(roomName);
   clearTimeout(room.cleanupTimer);
 
@@ -159,6 +159,11 @@ async function setupConnection(conn: WebSocket, req: IncomingMessage, actor: { i
       const bytes = new Uint8Array(data);
       const decoder = decoding.createDecoder(bytes);
       const kind = decoding.readVarUint(decoder);
+      if (actor.role === 'PARENT') {
+        if (kind !== MESSAGE_SYNC || decoding.readVarUint(decoder) !== syncProtocol.messageYjsSyncStep1) return;
+        handleMessage(room, conn, bytes);
+        return;
+      }
       if (kind === MESSAGE_SYNC && decoding.readVarUint(decoder) !== syncProtocol.messageYjsSyncStep1 && actor.role !== 'TEACHER' && !permissions.get(roomName.replace(/^whiteboard-/, ''))?.has(actor.id)) return;
       handleMessage(room, conn, bytes);
     } catch { conn.close(1003, 'Invalid message'); }
@@ -229,7 +234,7 @@ export function startWhiteboardWebSocketServer(server: Server, app: FastifyInsta
       if (!/^whiteboard-[a-zA-Z0-9_-]+$/.test(roomName)) throw new Error('Invalid room');
       const actor = app.jwt.verify<{ id: string; role: string; version?: number }>(url.searchParams.get('token') ?? '');
       const user = await prisma.user.findUnique({ where: { id: actor.id } });
-      if (!user || user.role !== actor.role || user.tokenVersion !== (actor.version ?? 0) || !await canAccessCourse(actor, roomName.replace(/^whiteboard-/, ''))) throw new Error('Forbidden');
+      if (!user || user.role !== actor.role || user.tokenVersion !== (actor.version ?? 0) || !await canReadClassroom(actor, roomName.replace(/^whiteboard-/, ''))) throw new Error('Forbidden');
       wss.handleUpgrade(req, socket, head, (conn) => {
         void setupConnection(conn, req, actor).catch(() => conn.close(1011, 'Unable to load whiteboard'));
         const expiry = setTimeout(() => conn.close(1008, 'Please reconnect'), 60 * 60_000);

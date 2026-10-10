@@ -61,23 +61,29 @@ export default function ParentDashboard() {
     setLoading(true);
     setError('');
     const token = localStorage.getItem('token') ?? sessionStorage.getItem('token');
-    fetch(`${API_URL}/api/parent/overview`, {
-      signal: controller.signal,
-      cache: 'no-store',
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(async (r) => {
+    let refreshing = false;
+    async function refresh(initial = false) {
+      if (refreshing || controller.signal.aborted) return;
+      refreshing = true;
+      try {
+        const r = await fetch(`${API_URL}/api/parent/overview`, {
+          signal: controller.signal, cache: 'no-store', headers: { Authorization: `Bearer ${token}` },
+        });
         if (!r.ok) throw new Error();
-        return r.json();
-      })
-      .then((j) => setChildren(j.data.children))
-      .catch((e) => {
-        if (e.name !== 'AbortError') setError('تعذر تحميل بيانات أبنائك. حاول مرة أخرى.');
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    return () => controller.abort();
+        const j = await r.json();
+        if (!controller.signal.aborted) { setChildren(j.data.children); setError(''); }
+      } catch (e) {
+        if (initial && !controller.signal.aborted) setError('تعذر تحميل بيانات أبنائك. حاول مرة أخرى.');
+      } finally {
+        refreshing = false;
+        if (initial && !controller.signal.aborted) setLoading(false);
+      }
+    }
+    void refresh(true);
+    const timer = setInterval(() => { if (!document.hidden) void refresh(); }, 30000);
+    const focus = () => { void refresh(); };
+    window.addEventListener('focus', focus);
+    return () => { clearInterval(timer); window.removeEventListener('focus', focus); controller.abort(); };
   }, [reload]);
   const child = children.find((c) => c.id === selected) ?? children[0];
   const next = child?.courses
@@ -193,6 +199,7 @@ export default function ParentDashboard() {
                 </small>
               )}
             </div>
+            {next?.status === 'LIVE' && <Link className="btn btn-gold" href={`/classroom/${next.course.id}`}>مشاهدة الحصة</Link>}
           </section>
           <div className="family-stats">
             <section className="card pad">
@@ -263,6 +270,7 @@ export default function ParentDashboard() {
                         <small>إنجاز يسجله الطالب؛ لا يمثل تقييم المعلم لمستواه.</small>
                       </div>
                     )}
+                    {course.upcomingSessions.some(s => s.status === 'LIVE') && <Link className="btn btn-gold btn-sm" href={`/classroom/${course.id}`}>مشاهدة الحصة · {course.title}</Link>}
                     <details>
                       <summary>المواعيد القادمة ({course.upcomingSessions.length})</summary>
                       {course.upcomingSessions.length ? (

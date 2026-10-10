@@ -161,10 +161,11 @@ function PdfViewer({ url, page, isTeacher, onPageChange }: {
 
 // ── Inner classroom UI (inside LiveKitRoom context) ──────────────────────────
 
-function ClassroomContent({ roomId, title, isTeacher, onLeave, onEnd }: {
+function ClassroomContent({ roomId, title, isTeacher, isObserver, onLeave, onEnd }: {
   title?: string;
   roomId: string;
   isTeacher: boolean;
+  isObserver: boolean;
   onLeave: () => void;
   onEnd: () => void;
 }) {
@@ -173,11 +174,11 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave, onEnd }: {
     { onlySubscribed: false },
   );
   const teacherTrack = cameraTracks.find((t) => getRole(t) === 'teacher');
-  const studentTracks = cameraTracks.filter((t) => getRole(t) !== 'teacher');
+  const studentTracks = cameraTracks.filter((t) => getRole(t) === 'student');
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
   const room = useRoomContext();
   const remoteParticipants = useRemoteParticipants();
-  const participantCount = cameraTracks.length;
+  const participantCount = cameraTracks.filter(t => ['teacher', 'student'].includes(getRole(t))).length;
   const [classError, setClassError] = useState('');
   const [reconnecting, setReconnecting] = useState(false);
   const screenTracks = useTracks([Track.Source.ScreenShare]);
@@ -447,7 +448,7 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave, onEnd }: {
   // content layer is interactive (per role) and the ink layer isn't.
   const contentVisible = view === 'content' && !!sharedDoc;
   const annotatable = view !== 'screen' && (!contentVisible || sharedDoc?.docType === 'image');
-  const inkInteractive = drawPermission && annotatable;
+  const inkInteractive = !isObserver && drawPermission && annotatable;
   const raisedSet = new Set(raisedHands.map((h) => h.identity));
   const showZoom = contentVisible && sharedDoc?.docType === 'image';
 
@@ -456,13 +457,13 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave, onEnd }: {
   //  • pdf   → teacher can navigate/scroll; students are locked out (follow only)
   //  • html / video / youtube → interactive for everyone
   const sharedPointer: 'none' | 'auto' =
-    !sharedDoc ? 'none'
+    !sharedDoc || (isObserver && sharedDoc.docType === 'html') ? 'none'
     : sharedDoc.docType === 'image' ? 'none'
     : sharedDoc.docType === 'pdf' ? (isTeacher ? 'auto' : 'none')
     : 'auto';
 
   return (
-    <div className="midad room classroom-v2">
+    <div className={`midad room classroom-v2${isObserver ? ' classroom-observer' : ''}`}>
       <RoomAudioRenderer />
 
       {/* ── Raised-hand notifications (teacher-only, fixed overlay) ── */}
@@ -495,7 +496,7 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave, onEnd }: {
               <p style={{ color: '#8ea0bb', fontSize: 14 }}>لم ينضم أحد بعد.</p>
             ) : (
               <div className="perm-picker-list">
-                {remoteParticipants.map((p) => {
+                {remoteParticipants.filter(p => { try { return JSON.parse(p.metadata ?? '{}').role === 'student'; } catch { return false; } }).map((p) => {
                   const granted = permittedStudents.has(p.identity);
                   return (
                     <div key={p.identity} className="perm-item">
@@ -586,7 +587,7 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave, onEnd }: {
       {/* ── Whiteboard area ── */}
       <div className="board-wrap">
         {/* Drawing tools — left sidebar */}
-        <div className="wb-toolbar" role="toolbar" aria-label="أدوات السبورة">
+        {!isObserver && <div className="wb-toolbar" role="toolbar" aria-label="أدوات السبورة">
           <button className={`wb-tool ${tool === 'pen' ? 'on' : ''}`} title="قلم" aria-pressed={tool === 'pen'} aria-label="قلم" disabled={!inkInteractive} onClick={() => setTool('pen')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 19l7-7 3 3-7 7-4 1 1-4z"/><path d="M18 13l-1.5-1.5"/><path d="M3 21l5-1 9-9-4-4-9 9z"/></svg>
           <span>قلم</span></button>
@@ -619,7 +620,7 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave, onEnd }: {
           <button disabled={!inkInteractive} className="wb-tool" title="مسح السبورة" aria-label="مسح السبورة" onClick={() => { if (window.confirm('مسح جميع الرسومات؟ يمكنك التراجع بعد المسح.')) whiteboardRef.current?.clear(); }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
           </button>
-        </div>
+        </div>}
 
         <div className="board-stage">
           {/* Board header: what's being shared + page nav + zoom + share */}
@@ -710,6 +711,7 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave, onEnd }: {
                     // touch the parent page; scripts/forms are allowed so the
                     // lesson can be interactive for both teacher and students.
                     <iframe
+                      tabIndex={isObserver ? -1 : undefined}
                       srcDoc={sharedDoc.htmlContent}
                       title={sharedDoc.name}
                       sandbox="allow-scripts allow-forms"
@@ -745,8 +747,8 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave, onEnd }: {
               </div>
             </div>
 
-            {view === 'board' && <div className="board-guide ar">{!drawPermission ? 'مشاهدة فقط · المعلم يتحكم بإذن الرسم' : tool === 'text' ? 'اضغط لإضافة نص، ثم اكتب' : tool === 'select' ? 'اضغط على الشكل لتحريكه أو تغيير حجمه' : 'اختر أداة ثم ارسم على السبورة'}</div>}
-            {contentVisible && annotatable && <div className="board-guide ar"><Icon name="edit" /> اكتب فوق المحتوى</div>}
+            {view === 'board' && <div className="board-guide ar">{isObserver ? 'مشاهدة فقط · السبورة تتحدث مع المعلم' : !drawPermission ? 'مشاهدة فقط · المعلم يتحكم بإذن الرسم' : tool === 'text' ? 'اضغط لإضافة نص، ثم اكتب' : tool === 'select' ? 'اضغط على الشكل لتحريكه أو تغيير حجمه' : 'اختر أداة ثم ارسم على السبورة'}</div>}
+            {!isObserver && contentVisible && annotatable && <div className="board-guide ar"><Icon name="edit" /> اكتب فوق المحتوى</div>}
 
             {view === 'screen' && screenTrack && <div className="workspace-screen"><ParticipantTile trackRef={screenTrack} style={{ height: '100%' }} /></div>}
             {/* shared-materials dock (teacher-only) */}
@@ -778,7 +780,7 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave, onEnd }: {
         </div>
 
         {/* Color palette + line width — right sidebar */}
-        <div className="wb-colors" aria-label="خصائص أداة السبورة"><span className="tool-caption">{tool === 'eraser' ? 'الممحاة' : tool === 'text' ? 'النص' : tool === 'pen' ? 'القلم · اللون والسُمك' : tool === 'highlighter' ? 'التظليل · اللون والسُمك' : 'الشكل · اللون والسُمك'}</span>
+        {!isObserver && <div className="wb-colors" aria-label="خصائص أداة السبورة"><span className="tool-caption">{tool === 'eraser' ? 'الممحاة' : tool === 'text' ? 'النص' : tool === 'pen' ? 'القلم · اللون والسُمك' : tool === 'highlighter' ? 'التظليل · اللون والسُمك' : 'الشكل · اللون والسُمك'}</span>
           {tool === 'eraser' && <div className="eraser-options">
             <select aria-label="نوع الممحاة" value={eraserMode} onChange={e => setEraserMode(e.target.value as EraserMode)}>
               <option value="object">مسح الشكل كاملًا</option><option value="partial">مسح جزء من الشكل</option>
@@ -801,7 +803,7 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave, onEnd }: {
             className="wb-width"
             aria-label="سُمك الخط"
           /><output>{lineWidth}</output></label>}
-        </div>
+        </div>}
       </div>
 
 
@@ -811,6 +813,8 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave, onEnd }: {
       <StartAudio className="classroom-start-audio" label="تشغيل صوت الحصة" />
       {/* ── Room controls ── */}
       <div className="room-controls" aria-label="أدوات المكالمة">
+        {isObserver && <span className="observer-notice" dir="rtl">وضع المشاهدة · بدون كاميرا أو ميكروفون أو تفاعل</span>}
+        {!isObserver && <>
 
         <button
           className={`rc-btn ${!isMicrophoneEnabled ? "rc-off" : ""}`} aria-pressed={isMicrophoneEnabled}
@@ -848,7 +852,7 @@ function ClassroomContent({ roomId, title, isTeacher, onLeave, onEnd }: {
           <CallIcon name="react" />
           <span>تفاعل</span>
         </button>
-</div></details>
+</div></details></>}
 
         <DisconnectButton onClick={onLeave} className="rc-btn rc-leave">
           <CallIcon name="leave" />
@@ -980,7 +984,8 @@ export default function ClassroomPage() {
   const params = useParams();
   const router = useRouter();
   const roomId = params.roomId as string;
-  const { user } = useAuth();
+  const { user, status } = useAuth();
+  const isObserver = user?.role === 'PARENT';
   const [lesson, setLesson] = useState<LessonInfo | null>(null);
   useEffect(() => {
     const controller = new AbortController();
@@ -1028,7 +1033,7 @@ export default function ClassroomPage() {
 
     const controller = new AbortController();
     let active = true;
-    fetch(`${API_URL}/api/sessions/${currentRole === 'teacher' ? 'create' : 'join'}`, {
+    fetch(`${API_URL}/api/sessions/${currentRole === 'teacher' ? 'create' : currentRole === 'parent' ? 'observe' : 'join'}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1081,10 +1086,10 @@ export default function ClassroomPage() {
       : 'انقطع الاتصال بالحصة. تحقق من الإنترنت ثم أعد الدخول.');
   }, [handleLeave]);
   const handleRoomError = useCallback(() => setError('تعذر الاتصال بالحصة. تحقق من الإنترنت وأعد الدخول.'), []);
-  const cameraCapture = useMemo(() => choices?.videoEnabled ? { deviceId: choices.videoDeviceId } : false, [choices?.videoEnabled, choices?.videoDeviceId]);
-  const audioCapture = useMemo(() => choices?.audioEnabled ? { deviceId: choices.audioDeviceId } : false, [choices?.audioEnabled, choices?.audioDeviceId]);
+  const cameraCapture = useMemo(() => !isObserver && choices?.videoEnabled ? { deviceId: choices.videoDeviceId } : false, [isObserver, choices?.videoEnabled, choices?.videoDeviceId]);
+  const audioCapture = useMemo(() => !isObserver && choices?.audioEnabled ? { deviceId: choices.audioDeviceId } : false, [isObserver, choices?.audioEnabled, choices?.audioDeviceId]);
 
-  if (exit) return <main className="midad classroom-lobby" dir="rtl"><section className="lobby-state classroom-exit"><div className="exit-icon"><Icon name={exit === 'removed' ? 'warning' : 'check'} size={30} /></div><h1>{exit === 'ended' ? 'انتهت الحصة' : exit === 'removed' ? 'تم إغلاق دخولك للحصة' : 'غادرت الحصة'}</h1><p>{exit === 'ended' ? 'شكرًا لمشاركتك. يمكنك متابعة مواد الدورة من لوحة التحكم.' : exit === 'removed' ? 'تواصل مع المعلم إذا كنت تحتاج العودة. يمكنك الرجوع إلى صفوفك الآن.' : 'تم قطع اتصالك بالكاميرا والميكروفون. يمكنك العودة ما دامت الحصة مستمرة.'}</p>{lesson && <strong>{lesson.title}</strong>}<div className="exit-actions"><button className="btn btn-gold" onClick={goDashboard}>الرجوع للوحة التحكم</button>{exit === 'left' && <button className="btn btn-outline" onClick={() => { setChoices(null); setToken(null); setError(''); setExit(null); }}>العودة لتجهيز الحصة</button>}<Link className="btn btn-outline" href={`/courses/${roomId}/lessons`}>مواد الدورة</Link></div></section></main>;
+  if (exit) return <main className="midad classroom-lobby" dir="rtl"><section className="lobby-state classroom-exit"><div className="exit-icon"><Icon name={exit === 'removed' ? 'warning' : 'check'} size={30} /></div><h1>{exit === 'ended' ? 'انتهت الحصة' : exit === 'removed' ? 'تم إغلاق دخولك للحصة' : 'غادرت الحصة'}</h1><p>{exit === 'ended' ? 'شكرًا لمشاركتك. يمكنك متابعة مواد الدورة من لوحة التحكم.' : exit === 'removed' ? 'تواصل مع المعلم إذا كنت تحتاج العودة. يمكنك الرجوع إلى صفوفك الآن.' : isObserver ? 'انتهت المشاهدة. يمكنك العودة ما دامت الحصة مستمرة.' : 'تم قطع اتصالك بالكاميرا والميكروفون. يمكنك العودة ما دامت الحصة مستمرة.'}</p>{lesson && <strong>{lesson.title}</strong>}<div className="exit-actions"><button className="btn btn-gold" onClick={goDashboard}>الرجوع للوحة التحكم</button>{exit === 'left' && <button className="btn btn-outline" onClick={() => { setChoices(null); setToken(null); setError(''); setExit(null); }}>{isObserver ? 'العودة للمشاهدة' : 'العودة لتجهيز الحصة'}</button>}{!isObserver && <Link className="btn btn-outline" href={`/courses/${roomId}/lessons`}>مواد الدورة</Link>}</div></section></main>;
 
   if (error) {
     return (
@@ -1098,6 +1103,8 @@ export default function ClassroomPage() {
     );
   }
 
+  if (status === 'loading') return <main className="midad classroom-lobby"><p role="status">جارٍ تحميل الحساب…</p></main>;
+  if (!choices && isObserver) return <main className="midad classroom-lobby" dir="rtl"><section className="lobby-state"><Icon name="eye" size={36} /><h1>مشاهدة حصة طفلك</h1><p>يمكنك متابعة صوت الحصة والكاميرا والمحتوى والسبورة. دخولك للمشاهدة فقط، بدون كاميرا أو ميكروفون أو تفاعل.</p><button className="btn btn-gold" onClick={() => setChoices({ audioEnabled: false, videoEnabled: false, audioDeviceId: '', videoDeviceId: '', username: user.name })}>دخول للمشاهدة</button><button className="btn btn-outline" onClick={goDashboard}>الرجوع لصفحة ولي الأمر</button></section></main>;
   if (!choices) return <ClassroomLobby lesson={lesson} name={user?.name || 'مشارك'} onJoin={setChoices} onBack={goDashboard} />;
 
   if (!token) {
@@ -1105,7 +1112,7 @@ export default function ClassroomPage() {
       <div className="midad classroom-lobby" style={{ alignItems: 'center', justifyContent: 'center' }}>
         <div className="lobby-state">
           <div aria-hidden="true" className="animate-spin" style={{ width: 32, height: 32, border: '2px solid #e7d8b9', borderTopColor: '#c9922a', borderRadius: '50%', margin: '0 auto 12px' }} />
-          <p style={{ fontSize: 14, color: '#60728a' }}>جارٍ دخول الحصة…</p><button className="btn btn-outline" onClick={() => { setChoices(null); setToken(null); setError(''); }}>العودة لتجهيز الأجهزة</button>
+          <p style={{ fontSize: 14, color: '#60728a' }}>جارٍ دخول الحصة…</p><button className="btn btn-outline" onClick={() => { setChoices(null); setToken(null); setError(''); }}>{isObserver ? 'العودة للمشاهدة' : 'العودة لتجهيز الأجهزة'}</button>
         </div>
       </div>
     );
@@ -1124,7 +1131,7 @@ export default function ClassroomPage() {
       onError={handleRoomError}
       style={{ height: '100dvh' }}
     >
-      <ClassroomContent title={lesson?.title} roomId={roomId} isTeacher={role === 'teacher'} onLeave={handleLeave} onEnd={handleEnd} />
+      <ClassroomContent title={lesson?.title} roomId={roomId} isTeacher={role === 'teacher'} isObserver={isObserver} onLeave={handleLeave} onEnd={handleEnd} />
     </LiveKitRoom>
   );
 }

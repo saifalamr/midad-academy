@@ -6,6 +6,7 @@ import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
 import { WebSocket } from 'ws';
 import * as Y from 'yjs';
 import * as encoding from 'lib0/encoding';
+import * as decoding from 'lib0/decoding';
 import * as sync from 'y-protocols/sync';
 import { once } from 'node:events';
 import type { FastifyInstance } from 'fastify';
@@ -103,6 +104,7 @@ before(
       ['student', 'STUDENT'],
       ['outsider', 'STUDENT'],
       ['parent', 'PARENT'],
+      ['otherParent', 'PARENT'],
       ['admin', 'ADMIN'],
     ] as const) {
       const email = `${key}@midad.test`.toLowerCase();
@@ -359,7 +361,7 @@ test('classroom creation is restricted and actual signed attendance is recorded 
     (await call('PATCH', `/api/sessions/${sessionId}/start`, 'teacher', {})).statusCode,
     200
   );
-  assert.equal(createdRoomCapacity, 11); // Ten students plus the teacher.
+  assert.equal(createdRoomCapacity, 21); // Ten students, up to ten family observers and the teacher.
   const payload = JSON.stringify({
     event: 'participant_joined',
     room: { name: `class-${sessionId}` },
@@ -1770,4 +1772,71 @@ test('family overview scopes children, upcoming classes and latest exercise grad
     .data.find((c) => c.id === course.id);
   assert.equal(catalog.sessions[0].scheduledAt, next.scheduledAt.toISOString());
   assert.equal(catalog.timeZone, 'Africa/Cairo');
+});
+
+
+test('parents receive subscribe-only live tokens and cannot observe unrelated or inactive enrollment', async () => {
+  const courseId = (await createCourse({ title: 'Observer security', description: 'Parent observation test', price: 0 })).json().data.id;
+  await enroll(courseId, 'student');
+  const parent = await prisma.parentProfile.findUniqueOrThrow({ where: { userId: actors.parent.id } });
+  await prisma.studentProfile.update({ where: { userId: actors.student.id }, data: { parentId: parent.id } });
+  const session = await fixtureSession(courseId, 'Watch only');
+  assert.equal((await call('POST', '/api/sessions/observe', 'parent', { roomName: courseId })).statusCode, 409);
+  await call('PATCH', `/api/sessions/${session.id}/start`, 'teacher');
+  const res = await call('POST', '/api/sessions/observe', 'parent', { roomName: courseId });
+  assert.equal(res.statusCode, 200);
+  assert.equal((await call('POST', '/api/sessions/observe', 'otherParent', { roomName: courseId })).statusCode, 403);
+  assert.equal((await call('GET', `/api/sessions/state/${courseId}`, 'otherParent')).statusCode, 403);
+  const claims = JSON.parse(Buffer.from(res.json().data.token.split('.')[1], 'base64url').toString());
+  assert.equal(claims.sub, actors.parent.id);
+  assert.equal(claims.video.room, `class-${session.id}`);
+  assert.equal(claims.video.canSubscribe, true);
+  assert.equal(claims.video.canPublish, false);
+  assert.equal(claims.video.canPublishData, false);
+  assert.equal(claims.video.canUpdateOwnMetadata, false);
+  assert.equal(JSON.parse(claims.metadata).role, 'parent');
+  assert.equal((await call('GET', `/api/sessions/state/${courseId}`, 'parent')).json().data.canDraw, false);
+  assert.equal((await call('PATCH', `/api/sessions/state/${courseId}`, 'parent', { pdfPage: 2 })).statusCode, 403);
+  assert.equal((await call('POST', '/api/sessions/end', 'parent', { roomName: courseId })).statusCode, 403);
+  assert.equal((await call('POST', '/api/sessions/join', 'parent', { roomName: courseId })).statusCode, 403);
+  for (const role of ['teacher', 'student', 'admin']) assert.equal((await call('POST', '/api/sessions/observe', role, { roomName: courseId })).statusCode, 403);
+  assert.ok((await call('GET', '/api/sessions/upcoming', 'parent')).json().data.some((s: any) => s.id === session.id));
+  assert.equal(await prisma.sessionAttendance.count({ where: { sessionId: session.id } }), 0);
+  // Even a stale/manually inserted drawing grant cannot turn a parent into an editor.
+  await prisma.drawingPermission.create({ data: { courseId, userId: actors.parent.id } });
+  assert.equal((await call('GET', `/api/sessions/state/${courseId}`, 'parent')).json().data.canDraw, false);
+  whiteboard = (await import('../apps/api/src/ws-server')).startWhiteboardWebSocketServer(app.server, app);
+  const port = (app.server.address() as { port: number }).port;
+  const connect = async (role: string) => {
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/whiteboard-${courseId}?token=${actors[role].token}`);
+    await once(ws, 'message');
+    return ws;
+  };
+  const viewer = await connect('parent');
+  const writer = await connect('teacher');
+  const received = new Y.Doc();
+  viewer.on('message', (bytes) => {
+    const decoder = (awaitDecoder(bytes));
+    if (decoding.readVarUint(decoder) !== 0) return;
+    sync.readSyncMessage(decoder, encoding.createEncoder(), received, null);
+  });
+  function awaitDecoder(bytes: any) { return decoding.createDecoder(new Uint8Array(bytes)); }
+  function update(key: string) {
+    const doc = new Y.Doc(); doc.getMap('drawing').set(key, true);
+    const e = encoding.createEncoder(); encoding.writeVarUint(e, 0); sync.writeUpdate(e, Y.encodeStateAsUpdate(doc)); doc.destroy(); return encoding.toUint8Array(e);
+  }
+  viewer.send(update('parentEdit'));
+  const delivered = once(viewer, 'message');
+  writer.send(update('teacherEdit'));
+  await delivered;
+  assert.equal(received.getMap('drawing').get('teacherEdit'), true);
+  assert.equal(received.getMap('drawing').get('parentEdit'), undefined);
+  await Promise.all([viewer, writer].map(async ws => { const closed = once(ws, 'close'); ws.close(); await closed; }));
+  await whiteboard.close(); whiteboard = undefined;
+  received.destroy();
+  await prisma.enrollment.updateMany({ where: { courseId }, data: { status: 'CANCELLED' } });
+  assert.equal((await call('POST', '/api/sessions/observe', 'parent', { roomName: courseId })).statusCode, 403);
+  assert.equal((await call('GET', `/api/sessions/state/${courseId}`, 'parent')).statusCode, 403);
+  assert.ok(!(await call('GET', '/api/sessions/upcoming', 'parent')).json().data.some((s: any) => s.id === session.id));
+  await call('POST', '/api/sessions/end', 'teacher', { roomName: courseId });
 });

@@ -23,7 +23,7 @@ test('parent switches children, retries errors and sees scoped attendance and ex
         title: 'الحرف القادم',
         scheduledAt: '2099-01-01T14:00:00Z',
         durationMinutes: 50,
-        status: 'SCHEDULED',
+        status: 'LIVE',
       },
     ],
     exercises: [
@@ -102,6 +102,7 @@ test('parent switches children, retries errors and sees scoped attendance and ex
   await expect(page.locator('main').getByRole('alert')).toContainText('تعذر تحميل');
   await page.getByRole('button', { name: 'إعادة المحاولة', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'دورات أحمد' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'مشاهدة الحصة', exact: true })).toHaveAttribute('href', '/classroom/family-course');
   await expect(page.getByText('الحرف القادم', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('لم تُسلّم', { exact: true })).toBeVisible();
   await expect(page.getByText('بانتظار تصحيح المعلم', { exact: true })).toBeVisible();
@@ -121,6 +122,7 @@ test('parent switches children, retries errors and sees scoped attendance and ex
   }
   await page.getByRole('button', { name: /مريم/ }).click();
   await expect(page.getByRole('heading', { name: 'دورات مريم' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'مشاهدة الحصة', exact: true })).toHaveCount(0);
   await expect(page.getByText('تمرين مصحح', { exact: true })).toHaveCount(0);
   await expect(page.getByText('لم تسجل الأكاديمية طفلك في دورة بعد.')).toBeVisible();
   await page.getByRole('button', { name: /أحمد/ }).click();
@@ -186,4 +188,36 @@ test('course enquiry opens academy WhatsApp with exact course, month and timezon
     href!
   );
   await publicContext.close();
+});
+
+test('parent live class links open a device-free observation lobby and use the protected observer endpoint', async ({ page, request }) => {
+  const login = await request.post('http://127.0.0.1:4000/api/auth/login', { data: { email: 'parent@preview.midad.test', password: 'MidadPreview2026!' } });
+  await page.addInitScript(token => {
+    localStorage.setItem('token', token);
+    (window as any).captureRequests = 0;
+    navigator.mediaDevices.getUserMedia = async () => { (window as any).captureRequests++; throw new Error('Observation must not capture'); };
+  }, (await login.json()).data.token);
+  await page.route('**/api/sessions/upcoming', route => route.fulfill({ json: { data: [{ courseId: 'preview-arabic', title: 'حصة مباشرة', status: 'LIVE', course: { title: 'العربية' } }] } }));
+  let observerCalls = 0;
+  await page.route('**/api/sessions/observe', async route => {
+    observerCalls++;
+    expect(route.request().postDataJSON()).toEqual({ roomName: 'preview-arabic' });
+    await route.fulfill({ status: 409, json: { error: 'Class has ended' } });
+  });
+  await page.goto('/classroom/preview-arabic');
+  await expect(page.getByRole('heading', { name: 'مشاهدة حصة طفلك' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'تشغيل الكاميرا' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'تشغيل الصوت', exact: true })).toHaveCount(0);
+  for (const width of [320, 820, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: 'test-results/observer-lobby.png', fullPage: true });
+  await page.getByRole('button', { name: 'دخول للمشاهدة' }).click();
+  await expect(page.getByText('الحصة غير مباشرة الآن.', { exact: false })).toBeVisible();
+  expect(observerCalls).toBe(1);
+  expect(await page.evaluate(() => (window as any).captureRequests)).toBe(0);
+  await page.getByRole('button', { name: 'الرجوع للوحة التحكم' }).click();
+  await expect(page).toHaveURL(/\/parent$/);
 });
