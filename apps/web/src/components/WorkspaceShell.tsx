@@ -25,6 +25,7 @@ export default function WorkspaceShell({ children }: { children: React.ReactNode
     { href: '/courses', label: 'الدورات', icon: 'book' },
     ...(user.role === 'TEACHER'
       ? [
+          { href: '/teacher/reports', label: 'تقارير الحصص', icon: 'edit' as IconName },
           { href: '/teacher/students', label: 'الطلاب', icon: 'graduate' as IconName },
           { href: '/teacher/review-answers', label: 'مراجعة الإجابات', icon: 'edit' as IconName },
         ]

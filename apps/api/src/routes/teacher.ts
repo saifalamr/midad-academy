@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { awardQuiz } from '../lib/rewards';
 import { httpError } from '../lib/access';
+import { sessionReportRoutes } from './session-reports';
 
 const gradeAnswerSchema = z.object({
   pointsAwarded: z.number().int().min(0),
@@ -10,6 +11,7 @@ const gradeAnswerSchema = z.object({
 });
 
 export async function teacherRoutes(app: FastifyInstance) {
+  await sessionReportRoutes(app);
   app.get('/payment-reviews', { preHandler: [app.authenticate] }, async (request, reply) => {
     if (request.user.role !== 'TEACHER') return reply.status(403).send({ error: 'Only course teachers can review payments' });
     const payments = await prisma.payment.findMany({ where: { requiresReview: true, course: { teacher: { userId: request.user.id } } },

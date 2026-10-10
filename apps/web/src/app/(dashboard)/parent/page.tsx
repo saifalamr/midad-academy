@@ -6,6 +6,7 @@ import Icon from '@/components/Icon';
 import { API_URL } from '@/lib/config';
 import { academyContactUrl, sessionDate } from '@/lib/academy-contact';
 import './parent.css';
+import { performanceLabels, homeworkLabels, type Report } from '@/lib/session-reports';
 
 type Session = {
   id: string;
@@ -46,6 +47,15 @@ type Child = {
   courses: Course[];
   courseProgress: { courseId: string; total: number; completed: number }[];
   materialProgress: { courseId: string; total: number; completed: number }[];
+  reports?: (Omit<Report, 'version' | 'publishedAt'> & {
+    publishedAt: string;
+    sessionTitle: string;
+    scheduledAt: string;
+    courseTitle: string;
+    timeZone: string;
+    teacherName: string;
+    attended: boolean;
+  })[];
   recentSessions: Session[];
 };
 
@@ -67,23 +77,37 @@ export default function ParentDashboard() {
       refreshing = true;
       try {
         const r = await fetch(`${API_URL}/api/parent/overview`, {
-          signal: controller.signal, cache: 'no-store', headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+          cache: 'no-store',
+          headers: { Authorization: `Bearer ${token}` },
         });
         if (!r.ok) throw new Error();
         const j = await r.json();
-        if (!controller.signal.aborted) { setChildren(j.data.children); setError(''); }
+        if (!controller.signal.aborted) {
+          setChildren(j.data.children);
+          setError('');
+        }
       } catch (e) {
-        if (initial && !controller.signal.aborted) setError('تعذر تحميل بيانات أبنائك. حاول مرة أخرى.');
+        if (initial && !controller.signal.aborted)
+          setError('تعذر تحميل بيانات أبنائك. حاول مرة أخرى.');
       } finally {
         refreshing = false;
         if (initial && !controller.signal.aborted) setLoading(false);
       }
     }
     void refresh(true);
-    const timer = setInterval(() => { if (!document.hidden) void refresh(); }, 30000);
-    const focus = () => { void refresh(); };
+    const timer = setInterval(() => {
+      if (!document.hidden) void refresh();
+    }, 30000);
+    const focus = () => {
+      void refresh();
+    };
     window.addEventListener('focus', focus);
-    return () => { clearInterval(timer); window.removeEventListener('focus', focus); controller.abort(); };
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', focus);
+      controller.abort();
+    };
   }, [reload]);
   const child = children.find((c) => c.id === selected) ?? children[0];
   const next = child?.courses
@@ -199,7 +223,11 @@ export default function ParentDashboard() {
                 </small>
               )}
             </div>
-            {next?.status === 'LIVE' && <Link className="btn btn-gold" href={`/classroom/${next.course.id}`}>مشاهدة الحصة</Link>}
+            {next?.status === 'LIVE' && (
+              <Link className="btn btn-gold" href={`/classroom/${next.course.id}`}>
+                مشاهدة الحصة
+              </Link>
+            )}
           </section>
           <div className="family-stats">
             <section className="card pad">
@@ -270,7 +298,11 @@ export default function ParentDashboard() {
                         <small>إنجاز يسجله الطالب؛ لا يمثل تقييم المعلم لمستواه.</small>
                       </div>
                     )}
-                    {course.upcomingSessions.some(s => s.status === 'LIVE') && <Link className="btn btn-gold btn-sm" href={`/classroom/${course.id}`}>مشاهدة الحصة · {course.title}</Link>}
+                    {course.upcomingSessions.some((s) => s.status === 'LIVE') && (
+                      <Link className="btn btn-gold btn-sm" href={`/classroom/${course.id}`}>
+                        مشاهدة الحصة · {course.title}
+                      </Link>
+                    )}
                     <details>
                       <summary>المواعيد القادمة ({course.upcomingSessions.length})</summary>
                       {course.upcomingSessions.length ? (
@@ -356,6 +388,51 @@ export default function ParentDashboard() {
                 ))}
               </ul>
             )}
+          </section>
+          <section className="card pad family-reports" aria-label="تقارير المعلم">
+            <h2>تقارير المعلم عن {child.name}</h2>
+            <p className="muted">تقييم المعلم بعد كل حصة. تظهر هنا التقارير المعتمدة فقط.</p>
+            {!child.reports?.length ? (
+              <p>لا توجد تقارير معتمدة بعد.</p>
+            ) : (
+              child.reports.map((report) => (
+                <article key={report.id} className="family-report">
+                  <header>
+                    <div>
+                      <h3>{report.sessionTitle}</h3>
+                      <p>
+                        {report.courseTitle} · {sessionDate(report.scheduledAt, report.timeZone)}
+                      </p>
+                      <small>المعلم: {report.teacherName}</small>
+                    </div>
+                    <span className="chip">
+                      {report.attended ? 'حضر الحصة' : 'لا يوجد حضور مسجل'}
+                    </span>
+                  </header>
+                  <dl>
+                    <div>
+                      <dt>المستوى في الحصة</dt>
+                      <dd>{performanceLabels[report.performance]}</dd>
+                    </div>
+                    <div>
+                      <dt>المشاركات</dt>
+                      <dd>{report.participationCount}</dd>
+                    </div>
+                    <div>
+                      <dt>الواجب</dt>
+                      <dd>{homeworkLabels[report.homework]}</dd>
+                    </div>
+                  </dl>
+                  <p className="family-report-note">{report.note}</p>
+                  <small className="muted">
+                    اعتمد في {sessionDate(report.publishedAt, report.timeZone)}
+                  </small>
+                </article>
+              ))
+            )}
+            <small className="muted">
+              حالة الواجب وعدد المشاركات يسجلهما المعلم ضمن تقييمه للحصة.
+            </small>
           </section>
           <footer className="card pad family-support">
             <div>

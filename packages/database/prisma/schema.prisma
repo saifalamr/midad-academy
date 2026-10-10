@@ -126,6 +126,7 @@ model StudentProfile {
   pointEvents  PointTransaction[]
   quizResults  StudentQuizResult[]
   attendance SessionAttendance[]
+  sessionReports SessionReport[]
   learningStates LearningState[]
   seatReservations SeatReservation[]
 }
@@ -292,6 +293,7 @@ model ClassSession {
   course  Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
   teacher TeacherProfile @relation(fields: [teacherId], references: [id])
   attendance SessionAttendance[]
+  reports SessionReport[]
 
   @@index([courseId, scheduledAt])
   @@index([teacherId, scheduledAt])
@@ -436,4 +438,23 @@ model LearningState {
   content CourseContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
   @@id([studentId, contentId])
   @@index([contentId])
+}
+
+
+model SessionReport {
+  id String @id @default(cuid())
+  sessionId String
+  studentId String
+  performance String @default("NOT_ASSESSED")
+  participationCount Int @default(0)
+  homework String @default("NOT_ASSIGNED")
+  note String @default("")
+  version Int @default(1)
+  publishedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  session ClassSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  @@unique([sessionId, studentId])
+  @@index([studentId, publishedAt])
 }

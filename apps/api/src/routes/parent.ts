@@ -121,7 +121,14 @@ export async function parentRoutes(app: FastifyInstance) {
         const latest = new Map<string, (typeof attempts)[number]>();
         for (const attempt of attempts)
           if (!latest.has(attempt.quizId)) latest.set(attempt.quizId, attempt);
+        const reports = await prisma.sessionReport.findMany({
+          where: { studentId: child.id, publishedAt: { not: null } },
+          select: { id: true, performance: true, participationCount: true, homework: true, note: true, publishedAt: true,
+            session: { select: { title: true, scheduledAt: true, course: { select: { title: true, timeZone: true } }, teacher: { select: { user: { select: { name: true } } } }, attendance: { where: { studentId: child.id }, select: { id: true } } } } },
+          orderBy: { publishedAt: 'desc' }, take: 20,
+        });
         return {
+          reports: reports.map(({ session, ...report }) => ({ ...report, sessionTitle: session.title, scheduledAt: session.scheduledAt, courseTitle: session.course.title, timeZone: session.course.timeZone, teacherName: session.teacher.user.name, attended: !!session.attendance.length })),
           courses: child.enrollments.map(({ course }) => ({
             id: course.id,
             title: course.title,

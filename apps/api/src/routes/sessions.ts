@@ -325,6 +325,10 @@ export async function sessionRoutes(app: FastifyInstance) {
             emptyTimeout: 600,
             maxParticipants: course.maxStudents * 2 + 1,
           });
+          // Snapshot the starting roster so later enrollment changes do not erase
+          // students who still need an end-of-class report. Empty drafts stay private.
+          const roster = await tx.enrollment.findMany({ where: { courseId: current.courseId, status: 'ACTIVE' }, select: { studentId: true } });
+          await tx.sessionReport.createMany({ data: roster.map(({ studentId }) => ({ sessionId, studentId, version: 0 })), skipDuplicates: true });
           return tx.classSession.update({
             where: { id: sessionId },
             data: { status: 'LIVE', liveKitRoomId },

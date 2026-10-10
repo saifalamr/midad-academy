@@ -1,0 +1,132 @@
+.reports-page {
+  padding: 28px 24px;
+  max-width: 1080px;
+  color: #1b3a6b;
+}
+.report-heading,
+.report-summary,
+.report-student > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.report-heading {
+  margin-bottom: 24px;
+}
+.report-heading h1 {
+  margin: 8px 0;
+}
+.report-heading p,
+.report-note {
+  line-height: 1.8;
+}
+.report-picker {
+  margin-bottom: 24px;
+}
+.report-picker label,
+.report-comment {
+  display: block;
+}
+.report-picker select,
+.report-fields select,
+.report-fields input,
+.report-comment textarea {
+  width: 100%;
+  min-width: 0;
+  background: white;
+  border: 1px solid #dce2eb;
+  border-radius: 9px;
+  padding: 12px;
+  color: #1b3a6b;
+  font: inherit;
+  margin-top: 8px;
+}
+.report-summary {
+  margin: 20px 0;
+}
+.report-student {
+  margin-bottom: 18px;
+}
+.report-student h3 {
+  margin: 0 0 6px;
+}
+.report-student fieldset {
+  border: 0;
+  margin: 20px 0 0;
+  padding: 0;
+  min-width: 0;
+}
+.report-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.report-fields label {
+  line-height: 1.6;
+  min-width: 0;
+}
+.report-comment {
+  margin-top: 18px;
+}
+.report-comment textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+.report-comment small {
+  display: block;
+  text-align: end;
+  color: #68768b;
+}
+.report-badge {
+  background: #f3e7ca;
+  color: #835e1b;
+  border-radius: 20px;
+  padding: 7px 12px;
+  font-size: 13px;
+}
+.report-attended,
+.report-success {
+  color: #26795e;
+}
+.report-note {
+  font-size: 13px;
+  color: #68768b;
+}
+.report-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+.report-student select:disabled,
+.report-student input:disabled,
+.report-student textarea:disabled {
+  opacity: 0.8;
+  background: #f5f6f8;
+}
+.reports-page :focus-visible {
+  outline: 3px solid #c9922a;
+  outline-offset: 2px;
+}
+@media (max-width: 700px) {
+  .reports-page {
+    padding: 20px 14px;
+  }
+  .report-fields {
+    grid-template-columns: 1fr;
+  }
+  .report-actions .btn {
+    width: 100%;
+  }
+  .report-heading h1 {
+    font-size: 28px;
+  }
+  .report-picker select {
+    font-size: 13px;
+  }
+  .report-summary strong {
+    font-size: 14px;
+  }
+}
