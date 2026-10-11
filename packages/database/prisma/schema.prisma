@@ -183,6 +183,7 @@ model CourseContent {
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
   quiz   Quiz?
   learningStates LearningState[]
+  sessionMaterials SessionMaterial[]
 
   @@index([courseId, order])
 }
@@ -294,6 +295,8 @@ model ClassSession {
   teacher TeacherProfile @relation(fields: [teacherId], references: [id])
   attendance SessionAttendance[]
   reports SessionReport[]
+  materialsVersion Int @default(0)
+  materials SessionMaterial[]
 
   @@index([courseId, scheduledAt])
   @@index([teacherId, scheduledAt])
@@ -457,4 +460,21 @@ model SessionReport {
   student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
   @@unique([sessionId, studentId])
   @@index([studentId, publishedAt])
+}
+
+// Per-class curriculum snapshots remain stable after teaching starts.
+model SessionMaterial {
+  id String @id @default(cuid())
+  sessionId String
+  contentId String
+  order Int
+  title String
+  type ContentType
+  contentUrl String
+  description String
+  session ClassSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  content CourseContent @relation(fields: [contentId], references: [id], onDelete: Restrict)
+  @@unique([sessionId, contentId])
+  @@unique([sessionId, order])
+  @@index([contentId])
 }

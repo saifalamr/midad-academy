@@ -82,7 +82,9 @@ export default function TeacherDashboard() {
           <h1 className="dh-title">دوراتي وحصصي</h1>
           <p>الإدارة تعيّن دوراتك وتجهّز المنهج والمواعيد. من هنا تبدأ الحصة وتتابع الطلاب.</p>
         </div>
-        <Link className="btn btn-gold" href="/teacher/reports"><Icon name="edit" /> تقارير الحصص</Link>
+        <Link className="btn btn-gold" href="/teacher/reports">
+          <Icon name="edit" /> تقارير الحصص
+        </Link>
         <Link className="btn btn-outline" href="/teacher/review-answers">
           <Icon name="edit" /> مراجعة الإجابات
         </Link>
@@ -118,6 +120,12 @@ export default function TeacherDashboard() {
                       {s.course.title} · {new Date(s.scheduledAt).toLocaleString('ar')}
                     </p>
                   </div>
+                  <Link
+                    className="btn btn-outline btn-sm"
+                    href={`/teacher/sessions/${s.id}/materials`}
+                  >
+                    خطة الحصة والمواد
+                  </Link>
                   <button
                     className="btn btn-gold"
                     disabled={!!starting}

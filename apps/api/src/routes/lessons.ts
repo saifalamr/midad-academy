@@ -1,5 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { lockCourse } from '../lib/enrollment';
+import { httpError } from '../lib/access';
 import { prisma } from '../lib/prisma';
 
 const updateContentSchema = z.object({
@@ -60,7 +62,15 @@ export async function lessonRoutes(app: FastifyInstance) {
         return reply.status(404).send({ error: 'Lesson not found' });
       }
 
-      await prisma.courseContent.delete({ where: { id } });
+      await prisma.$transaction(async (tx) => {
+        await lockCourse(tx, content.courseId);
+        if (await tx.sessionMaterial.count({ where: { contentId: id } }))
+          throw httpError(
+            409,
+            'هذه المادة مرتبطة بخطة حصة. أزلها من الحصص المجدولة أولًا؛ مواد الحصص التي بدأت محفوظة في السجل.'
+          );
+        await tx.courseContent.delete({ where: { id } });
+      });
 
       return reply.send({ data: { id } });
     }

@@ -1,0 +1,116 @@
+.session-plan {
+  max-width: 1200px;
+  margin: auto;
+  padding: 28px 24px;
+  color: var(--ink);
+  line-height: 1.7;
+}
+.session-plan header {
+  margin: 24px 0;
+}
+.session-plan h1 {
+  font-size: clamp(26px, 4vw, 38px);
+  overflow-wrap: anywhere;
+}
+.session-plan h2 {
+  font-size: 22px;
+  margin-bottom: 12px;
+}
+.session-plan p {
+  color: var(--ink-3);
+  margin: 10px 0;
+}
+.plan-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.plan-columns > section {
+  min-width: 0;
+}
+.plan-list {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0;
+}
+.plan-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--line);
+  padding: 16px 0;
+  flex-wrap: wrap;
+}
+.plan-copy {
+  flex: 1;
+  min-width: 100px;
+  overflow-wrap: anywhere;
+}
+.plan-copy small {
+  display: block;
+  color: var(--ink-3);
+}
+.plan-number {
+  display: grid;
+  place-items: center;
+  min-width: 30px;
+  height: 30px;
+  background: var(--gold-pale, #f4e6c6);
+  color: var(--navy);
+  border-radius: 8px;
+  font-weight: bold;
+}
+.plan-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.plan-actions button {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  color: var(--navy);
+  cursor: pointer;
+  min-height: 44px;
+}
+.plan-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.plan-error,
+.plan-info {
+  padding: 14px;
+  border-radius: 12px;
+  background: #fff5df;
+}
+.plan-error {
+  background: #ffebe5;
+  color: #9a2c24;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.session-plan .plan-success {
+  color: #24724b;
+}
+@media (max-width: 760px) {
+  .session-plan {
+    padding: 20px 16px;
+  }
+  .plan-columns {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .plan-actions {
+    width: 100%;
+  }
+  .plan-item .btn {
+    white-space: normal;
+  }
+  .session-plan .card.pad {
+    padding: 18px;
+  }
+}

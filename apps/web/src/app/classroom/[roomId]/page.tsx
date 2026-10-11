@@ -73,7 +73,7 @@ type Reaction  = { id: string; emoji: string; x: number };
 type DocType = 'pdf' | 'image' | 'youtube' | 'video' | 'html';
 type SharedDoc = { url: string; name: string; docType: DocType; htmlContent?: string };
 type CourseContentItem = { id: string; title: string; type: string; contentUrl: string };
-type ShareTab = 'content' | 'url' | 'html' | 'file';
+type ShareTab = 'plan' | 'content' | 'url' | 'html' | 'file';
 
 function getYouTubeId(url: string): string | null {
   try {
@@ -218,6 +218,8 @@ function ClassroomContent({ roomId, title, isTeacher, isObserver, onLeave, onEnd
   // ── Document sharing ──────────────────────────────────────────────────────
   const [sharedDoc, setSharedDoc] = useState<SharedDoc | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [sessionContent, setSessionContent] = useState<CourseContentItem[]>([]);
+  const [planLoadError, setPlanLoadError] = useState('');
   const [courseContent, setCourseContent] = useState<CourseContentItem[]>([]);
   const [manualUrl, setManualUrl] = useState('');
   const [manualName, setManualName] = useState('');
@@ -231,7 +233,7 @@ function ClassroomContent({ roomId, title, isTeacher, isObserver, onLeave, onEnd
   const [contentLoadError, setContentLoadError] = useState('');
   const contentController = useRef<AbortController | null>(null);
   const contentBusy = uploading || sharing;
-  const [shareTab, setShareTab] = useState<ShareTab>('content');
+  const [shareTab, setShareTab] = useState<ShareTab>('plan');
   const [shareError, setShareError] = useState('');
 
   // ── PDF page sync — teacher drives the page, students follow ──────────────
@@ -320,15 +322,17 @@ function ClassroomContent({ roomId, title, isTeacher, isObserver, onLeave, onEnd
   const loadCourseContent = useCallback(async () => {
     contentController.current?.abort();
     const controller = new AbortController(); contentController.current = controller;
-    setContentLoading(true); setContentLoadError('');
-    try {
-      const res = await authFetch(`/api/courses/${roomId}/lessons`, { signal: controller.signal });
-      if (!res.ok) throw new Error();
-      const json = await res.json();
-      if (!controller.signal.aborted) setCourseContent(json.data ?? []);
-    } catch {
-      if (!controller.signal.aborted) setContentLoadError('تعذر تحميل مواد الدورة. أعد المحاولة أو شارك ملفًا من جهازك.');
-    } finally { if (!controller.signal.aborted) setContentLoading(false); }
+    setContentLoading(true); setContentLoadError(''); setPlanLoadError('');
+    const results = await Promise.allSettled([
+      authFetch(`/api/sessions/materials/live/${roomId}`, { signal: controller.signal }).then(async res => { if (!res.ok) throw new Error(); return (await res.json()).data.materials as CourseContentItem[]; }),
+      authFetch(`/api/courses/${roomId}/lessons`, { signal: controller.signal }).then(async res => { if (!res.ok) throw new Error(); return (await res.json()).data as CourseContentItem[]; }),
+    ]);
+    if (controller.signal.aborted) return;
+    if (results[0].status === 'fulfilled') setSessionContent(results[0].value);
+    else { setSessionContent([]); setPlanLoadError('تعذر تحميل خطة الحصة. أعد المحاولة.'); }
+    if (results[1].status === 'fulfilled') setCourseContent(results[1].value.filter(item => item.type !== 'EXERCISE'));
+    else { setCourseContent([]); setContentLoadError('تعذر تحميل منهج الدورة. أعد المحاولة.'); }
+    setContentLoading(false);
   }, [roomId]);
   useEffect(() => {
     if (isTeacher) void loadCourseContent();
@@ -338,7 +342,7 @@ function ClassroomContent({ roomId, title, isTeacher, isObserver, onLeave, onEnd
   function openShareModal() {
     if (contentBusy) return;
     setShareError(''); setManualUrl(''); setManualName(''); setHtmlContent('');
-    setShareTab('content'); setShowShareModal(true); void loadCourseContent();
+    setShareTab('plan'); setShowShareModal(true); void loadCourseContent();
   }
 
   async function shareDocument(url: string, name: string, docType: DocType, html = '') {
@@ -754,9 +758,9 @@ function ClassroomContent({ roomId, title, isTeacher, isObserver, onLeave, onEnd
             {/* shared-materials dock (teacher-only) */}
             {isTeacher && (
               <div className="board-dock">
-                <span className="dock-label">Shared</span>
-                {courseContent.map((c) => {
-                  const dt = detectDocType(c.contentUrl);
+                <span className="dock-label">خطة الحصة</span>
+                {sessionContent.map((c) => {
+                  const dt = c.type === 'VIDEO' && !getYouTubeId(c.contentUrl) ? 'video' : detectDocType(c.contentUrl);
                   const active = sharedDoc?.url === c.contentUrl;
                   const cls = dt === 'image' ? 'img' : (dt === 'video' || dt === 'youtube') ? 'aud' : 'doc';
                   const label = <Icon name={dt === 'image' ? 'file' : (dt === 'video' || dt === 'youtube') ? 'video' : 'file'} />;
@@ -884,7 +888,7 @@ function ClassroomContent({ roomId, title, isTeacher, isObserver, onLeave, onEnd
 
             {/* Tab switcher */}
             <div className="share-tabs">
-              {([['content', 'الدروس'], ['file', 'رفع ملف'], ['url', 'رابط / يوتيوب'], ['html', 'HTML']] as const).map(([key, label]) => (
+              {([['plan', 'خطة الحصة'], ['content', 'منهج الدورة'], ['file', 'رفع ملف'], ['url', 'رابط / يوتيوب'], ['html', 'HTML']] as const).map(([key, label]) => (
                 <button
                   key={key}
                   type="button"
@@ -897,20 +901,20 @@ function ClassroomContent({ roomId, title, isTeacher, isObserver, onLeave, onEnd
             </div>
 
             <div className="modal-body">
-              {shareTab === 'content' && (
+              {(shareTab === 'content' || shareTab === 'plan') && (
                 <div className="field">
-                  <label>من دروس الدورة</label>
-                  {contentLoading ? <p role="status">جارٍ تحميل مواد الدورة…</p> : contentLoadError ? <div role="alert"><p>{contentLoadError}</p><button className="btn btn-outline btn-sm" onClick={() => void loadCourseContent()}>إعادة تحميل المواد</button></div> : courseContent.length === 0 ? (
-                    <p style={{ fontSize: 13, color: 'var(--ink-3)' }}>لا توجد ملفات في الدورة بعد.</p>
+                  <label>{shareTab === 'plan' ? 'مواد هذه الحصة حسب ترتيب الإدارة' : 'كل مواد منهج الدورة'}</label>
+                  {contentLoading ? <p role="status">جارٍ تحميل مواد الدورة…</p> : (shareTab === 'plan' ? planLoadError : contentLoadError) ? <div role="alert"><p>{shareTab === 'plan' ? planLoadError : contentLoadError}</p><button className="btn btn-outline btn-sm" onClick={() => void loadCourseContent()}>إعادة تحميل المواد</button></div> : (shareTab === 'plan' ? sessionContent : courseContent).length === 0 ? (
+                    <p style={{ fontSize: 13, color: 'var(--ink-3)' }}>{shareTab === 'plan' ? 'الإدارة لم تخصص مواد لهذه الحصة بعد. يمكنك مراجعة تبويب منهج الدورة.' : 'لا توجد ملفات في الدورة بعد.'}</p>
                   ) : (
                     <div className="share-list">
-                      {courseContent.map((c) => {
-                        const docType = detectDocType(c.contentUrl);
+                      {(shareTab === 'plan' ? sessionContent : courseContent).map((c, index) => {
+                        const docType = c.type === 'VIDEO' && !getYouTubeId(c.contentUrl) ? 'video' : detectDocType(c.contentUrl);
                         const icon = docType === 'youtube' || docType === 'video' ? <><Icon name="video" /></> : docType === 'image' ? <><Icon name="file" /></> : <><Icon name="file" /></>;
                         return (
                           <button key={c.id} type="button" className="share-list-item" disabled={contentBusy}
                             onClick={() => shareDocument(c.contentUrl, c.title, docType)}>
-                            {icon} {c.title}
+                            {icon} {shareTab === 'plan' ? `${index + 1}. ` : ''}{c.title}
                           </button>
                         );
                       })}

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { AccessToken, RoomServiceClient, WebhookReceiver } from 'livekit-server-sdk';
+import { teacherMaterialRoutes } from './session-materials';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
@@ -23,6 +24,7 @@ function toHttpUrl(wsUrl: string) {
 }
 
 export async function sessionRoutes(app: FastifyInstance) {
+  await teacherMaterialRoutes(app);
   // ── POST /api/sessions/create ─────────────────────────────────────────────
   // Creates (or reuses) a LiveKit room and returns a signed participant token.
   // The caller's identity, display name, and role come from the verified JWT —

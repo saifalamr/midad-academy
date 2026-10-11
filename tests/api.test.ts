@@ -1900,3 +1900,49 @@ test('starting roster survives later cancellation so every original student can 
   assert.equal(students.length, 1); assert.equal(students[0].id, student.id);
   assert.equal((await call('PUT', '/api/teacher/reports/' + session.id + '/' + student.id, 'teacher', { performance: 'NOT_ASSESSED', participationCount: 0, homework: 'NOT_ASSIGNED', note: 'لم يحضر هذه الحصة.', version: 0, publish: true })).statusCode, 200);
 });
+
+test('session curriculum is admin-assigned, ordered, versioned, private to its teacher and frozen at start', async () => {
+  const courseId = (await createCourse({ title: 'Session curriculum', description: 'Prepared classroom plan', price: 0 })).json().data.id;
+  const session = await fixtureSession(courseId, 'Materials test');
+  const pdf = (await call('POST', `/api/courses/${courseId}/lessons`, 'admin', { title: 'First PDF', description: 'Review letters', type: 'PDF', contentUrl: 'https://example.com/letters.pdf', duration: 5 })).json().data;
+  const video = (await call('POST', `/api/courses/${courseId}/lessons`, 'admin', { title: 'Video lesson', description: 'Explain letters', type: 'VIDEO', contentUrl: 'https://example.com/video', duration: 5 })).json().data;
+  const foreign = await prisma.courseContent.findFirstOrThrow({ where: { courseId: freeId } });
+  const adminPath = `/api/admin/sessions/${session.id}/materials`;
+  const teacherPath = `/api/sessions/${session.id}/materials`;
+  assert.equal((await call('GET', adminPath)).statusCode, 401);
+  for (const role of ['teacher', 'student', 'parent']) assert.equal((await call('PUT', adminPath, role, { version: 0, contentIds: [pdf.id] })).statusCode, 403);
+  assert.equal((await call('GET', teacherPath, 'otherTeacher')).statusCode, 404);
+  for (const role of ['student', 'parent']) assert.equal((await call('GET', teacherPath, role)).statusCode, 403);
+  assert.equal((await call('PUT', adminPath, 'admin', { version: 0, contentIds: [foreign.id] })).statusCode, 400);
+  assert.equal((await call('PUT', adminPath, 'admin', { version: 0, contentIds: [pdf.id, pdf.id] })).statusCode, 400);
+  const saved = await call('PUT', adminPath, 'admin', { version: 0, contentIds: [video.id, pdf.id] });
+  assert.equal(saved.statusCode, 200, saved.body);
+  assert.equal(saved.json().data.materialsVersion, 1);
+  assert.deepEqual(saved.json().data.materials.map((m: any) => m.contentId), [video.id, pdf.id]);
+  assert.equal((await call('PUT', adminPath, 'admin', { version: 0, contentIds: [] })).statusCode, 409);
+  assert.equal((await call('DELETE', `/api/lessons/${pdf.id}`, 'admin')).statusCode, 409);
+  const parallel = await Promise.all([
+    call('PUT', adminPath, 'admin', { version: 1, contentIds: [pdf.id, video.id] }),
+    call('PUT', adminPath, 'admin', { version: 1, contentIds: [video.id, pdf.id] }),
+  ]);
+  assert.deepEqual(parallel.map(r => r.statusCode).sort(), [200, 409]);
+  const plan = (await call('GET', teacherPath, 'teacher')).json().data;
+  assert.equal(plan.materials.length, 2);
+  assert.equal((await call('PATCH', `/api/sessions/${session.id}/start`, 'teacher')).statusCode, 200);
+  const live = await call('GET', `/api/sessions/materials/live/${courseId}`, 'teacher');
+  assert.equal(live.statusCode, 200, live.body);
+  assert.deepEqual(live.json().data.materials, plan.materials);
+  assert.equal((await call('GET', `/api/sessions/materials/live/${courseId}`, 'otherTeacher')).statusCode, 404);
+  assert.equal((await call('PUT', adminPath, 'admin', { version: 2, contentIds: [] })).statusCode, 409);
+  // Course library order is independent of this session's saved order.
+  await call('PATCH', `/api/lessons/${pdf.id}`, 'admin', { order: 99 });
+  assert.deepEqual((await call('GET', teacherPath, 'teacher')).json().data.materials, plan.materials);
+  await call('POST', '/api/sessions/end', 'teacher', { roomName: courseId });
+  assert.equal((await call('PUT', adminPath, 'admin', { version: 2, contentIds: [] })).statusCode, 409);
+  assert.equal((await call('GET', teacherPath, 'teacher')).json().data.materials.length, 2);
+  const scheduled = await fixtureSession(courseId, 'Clear plan');
+  const path = `/api/admin/sessions/${scheduled.id}/materials`;
+  assert.equal((await call('PUT', path, 'admin', { version: 0, contentIds: [pdf.id] })).statusCode, 200);
+  assert.equal((await call('PUT', path, 'admin', { version: 1, contentIds: [] })).statusCode, 200);
+  assert.equal((await call('GET', path, 'admin')).json().data.session.materials.length, 0);
+});
