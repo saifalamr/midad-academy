@@ -23,6 +23,20 @@ export default function WorkspaceShell({ children }: { children: React.ReactNode
       icon: 'calendar',
     },
     { href: '/courses', label: 'الدورات', icon: 'book' },
+    ...(user.role !== 'ADMIN'
+      ? [
+          {
+            href: `/${user.role.toLowerCase()}/homework`,
+            label:
+              user.role === 'TEACHER'
+                ? 'تصحيح الواجبات'
+                : user.role === 'PARENT'
+                  ? 'واجبات أبنائي'
+                  : 'واجباتي',
+            icon: 'edit' as IconName,
+          },
+        ]
+      : []),
     ...(user.role === 'TEACHER'
       ? [
           { href: '/teacher/reports', label: 'تقارير الحصص', icon: 'edit' as IconName },

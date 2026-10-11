@@ -24,6 +24,7 @@ import { sessionRoutes } from './routes/sessions';
 import { accountRoutes } from './routes/account';
 import { startWhiteboardWebSocketServer } from './ws-server';
 import { rateLimitKey } from './lib/rate-limit';
+import { homeworkRoutes } from './routes/homework';
 import { adminRoutes } from './routes/admin';
 import { bootstrapAdmin } from './lib/bootstrap-admin';
 import { prepareReview } from './lib/prepare-review';
@@ -119,6 +120,7 @@ export async function buildApp() {
   await app.register(healthRoutes, { prefix: '/api' });
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(accountRoutes, { prefix: '/api/account' });
+  await app.register(homeworkRoutes, { prefix: '/api/homework' });
   await app.register(adminRoutes, { prefix: '/api/admin' });
   await app.register(courseRoutes, { prefix: '/api/courses' });
   await app.register(lessonRoutes, { prefix: '/api/lessons' });

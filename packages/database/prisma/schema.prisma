@@ -127,6 +127,7 @@ model StudentProfile {
   quizResults  StudentQuizResult[]
   attendance SessionAttendance[]
   sessionReports SessionReport[]
+  homeworkSubmissions HomeworkSubmission[]
   learningStates LearningState[]
   seatReservations SeatReservation[]
 }
@@ -297,6 +298,7 @@ model ClassSession {
   reports SessionReport[]
   materialsVersion Int @default(0)
   materials SessionMaterial[]
+  homework SessionHomework?
 
   @@index([courseId, scheduledAt])
   @@index([teacherId, scheduledAt])
@@ -477,4 +479,30 @@ model SessionMaterial {
   @@unique([sessionId, contentId])
   @@unique([sessionId, order])
   @@index([contentId])
+}
+
+model SessionHomework {
+  sessionId String @id
+  title String
+  questions Json
+  version Int @default(1)
+  updatedAt DateTime @updatedAt
+  session ClassSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  submissions HomeworkSubmission[]
+}
+
+model HomeworkSubmission {
+  id String @id @default(cuid())
+  sessionId String
+  studentId String
+  answers Json
+  grades Json
+  feedback String @default("")
+  version Int @default(1)
+  submittedAt DateTime @default(now())
+  publishedAt DateTime?
+  homework SessionHomework @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  @@unique([sessionId, studentId])
+  @@index([studentId, submittedAt])
 }

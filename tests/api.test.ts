@@ -1946,3 +1946,71 @@ test('session curriculum is admin-assigned, ordered, versioned, private to its t
   assert.equal((await call('PUT', path, 'admin', { version: 1, contentIds: [] })).statusCode, 200);
   assert.equal((await call('GET', path, 'admin')).json().data.session.materials.length, 0);
 });
+
+test('class homework freezes before start, hides answer keys, saves once and publishes teacher-reviewed grades only to the linked family', async () => {
+  // Earlier password-reset coverage revoked this pupil's old session.
+  const outsiderUser = await prisma.user.findUniqueOrThrow({ where: { id: actors.outsider.id } });
+  actors.outsider.token = app.jwt.sign({ id: outsiderUser.id, role: outsiderUser.role, version: outsiderUser.tokenVersion });
+  const courseId = (await createCourse({ title: 'Homework class', description: 'Homework curriculum test', price: 0 })).json().data.id;
+  const student = await prisma.studentProfile.findUniqueOrThrow({ where: { userId: actors.student.id } });
+  const parent = await prisma.parentProfile.findUniqueOrThrow({ where: { userId: actors.parent.id } });
+  await prisma.studentProfile.update({ where: { id: student.id }, data: { parentId: parent.id } });
+  await enroll(courseId, 'student');
+  const session = await fixtureSession(courseId, 'Homework');
+  const path = `/api/homework/${session.id}`;
+  const questions = [
+    { id: randomUUID(), text: 'First letter', type: 'MCQ', options: ['Alif', 'Ba'], correctAnswer: 'Alif', points: 2 },
+    { id: randomUUID(), text: 'Alif is a letter', type: 'TRUE_FALSE', correctAnswer: 'true', points: 1 },
+    { id: randomUUID(), text: 'Match letters', type: 'MATCHING', pairs: [{ left: 'Alif', right: 'أ' }, { left: 'Ba', right: 'ب' }], points: 3 },
+  ];
+  const body = { title: 'Letters homework', version: 0, questions };
+  assert.equal((await call('GET', path)).statusCode, 401);
+  assert.equal((await call('PUT', path, 'teacher', body)).statusCode, 403);
+  assert.equal((await call('PUT', path, 'admin', { ...body, questions: [{...questions[0], correctAnswer:'invalid'}] })).statusCode, 400);
+  assert.equal((await call('PUT', path, 'admin', body)).statusCode, 200);
+  assert.equal((await call('PUT', path, 'admin', body)).statusCode, 409);
+  assert.equal((await call('GET', path, 'student')).statusCode, 409);
+  assert.equal((await call('GET', path, 'outsider')).statusCode, 403);
+  await call('PATCH', `/api/sessions/${session.id}/start`, 'teacher');
+  assert.equal((await call('PUT', path, 'admin', { ...body, version: 1 })).statusCode, 409);
+  await call('POST', '/api/sessions/end', 'teacher', { roomName: courseId });
+  // Roster snapshot grants the original pupil access even if enrollment ends later.
+  await prisma.enrollment.update({ where: { courseId_studentId: { courseId, studentId: student.id } }, data: { status: 'CANCELLED' } });
+  const assignment = await call('GET', path, 'student');
+  assert.equal(assignment.statusCode, 200, assignment.body);
+  assert.ok(!assignment.body.includes('correctAnswer'));
+  assert.ok(!assignment.body.includes('pairs'));
+  assert.ok(!assignment.json().data.session.homework);
+  assert.ok((await call('GET', '/api/homework', 'parent')).json().data.some((r: any) => r.sessionTitle === 'Homework' && r.status === 'NOT_SUBMITTED'));
+  const answers = { [questions[0].id]: 'Alif', [questions[1].id]: 'false', [questions[2].id]: ['أ', 'ب'] };
+  assert.equal((await call('POST', path+'/submit', 'outsider', { version: 1, answers })).statusCode, 403);
+  assert.equal((await call('POST', path+'/submit', 'student', { version: 99, answers })).statusCode, 409);
+  assert.equal((await call('POST', path+'/submit', 'student', { version: 1, answers: {...answers,[questions[2].id]:['أ','أ']} })).statusCode, 400);
+  const attempts = await Promise.all([call('POST', path+'/submit','student',{version:1,answers}),call('POST',path+'/submit','student',{version:1,answers})]);
+  assert.deepEqual(attempts.map(r=>r.statusCode), [200,200]);
+  assert.equal(attempts[0].json().data.id, attempts[1].json().data.id);
+  assert.ok(!attempts[0].json().data.grades);
+  const id = attempts[0].json().data.id;
+  assert.equal((await call('POST',path+'/submit','student',{version:1,answers:{...answers,[questions[0].id]:'Ba'}})).statusCode,409);
+  const family = (await call('GET','/api/homework','parent')).json().data;
+  assert.ok(family.some((r:any)=>r.id===id&&!r.grades));
+  assert.ok(!(await call('GET','/api/homework','otherParent')).json().data.some((r:any)=>r.id===id));
+  const review=(await call('GET',path,'teacher')).json().data.submissions[0];
+  assert.equal(review.grades[questions[0].id],2);assert.equal(review.grades[questions[1].id],0);assert.equal(review.grades[questions[2].id],3);
+  const gradePath=`/api/homework/submissions/${id}/grade`;
+  const grade={version:1,grades:review.grades,feedback:'Review Alif',publish:false};
+  assert.equal((await call('PUT',gradePath,'otherTeacher',grade)).statusCode,404);
+  assert.equal((await call('PUT',gradePath,'parent',grade)).statusCode,403);
+  assert.equal((await call('PUT',gradePath,'teacher',{...grade,grades:{...grade.grades,[questions[0].id]:20}})).statusCode,400);
+  assert.equal((await call('PUT',gradePath,'teacher',grade)).statusCode,200);
+  assert.ok(!(await call('GET',path,'student')).json().data.submission.grades);
+  assert.equal((await call('PUT',gradePath,'teacher',{...grade,publish:true})).statusCode,409);
+  const published=await call('PUT',gradePath,'teacher',{...grade,version:2,publish:true});
+  assert.equal(published.statusCode,200,published.body);
+  assert.equal((await call('GET',path,'student')).json().data.submission.feedback,'Review Alif');
+  assert.equal((await call('GET','/api/homework','parent')).json().data.find((r:any)=>r.id===id).grades[questions[0].id],2);
+  assert.equal((await call('PUT',gradePath,'teacher',{...grade,version:3,publish:true})).statusCode,409);
+  assert.equal((await call('GET',path,'otherTeacher')).statusCode,404);
+  assert.equal((await call('GET',path,'parent')).statusCode,403);
+  assert.ok((await call('GET','/api/homework','student')).json().data.some((r:any)=>r.id===session.id&&r.status==='GRADED'));
+});

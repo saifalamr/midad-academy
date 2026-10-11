@@ -1010,6 +1010,12 @@ export default function ClassroomPage() {
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [exit, setExit] = useState<'left' | 'ended' | 'removed' | null>(null);
+  useEffect(() => {
+    if (exit !== 'ended' || user?.role !== 'STUDENT' || !lesson?.id) return;
+    const controller = new AbortController();
+    authFetch(`/api/homework/${lesson.id}`, {signal: controller.signal}).then(res => {if (res.ok && !controller.signal.aborted) router.replace(`/student/homework/${lesson.id}`);}).catch(() => {});
+    return () => controller.abort();
+  }, [exit, user?.role, lesson?.id, router]);
 
   useEffect(() => {
     if (!choices || exit) return;
@@ -1093,7 +1099,7 @@ export default function ClassroomPage() {
   const cameraCapture = useMemo(() => !isObserver && choices?.videoEnabled ? { deviceId: choices.videoDeviceId } : false, [isObserver, choices?.videoEnabled, choices?.videoDeviceId]);
   const audioCapture = useMemo(() => !isObserver && choices?.audioEnabled ? { deviceId: choices.audioDeviceId } : false, [isObserver, choices?.audioEnabled, choices?.audioDeviceId]);
 
-  if (exit) return <main className="midad classroom-lobby" dir="rtl"><section className="lobby-state classroom-exit"><div className="exit-icon"><Icon name={exit === 'removed' ? 'warning' : 'check'} size={30} /></div><h1>{exit === 'ended' ? 'انتهت الحصة' : exit === 'removed' ? 'تم إغلاق دخولك للحصة' : 'غادرت الحصة'}</h1><p>{exit === 'ended' ? 'شكرًا لمشاركتك. يمكنك متابعة مواد الدورة من لوحة التحكم.' : exit === 'removed' ? 'تواصل مع المعلم إذا كنت تحتاج العودة. يمكنك الرجوع إلى صفوفك الآن.' : isObserver ? 'انتهت المشاهدة. يمكنك العودة ما دامت الحصة مستمرة.' : 'تم قطع اتصالك بالكاميرا والميكروفون. يمكنك العودة ما دامت الحصة مستمرة.'}</p>{lesson && <strong>{lesson.title}</strong>}<div className="exit-actions"><button className="btn btn-gold" onClick={goDashboard}>الرجوع للوحة التحكم</button>{exit === 'left' && <button className="btn btn-outline" onClick={() => { setChoices(null); setToken(null); setError(''); setExit(null); }}>{isObserver ? 'العودة للمشاهدة' : 'العودة لتجهيز الحصة'}</button>}{role === 'teacher' && <Link className="btn btn-gold" href={`/teacher/reports?course=${encodeURIComponent(roomId)}`}>كتابة تقارير الطلاب</Link>}{!isObserver && <Link className="btn btn-outline" href={`/courses/${roomId}/lessons`}>مواد الدورة</Link>}</div></section></main>;
+  if (exit) return <main className="midad classroom-lobby" dir="rtl"><section className="lobby-state classroom-exit"><div className="exit-icon"><Icon name={exit === 'removed' ? 'warning' : 'check'} size={30} /></div><h1>{exit === 'ended' ? 'انتهت الحصة' : exit === 'removed' ? 'تم إغلاق دخولك للحصة' : 'غادرت الحصة'}</h1><p>{exit === 'ended' ? 'شكرًا لمشاركتك. يمكنك متابعة مواد الدورة من لوحة التحكم.' : exit === 'removed' ? 'تواصل مع المعلم إذا كنت تحتاج العودة. يمكنك الرجوع إلى صفوفك الآن.' : isObserver ? 'انتهت المشاهدة. يمكنك العودة ما دامت الحصة مستمرة.' : 'تم قطع اتصالك بالكاميرا والميكروفون. يمكنك العودة ما دامت الحصة مستمرة.'}</p>{lesson && <strong>{lesson.title}</strong>}<div className="exit-actions"><button className="btn btn-gold" onClick={goDashboard}>الرجوع للوحة التحكم</button>{exit === 'left' && <button className="btn btn-outline" onClick={() => { setChoices(null); setToken(null); setError(''); setExit(null); }}>{isObserver ? 'العودة للمشاهدة' : 'العودة لتجهيز الحصة'}</button>}{role === 'student' && <Link className="btn btn-gold" href={`/student/homework${lesson?.id ? '/' + lesson.id : ''}`}>واجب الحصة</Link>}{role === 'teacher' && <Link className="btn btn-gold" href={`/teacher/reports?course=${encodeURIComponent(roomId)}`}>كتابة تقارير الطلاب</Link>}{!isObserver && <Link className="btn btn-outline" href={`/courses/${roomId}/lessons`}>مواد الدورة</Link>}</div></section></main>;
 
   if (error) {
     return (

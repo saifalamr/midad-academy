@@ -5,7 +5,7 @@ import type { LocalUserChoices } from '@livekit/components-react';
 import Icon from './Icon';
 
 type Kind = 'audio' | 'video';
-export type LessonInfo = { title: string; courseId: string; scheduledAt: string; status: string; teacherName?: string; course: { title: string } }; 
+export type LessonInfo = { id?: string; title: string; courseId: string; scheduledAt: string; status: string; teacherName?: string; course: { title: string } };
 export default function ClassroomLobby({ name, lesson, onJoin, onBack }: { name: string; lesson?: LessonInfo | null; onJoin: (choices: LocalUserChoices) => void; onBack: () => void }) {
   const [enabled, setEnabled] = useState({ audio: false, video: false });
   const [busy, setBusy] = useState<Kind | null>(null);

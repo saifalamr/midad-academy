@@ -1,0 +1,127 @@
+.homework-page {
+  max-width: 1050px;
+  margin: auto;
+  padding: 28px 24px;
+  color: var(--ink);
+  line-height: 1.7;
+}
+.homework-page header {
+  margin: 24px 0;
+}
+.homework-page h1 {
+  font-size: clamp(26px, 4vw, 38px);
+}
+.homework-page h2 {
+  font-size: 22px;
+  overflow-wrap: anywhere;
+}
+.homework-page p {
+  color: var(--ink-3);
+  margin: 12px 0;
+}
+.homework-fields {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.homework-page .field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0;
+}
+.homework-page .input {
+  width: 100%;
+  min-width: 0;
+}
+.homework-row,
+.homework-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.homework-question {
+  margin: 20px 0;
+  min-width: 0;
+}
+.homework-question legend {
+  font-weight: 700;
+  color: var(--navy);
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.homework-question small {
+  color: var(--ink-3);
+}
+.homework-choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 10px 12px;
+  margin: 10px 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.homework-choice input {
+  accent-color: var(--gold);
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.homework-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.homework-error {
+  padding: 14px;
+  border-radius: 12px;
+  background: #ffebe5;
+  color: #9a2c24;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.homework-success {
+  padding: 14px;
+  border-radius: 12px;
+  background: #e8f4eb;
+  color: #246c46 !important;
+}
+.homework-grade {
+  border-bottom: 1px solid var(--line);
+  padding: 15px 0;
+  overflow-wrap: anywhere;
+}
+.homework-feedback {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.homework-grid .card {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.homework-fields:disabled .input {
+  opacity: 0.8;
+}
+@media (max-width: 700px) {
+  .homework-page {
+    padding: 20px 16px;
+  }
+  .homework-grid,
+  .homework-row {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .homework-page .card.pad {
+    padding: 18px;
+  }
+  .homework-actions .btn {
+    width: 100%;
+    white-space: normal;
+  }
+}

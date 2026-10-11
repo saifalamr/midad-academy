@@ -632,6 +632,12 @@ export default function AdminPage() {
                       >
                         مواد الحصة
                       </Link>
+                      <Link
+                        className="btn btn-outline btn-sm"
+                        href={`/admin/sessions/${s.id}/homework`}
+                      >
+                        واجب الحصة
+                      </Link>
                       {s.status === 'SCHEDULED' && (
                         <button
                           className="btn btn-outline btn-sm"
