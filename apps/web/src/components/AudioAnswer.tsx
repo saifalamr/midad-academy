@@ -178,10 +178,11 @@ export default function AudioAnswer({
       capture.start(500);
       stopTimer.current = setTimeout(stop, maxSeconds * 1000);
     } catch (e) {
-      stream.current?.getTracks().forEach((t) => t.stop());
-      stream.current = null;
-      if (attempt === revision.current)
+      if (attempt === revision.current) {
+        stream.current?.getTracks().forEach((t) => t.stop());
+        stream.current = null;
         setError(e instanceof Error ? e.message : 'اسمح باستخدام الميكروفون ثم أعد المحاولة');
+      }
     } finally {
       if (attempt === revision.current) setRequesting(false);
     }
