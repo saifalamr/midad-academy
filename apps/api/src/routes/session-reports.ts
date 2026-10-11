@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { queueFamilyNotification } from '../lib/notifications';
 import { prisma } from '../lib/prisma';
 import { httpError } from '../lib/access';
 
@@ -153,6 +154,8 @@ export async function sessionReportRoutes(app: FastifyInstance) {
         if (existing?.publishedAt) throw httpError(409, 'التقرير معتمد بالفعل. حدّث الصفحة لعرضه.');
         if (body.version !== (existing?.version ?? 0))
           throw httpError(409, 'تغيرت المسودة في نافذة أخرى. حدّث الصفحة قبل الحفظ.');
+        if (body.publish && /\[(?:اكتب|اسم|المهارة)/.test(body.note))
+          throw httpError(400, 'أكمل الفراغات في قالب التقرير قبل الاعتماد.');
         if (body.publish && body.note.length < 3)
           throw httpError(400, 'اكتب ملاحظة واضحة لولي الأمر قبل الاعتماد.');
         if (!attendance && (body.participationCount !== 0 || body.performance !== 'NOT_ASSESSED'))
@@ -164,11 +167,13 @@ export async function sessionReportRoutes(app: FastifyInstance) {
           note: body.note,
           publishedAt: body.publish ? new Date() : null,
         };
-        return tx.sessionReport.upsert({
+        const report = await tx.sessionReport.upsert({
           where: { sessionId_studentId: { sessionId, studentId } },
           create: { sessionId, studentId, ...data },
           update: { ...data, version: { increment: 1 } },
         });
+        if (body.publish) await queueFamilyNotification(tx, 'REPORT', report.id, studentId);
+        return report;
       });
       return { data: report };
     }

@@ -44,6 +44,15 @@ export default function WorkspaceShell({ children }: { children: React.ReactNode
           { href: '/teacher/review-answers', label: 'مراجعة الإجابات', icon: 'edit' as IconName },
         ]
       : []),
+    ...(user.role === 'ADMIN' || user.role === 'PARENT'
+      ? [
+          {
+            href: `/${user.role.toLowerCase()}/notifications`,
+            label: user.role === 'ADMIN' ? 'سجل الرسائل' : 'رسائل واتساب',
+            icon: 'calendar' as IconName,
+          },
+        ]
+      : []),
     { href: '/account', label: 'حسابي', icon: 'family' },
   ];
   return (

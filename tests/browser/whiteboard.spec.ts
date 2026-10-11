@@ -3,14 +3,26 @@ test('two participants keep concurrent drawings, undo only their edits, erase an
   browser,
   request,
 }) => {
-  const login = async (email: string) =>
-    (
-      await (
-        await request.post('http://127.0.0.1:4000/api/auth/login', {
-          data: { email, password: 'MidadPreview2026!' },
-        })
-      ).json()
-    ).data;
+  const login = async (email: string) => {
+    let response = await request.post('http://127.0.0.1:4000/api/auth/login', {
+      data: { email, password: 'MidadPreview2026!' },
+    });
+    // A complete suite deliberately shares one local IP. Honor the unchanged
+    // production throttle rather than weakening it to accommodate test traffic.
+    if (response.status() === 429) {
+      await new Promise((resolve) =>
+        setTimeout(
+          resolve,
+          Math.min(60, Number(response.headers()['retry-after']) || 1) * 1000 + 100
+        )
+      );
+      response = await request.post('http://127.0.0.1:4000/api/auth/login', {
+        data: { email, password: 'MidadPreview2026!' },
+      });
+    }
+    expect(response.ok(), await response.text()).toBeTruthy();
+    return (await response.json()).data;
+  };
   const teacherAuth = await login('teacher@preview.midad.test');
   const studentAuth = await login('student@preview.midad.test');
   const grant = await request.post('http://127.0.0.1:4000/api/sessions/drawing-permission', {

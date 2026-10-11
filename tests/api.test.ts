@@ -361,7 +361,7 @@ test('classroom creation is restricted and actual signed attendance is recorded 
     (await call('PATCH', `/api/sessions/${sessionId}/start`, 'teacher', {})).statusCode,
     200
   );
-  assert.equal(createdRoomCapacity, 21); // Ten students, up to ten family observers and the teacher.
+  assert.equal(createdRoomCapacity, 22); // Ten students, ten family observers, the teacher and administration.
   const payload = JSON.stringify({
     event: 'participant_joined',
     room: { name: `class-${sessionId}` },
@@ -1765,7 +1765,7 @@ test('family overview scopes children, upcoming classes and latest exercise grad
   assert.ok(!res.body.includes('must not leak'));
   const other = (await call('GET', '/api/parent/overview', 'parent')).json().data.children;
   assert.ok(other.every((c) => c.id !== child.studentProfile.id));
-  for (const role of ['teacher', 'student', 'admin'])
+  for (const role of ['teacher', 'student'])
     assert.equal((await call('GET', '/api/parent/overview', role)).statusCode, 403);
   const catalog = (await call('GET', '/api/courses/browse', 'parent'))
     .json()
@@ -1774,20 +1774,41 @@ test('family overview scopes children, upcoming classes and latest exercise grad
   assert.equal(catalog.timeZone, 'Africa/Cairo');
 });
 
-
 test('parents receive subscribe-only live tokens and cannot observe unrelated or inactive enrollment', async () => {
-  const courseId = (await createCourse({ title: 'Observer security', description: 'Parent observation test', price: 0 })).json().data.id;
+  const courseId = (
+    await createCourse({
+      title: 'Observer security',
+      description: 'Parent observation test',
+      price: 0,
+    })
+  ).json().data.id;
   await enroll(courseId, 'student');
-  const parent = await prisma.parentProfile.findUniqueOrThrow({ where: { userId: actors.parent.id } });
-  await prisma.studentProfile.update({ where: { userId: actors.student.id }, data: { parentId: parent.id } });
+  const parent = await prisma.parentProfile.findUniqueOrThrow({
+    where: { userId: actors.parent.id },
+  });
+  await prisma.studentProfile.update({
+    where: { userId: actors.student.id },
+    data: { parentId: parent.id },
+  });
   const session = await fixtureSession(courseId, 'Watch only');
-  assert.equal((await call('POST', '/api/sessions/observe', 'parent', { roomName: courseId })).statusCode, 409);
+  assert.equal(
+    (await call('POST', '/api/sessions/observe', 'parent', { roomName: courseId })).statusCode,
+    409
+  );
   await call('PATCH', `/api/sessions/${session.id}/start`, 'teacher');
   const res = await call('POST', '/api/sessions/observe', 'parent', { roomName: courseId });
   assert.equal(res.statusCode, 200);
-  assert.equal((await call('POST', '/api/sessions/observe', 'otherParent', { roomName: courseId })).statusCode, 403);
-  assert.equal((await call('GET', `/api/sessions/state/${courseId}`, 'otherParent')).statusCode, 403);
-  const claims = JSON.parse(Buffer.from(res.json().data.token.split('.')[1], 'base64url').toString());
+  assert.equal(
+    (await call('POST', '/api/sessions/observe', 'otherParent', { roomName: courseId })).statusCode,
+    403
+  );
+  assert.equal(
+    (await call('GET', `/api/sessions/state/${courseId}`, 'otherParent')).statusCode,
+    403
+  );
+  const claims = JSON.parse(
+    Buffer.from(res.json().data.token.split('.')[1], 'base64url').toString()
+  );
   assert.equal(claims.sub, actors.parent.id);
   assert.equal(claims.video.room, `class-${session.id}`);
   assert.equal(claims.video.canSubscribe, true);
@@ -1795,60 +1816,141 @@ test('parents receive subscribe-only live tokens and cannot observe unrelated or
   assert.equal(claims.video.canPublishData, false);
   assert.equal(claims.video.canUpdateOwnMetadata, false);
   assert.equal(JSON.parse(claims.metadata).role, 'parent');
-  assert.equal((await call('GET', `/api/sessions/state/${courseId}`, 'parent')).json().data.canDraw, false);
-  assert.equal((await call('PATCH', `/api/sessions/state/${courseId}`, 'parent', { pdfPage: 2 })).statusCode, 403);
-  assert.equal((await call('POST', '/api/sessions/end', 'parent', { roomName: courseId })).statusCode, 403);
-  assert.equal((await call('POST', '/api/sessions/join', 'parent', { roomName: courseId })).statusCode, 403);
-  for (const role of ['teacher', 'student', 'admin']) assert.equal((await call('POST', '/api/sessions/observe', role, { roomName: courseId })).statusCode, 403);
-  assert.ok((await call('GET', '/api/sessions/upcoming', 'parent')).json().data.some((s: any) => s.id === session.id));
+  assert.equal(
+    (await call('GET', `/api/sessions/state/${courseId}`, 'parent')).json().data.canDraw,
+    false
+  );
+  assert.equal(
+    (await call('PATCH', `/api/sessions/state/${courseId}`, 'parent', { pdfPage: 2 })).statusCode,
+    403
+  );
+  assert.equal(
+    (await call('POST', '/api/sessions/end', 'parent', { roomName: courseId })).statusCode,
+    403
+  );
+  assert.equal(
+    (await call('POST', '/api/sessions/join', 'parent', { roomName: courseId })).statusCode,
+    403
+  );
+  for (const role of ['teacher', 'student'])
+    assert.equal(
+      (await call('POST', '/api/sessions/observe', role, { roomName: courseId })).statusCode,
+      403
+    );
+  const adminObserve = await call('POST', '/api/sessions/observe', 'admin', { roomName: courseId });
+  assert.equal(adminObserve.statusCode, 200);
+  const adminClaims = JSON.parse(
+    Buffer.from(adminObserve.json().data.token.split('.')[1], 'base64url').toString()
+  );
+  assert.equal(adminClaims.video.hidden, true);
+  assert.equal(adminClaims.video.canPublish, false);
+  assert.equal(adminClaims.video.canPublishData, false);
+  assert.equal(
+    (await call('GET', `/api/sessions/state/${courseId}`, 'admin')).json().data.canDraw,
+    false
+  );
+  assert.equal(
+    (await call('PATCH', `/api/sessions/state/${courseId}`, 'admin', { pdfPage: 2 })).statusCode,
+    403
+  );
+  assert.ok(
+    (await call('GET', '/api/sessions/upcoming', 'parent'))
+      .json()
+      .data.some((s: any) => s.id === session.id)
+  );
   assert.equal(await prisma.sessionAttendance.count({ where: { sessionId: session.id } }), 0);
   // Even a stale/manually inserted drawing grant cannot turn a parent into an editor.
   await prisma.drawingPermission.create({ data: { courseId, userId: actors.parent.id } });
-  assert.equal((await call('GET', `/api/sessions/state/${courseId}`, 'parent')).json().data.canDraw, false);
-  whiteboard = (await import('../apps/api/src/ws-server')).startWhiteboardWebSocketServer(app.server, app);
+  assert.equal(
+    (await call('GET', `/api/sessions/state/${courseId}`, 'parent')).json().data.canDraw,
+    false
+  );
+  whiteboard = (await import('../apps/api/src/ws-server')).startWhiteboardWebSocketServer(
+    app.server,
+    app
+  );
   const port = (app.server.address() as { port: number }).port;
   const connect = async (role: string) => {
-    const ws = new WebSocket(`ws://127.0.0.1:${port}/whiteboard-${courseId}?token=${actors[role].token}`);
+    const ws = new WebSocket(
+      `ws://127.0.0.1:${port}/whiteboard-${courseId}?token=${actors[role].token}`
+    );
     await once(ws, 'message');
     return ws;
   };
   const viewer = await connect('parent');
+  const hiddenViewer = await connect('admin');
   const writer = await connect('teacher');
   const received = new Y.Doc();
   viewer.on('message', (bytes) => {
-    const decoder = (awaitDecoder(bytes));
+    const decoder = awaitDecoder(bytes);
     if (decoding.readVarUint(decoder) !== 0) return;
     sync.readSyncMessage(decoder, encoding.createEncoder(), received, null);
   });
-  function awaitDecoder(bytes: any) { return decoding.createDecoder(new Uint8Array(bytes)); }
-  function update(key: string) {
-    const doc = new Y.Doc(); doc.getMap('drawing').set(key, true);
-    const e = encoding.createEncoder(); encoding.writeVarUint(e, 0); sync.writeUpdate(e, Y.encodeStateAsUpdate(doc)); doc.destroy(); return encoding.toUint8Array(e);
+  function awaitDecoder(bytes: any) {
+    return decoding.createDecoder(new Uint8Array(bytes));
   }
+  function update(key: string) {
+    const doc = new Y.Doc();
+    doc.getMap('drawing').set(key, true);
+    const e = encoding.createEncoder();
+    encoding.writeVarUint(e, 0);
+    sync.writeUpdate(e, Y.encodeStateAsUpdate(doc));
+    doc.destroy();
+    return encoding.toUint8Array(e);
+  }
+  hiddenViewer.send(update('adminEdit'));
   viewer.send(update('parentEdit'));
   const delivered = once(viewer, 'message');
   writer.send(update('teacherEdit'));
   await delivered;
   assert.equal(received.getMap('drawing').get('teacherEdit'), true);
   assert.equal(received.getMap('drawing').get('parentEdit'), undefined);
-  await Promise.all([viewer, writer].map(async ws => { const closed = once(ws, 'close'); ws.close(); await closed; }));
-  await whiteboard.close(); whiteboard = undefined;
+  assert.equal(received.getMap('drawing').get('adminEdit'), undefined);
+  await Promise.all(
+    [viewer, hiddenViewer, writer].map(async (ws) => {
+      const closed = once(ws, 'close');
+      ws.close();
+      await closed;
+    })
+  );
+  await whiteboard.close();
+  whiteboard = undefined;
   received.destroy();
   await prisma.enrollment.updateMany({ where: { courseId }, data: { status: 'CANCELLED' } });
-  assert.equal((await call('POST', '/api/sessions/observe', 'parent', { roomName: courseId })).statusCode, 403);
+  assert.equal(
+    (await call('POST', '/api/sessions/observe', 'parent', { roomName: courseId })).statusCode,
+    403
+  );
   assert.equal((await call('GET', `/api/sessions/state/${courseId}`, 'parent')).statusCode, 403);
-  assert.ok(!(await call('GET', '/api/sessions/upcoming', 'parent')).json().data.some((s: any) => s.id === session.id));
+  assert.ok(
+    !(await call('GET', '/api/sessions/upcoming', 'parent'))
+      .json()
+      .data.some((s: any) => s.id === session.id)
+  );
   await call('POST', '/api/sessions/end', 'teacher', { roomName: courseId });
 });
 
 test('session reports keep drafts private, enforce roster and teacher ownership, and publish once with version checks', async () => {
-  const courseId = (await createCourse({ title: 'Teacher reports', description: 'Report security', price: 0 })).json().data.id;
+  const courseId = (
+    await createCourse({ title: 'Teacher reports', description: 'Report security', price: 0 })
+  ).json().data.id;
   await enroll(courseId, 'student');
-  const student = await prisma.studentProfile.findUniqueOrThrow({ where: { userId: actors.student.id } });
-  const outsider = await prisma.studentProfile.findUniqueOrThrow({ where: { userId: actors.outsider.id } });
+  const student = await prisma.studentProfile.findUniqueOrThrow({
+    where: { userId: actors.student.id },
+  });
+  const outsider = await prisma.studentProfile.findUniqueOrThrow({
+    where: { userId: actors.outsider.id },
+  });
   const session = await fixtureSession(courseId, 'Report lesson');
   const path = '/api/teacher/reports/' + session.id;
-  const draft = { performance: 'GOOD', participationCount: 3, homework: 'COMPLETED', note: 'مسودة خاصة للمعلم', version: 0, publish: false };
+  const draft = {
+    performance: 'GOOD',
+    participationCount: 3,
+    homework: 'COMPLETED',
+    note: 'مسودة خاصة للمعلم',
+    version: 0,
+    publish: false,
+  };
   assert.equal((await call('GET', path, 'teacher')).statusCode, 404);
   assert.equal((await call('PUT', path + '/' + student.id, 'teacher', draft)).statusCode, 404);
   await prisma.classSession.update({ where: { id: session.id }, data: { status: 'COMPLETED' } });
@@ -1864,85 +1966,236 @@ test('session reports keep drafts private, enforce roster and teacher ownership,
   assert.equal(first.statusCode, 200, first.body);
   assert.equal(first.json().data.version, 1);
   assert.equal(first.json().data.publishedAt, null);
-  assert.ok(!(await call('GET', '/api/parent/overview', 'parent')).body.includes('مسودة خاصة للمعلم'));
+  assert.ok(
+    !(await call('GET', '/api/parent/overview', 'parent')).body.includes('مسودة خاصة للمعلم')
+  );
   assert.equal((await call('PUT', path + '/' + student.id, 'teacher', draft)).statusCode, 409);
-  const race = await Promise.all(['نسخة أولى', 'نسخة ثانية'].map(note => call('PUT', path + '/' + student.id, 'teacher', { ...draft, version: 1, note })));
-  assert.deepEqual(race.map(r => r.statusCode).sort(), [200, 409]);
+  const race = await Promise.all(
+    ['نسخة أولى', 'نسخة ثانية'].map((note) =>
+      call('PUT', path + '/' + student.id, 'teacher', { ...draft, version: 1, note })
+    )
+  );
+  assert.deepEqual(race.map((r) => r.statusCode).sort(), [200, 409]);
   const current = (await call('GET', path, 'teacher')).json().data.students[0].report;
   assert.equal(current.version, 2);
-  assert.equal((await call('PUT', path + '/' + student.id, 'teacher', { ...draft, version: 2, publish: true, note: '' })).statusCode, 400);
-  const published = await call('PUT', path + '/' + student.id, 'teacher', { ...draft, version: 2, publish: true, note: 'أتقن الحروف وشارك ثلاث مرات. يراجع الكلمات في البيت.' });
+  assert.equal(
+    (
+      await call('PUT', path + '/' + student.id, 'teacher', {
+        ...draft,
+        version: 2,
+        publish: true,
+        note: '',
+      })
+    ).statusCode,
+    400
+  );
+  const published = await call('PUT', path + '/' + student.id, 'teacher', {
+    ...draft,
+    version: 2,
+    publish: true,
+    note: 'أتقن الحروف وشارك ثلاث مرات. يراجع الكلمات في البيت.',
+  });
   assert.equal(published.statusCode, 200, published.body);
   const parentData = (await call('GET', '/api/parent/overview', 'parent')).json().data;
-  const report = parentData.children.find((c: any) => c.id === student.id).reports.find((r: any) => r.id === published.json().data.id);
-  assert.equal(report.performance, 'GOOD'); assert.equal(report.participationCount, 3); assert.equal(report.attended, true); assert.equal(report.courseTitle, 'Teacher reports');
+  const report = parentData.children
+    .find((c: any) => c.id === student.id)
+    .reports.find((r: any) => r.id === published.json().data.id);
+  assert.equal(report.performance, 'GOOD');
+  assert.equal(report.participationCount, 3);
+  assert.equal(report.attended, true);
+  assert.equal(report.courseTitle, 'Teacher reports');
   assert.ok(!(await call('GET', '/api/parent/overview', 'otherParent')).body.includes(report.note));
-  assert.equal((await call('PUT', path + '/' + student.id, 'teacher', { ...draft, version: 3 })).statusCode, 409);
-  const listing = (await call('GET', '/api/teacher/reports', 'teacher')).json().data.find((s: any) => s.id === session.id);
-  assert.equal(listing.total, 1); assert.equal(listing.published, 1); assert.equal(listing.pending, 0);
-  await prisma.enrollment.create({ data: { courseId, studentId: outsider.id, enrolledAt: new Date(session.scheduledAt.getTime() - 1000) } });
+  assert.equal(
+    (await call('PUT', path + '/' + student.id, 'teacher', { ...draft, version: 3 })).statusCode,
+    409
+  );
+  const listing = (await call('GET', '/api/teacher/reports', 'teacher'))
+    .json()
+    .data.find((s: any) => s.id === session.id);
+  assert.equal(listing.total, 1);
+  assert.equal(listing.published, 1);
+  assert.equal(listing.pending, 0);
+  await prisma.enrollment.create({
+    data: {
+      courseId,
+      studentId: outsider.id,
+      enrolledAt: new Date(session.scheduledAt.getTime() - 1000),
+    },
+  });
   assert.equal((await call('PUT', path + '/' + outsider.id, 'teacher', draft)).statusCode, 400);
-  assert.equal((await call('PUT', path + '/' + outsider.id, 'teacher', { ...draft, performance: 'NOT_ASSESSED', participationCount: 0, note: 'لم يحضر الحصة، يرجى متابعة الموعد القادم.', publish: true })).statusCode, 200);
-  await prisma.enrollment.updateMany({ where: { courseId, studentId: outsider.id }, data: { status: 'CANCELLED' } });
-  assert.ok((await call('GET', path, 'teacher')).json().data.students.some((s: any) => s.id === outsider.id));
+  assert.equal(
+    (
+      await call('PUT', path + '/' + outsider.id, 'teacher', {
+        ...draft,
+        performance: 'NOT_ASSESSED',
+        participationCount: 0,
+        note: 'لم يحضر الحصة، يرجى متابعة الموعد القادم.',
+        publish: true,
+      })
+    ).statusCode,
+    200
+  );
+  await prisma.enrollment.updateMany({
+    where: { courseId, studentId: outsider.id },
+    data: { status: 'CANCELLED' },
+  });
+  assert.ok(
+    (await call('GET', path, 'teacher')).json().data.students.some((s: any) => s.id === outsider.id)
+  );
 });
 
 test('starting roster survives later cancellation so every original student can receive a report', async () => {
-  const courseId = (await createCourse({ title: 'Roster snapshot', description: 'Retain reporting roster', price: 0 })).json().data.id;
+  const courseId = (
+    await createCourse({
+      title: 'Roster snapshot',
+      description: 'Retain reporting roster',
+      price: 0,
+    })
+  ).json().data.id;
   await enroll(courseId, 'student');
-  const student = await prisma.studentProfile.findUniqueOrThrow({ where: { userId: actors.student.id } });
+  const student = await prisma.studentProfile.findUniqueOrThrow({
+    where: { userId: actors.student.id },
+  });
   const session = await fixtureSession(courseId, 'Original roster');
-  assert.equal((await call('PATCH', '/api/sessions/' + session.id + '/start', 'teacher')).statusCode, 200);
-  assert.equal((await prisma.sessionReport.findUniqueOrThrow({ where: { sessionId_studentId: { sessionId: session.id, studentId: student.id } } })).version, 0);
-  await prisma.enrollment.updateMany({ where: { courseId, studentId: student.id }, data: { status: 'CANCELLED' } });
+  assert.equal(
+    (await call('PATCH', '/api/sessions/' + session.id + '/start', 'teacher')).statusCode,
+    200
+  );
+  assert.equal(
+    (
+      await prisma.sessionReport.findUniqueOrThrow({
+        where: { sessionId_studentId: { sessionId: session.id, studentId: student.id } },
+      })
+    ).version,
+    0
+  );
+  await prisma.enrollment.updateMany({
+    where: { courseId, studentId: student.id },
+    data: { status: 'CANCELLED' },
+  });
   await call('POST', '/api/sessions/end', 'teacher', { roomName: courseId });
-  const students = (await call('GET', '/api/teacher/reports/' + session.id, 'teacher')).json().data.students;
-  assert.equal(students.length, 1); assert.equal(students[0].id, student.id);
-  assert.equal((await call('PUT', '/api/teacher/reports/' + session.id + '/' + student.id, 'teacher', { performance: 'NOT_ASSESSED', participationCount: 0, homework: 'NOT_ASSIGNED', note: 'لم يحضر هذه الحصة.', version: 0, publish: true })).statusCode, 200);
+  const students = (await call('GET', '/api/teacher/reports/' + session.id, 'teacher')).json().data
+    .students;
+  assert.equal(students.length, 1);
+  assert.equal(students[0].id, student.id);
+  assert.equal(
+    (
+      await call('PUT', '/api/teacher/reports/' + session.id + '/' + student.id, 'teacher', {
+        performance: 'NOT_ASSESSED',
+        participationCount: 0,
+        homework: 'NOT_ASSIGNED',
+        note: 'لم يحضر هذه الحصة.',
+        version: 0,
+        publish: true,
+      })
+    ).statusCode,
+    200
+  );
 });
 
 test('session curriculum is admin-assigned, ordered, versioned, private to its teacher and frozen at start', async () => {
-  const courseId = (await createCourse({ title: 'Session curriculum', description: 'Prepared classroom plan', price: 0 })).json().data.id;
+  const courseId = (
+    await createCourse({
+      title: 'Session curriculum',
+      description: 'Prepared classroom plan',
+      price: 0,
+    })
+  ).json().data.id;
   const session = await fixtureSession(courseId, 'Materials test');
-  const pdf = (await call('POST', `/api/courses/${courseId}/lessons`, 'admin', { title: 'First PDF', description: 'Review letters', type: 'PDF', contentUrl: 'https://example.com/letters.pdf', duration: 5 })).json().data;
-  const video = (await call('POST', `/api/courses/${courseId}/lessons`, 'admin', { title: 'Video lesson', description: 'Explain letters', type: 'VIDEO', contentUrl: 'https://example.com/video', duration: 5 })).json().data;
+  const pdf = (
+    await call('POST', `/api/courses/${courseId}/lessons`, 'admin', {
+      title: 'First PDF',
+      description: 'Review letters',
+      type: 'PDF',
+      contentUrl: 'https://example.com/letters.pdf',
+      duration: 5,
+    })
+  ).json().data;
+  const video = (
+    await call('POST', `/api/courses/${courseId}/lessons`, 'admin', {
+      title: 'Video lesson',
+      description: 'Explain letters',
+      type: 'VIDEO',
+      contentUrl: 'https://example.com/video',
+      duration: 5,
+    })
+  ).json().data;
   const foreign = await prisma.courseContent.findFirstOrThrow({ where: { courseId: freeId } });
   const adminPath = `/api/admin/sessions/${session.id}/materials`;
   const teacherPath = `/api/sessions/${session.id}/materials`;
   assert.equal((await call('GET', adminPath)).statusCode, 401);
-  for (const role of ['teacher', 'student', 'parent']) assert.equal((await call('PUT', adminPath, role, { version: 0, contentIds: [pdf.id] })).statusCode, 403);
+  for (const role of ['teacher', 'student', 'parent'])
+    assert.equal(
+      (await call('PUT', adminPath, role, { version: 0, contentIds: [pdf.id] })).statusCode,
+      403
+    );
   assert.equal((await call('GET', teacherPath, 'otherTeacher')).statusCode, 404);
-  for (const role of ['student', 'parent']) assert.equal((await call('GET', teacherPath, role)).statusCode, 403);
-  assert.equal((await call('PUT', adminPath, 'admin', { version: 0, contentIds: [foreign.id] })).statusCode, 400);
-  assert.equal((await call('PUT', adminPath, 'admin', { version: 0, contentIds: [pdf.id, pdf.id] })).statusCode, 400);
-  const saved = await call('PUT', adminPath, 'admin', { version: 0, contentIds: [video.id, pdf.id] });
+  for (const role of ['student', 'parent'])
+    assert.equal((await call('GET', teacherPath, role)).statusCode, 403);
+  assert.equal(
+    (await call('PUT', adminPath, 'admin', { version: 0, contentIds: [foreign.id] })).statusCode,
+    400
+  );
+  assert.equal(
+    (await call('PUT', adminPath, 'admin', { version: 0, contentIds: [pdf.id, pdf.id] }))
+      .statusCode,
+    400
+  );
+  const saved = await call('PUT', adminPath, 'admin', {
+    version: 0,
+    contentIds: [video.id, pdf.id],
+  });
   assert.equal(saved.statusCode, 200, saved.body);
   assert.equal(saved.json().data.materialsVersion, 1);
-  assert.deepEqual(saved.json().data.materials.map((m: any) => m.contentId), [video.id, pdf.id]);
-  assert.equal((await call('PUT', adminPath, 'admin', { version: 0, contentIds: [] })).statusCode, 409);
+  assert.deepEqual(
+    saved.json().data.materials.map((m: any) => m.contentId),
+    [video.id, pdf.id]
+  );
+  assert.equal(
+    (await call('PUT', adminPath, 'admin', { version: 0, contentIds: [] })).statusCode,
+    409
+  );
   assert.equal((await call('DELETE', `/api/lessons/${pdf.id}`, 'admin')).statusCode, 409);
   const parallel = await Promise.all([
     call('PUT', adminPath, 'admin', { version: 1, contentIds: [pdf.id, video.id] }),
     call('PUT', adminPath, 'admin', { version: 1, contentIds: [video.id, pdf.id] }),
   ]);
-  assert.deepEqual(parallel.map(r => r.statusCode).sort(), [200, 409]);
+  assert.deepEqual(parallel.map((r) => r.statusCode).sort(), [200, 409]);
   const plan = (await call('GET', teacherPath, 'teacher')).json().data;
   assert.equal(plan.materials.length, 2);
-  assert.equal((await call('PATCH', `/api/sessions/${session.id}/start`, 'teacher')).statusCode, 200);
+  assert.equal(
+    (await call('PATCH', `/api/sessions/${session.id}/start`, 'teacher')).statusCode,
+    200
+  );
   const live = await call('GET', `/api/sessions/materials/live/${courseId}`, 'teacher');
   assert.equal(live.statusCode, 200, live.body);
   assert.deepEqual(live.json().data.materials, plan.materials);
-  assert.equal((await call('GET', `/api/sessions/materials/live/${courseId}`, 'otherTeacher')).statusCode, 404);
-  assert.equal((await call('PUT', adminPath, 'admin', { version: 2, contentIds: [] })).statusCode, 409);
+  assert.equal(
+    (await call('GET', `/api/sessions/materials/live/${courseId}`, 'otherTeacher')).statusCode,
+    404
+  );
+  assert.equal(
+    (await call('PUT', adminPath, 'admin', { version: 2, contentIds: [] })).statusCode,
+    409
+  );
   // Course library order is independent of this session's saved order.
   await call('PATCH', `/api/lessons/${pdf.id}`, 'admin', { order: 99 });
-  assert.deepEqual((await call('GET', teacherPath, 'teacher')).json().data.materials, plan.materials);
+  assert.deepEqual(
+    (await call('GET', teacherPath, 'teacher')).json().data.materials,
+    plan.materials
+  );
   await call('POST', '/api/sessions/end', 'teacher', { roomName: courseId });
-  assert.equal((await call('PUT', adminPath, 'admin', { version: 2, contentIds: [] })).statusCode, 409);
+  assert.equal(
+    (await call('PUT', adminPath, 'admin', { version: 2, contentIds: [] })).statusCode,
+    409
+  );
   assert.equal((await call('GET', teacherPath, 'teacher')).json().data.materials.length, 2);
   const scheduled = await fixtureSession(courseId, 'Clear plan');
   const path = `/api/admin/sessions/${scheduled.id}/materials`;
-  assert.equal((await call('PUT', path, 'admin', { version: 0, contentIds: [pdf.id] })).statusCode, 200);
+  assert.equal(
+    (await call('PUT', path, 'admin', { version: 0, contentIds: [pdf.id] })).statusCode,
+    200
+  );
   assert.equal((await call('PUT', path, 'admin', { version: 1, contentIds: [] })).statusCode, 200);
   assert.equal((await call('GET', path, 'admin')).json().data.session.materials.length, 0);
 });
@@ -1950,23 +2203,67 @@ test('session curriculum is admin-assigned, ordered, versioned, private to its t
 test('class homework freezes before start, hides answer keys, saves once and publishes teacher-reviewed grades only to the linked family', async () => {
   // Earlier password-reset coverage revoked this pupil's old session.
   const outsiderUser = await prisma.user.findUniqueOrThrow({ where: { id: actors.outsider.id } });
-  actors.outsider.token = app.jwt.sign({ id: outsiderUser.id, role: outsiderUser.role, version: outsiderUser.tokenVersion });
-  const courseId = (await createCourse({ title: 'Homework class', description: 'Homework curriculum test', price: 0 })).json().data.id;
-  const student = await prisma.studentProfile.findUniqueOrThrow({ where: { userId: actors.student.id } });
-  const parent = await prisma.parentProfile.findUniqueOrThrow({ where: { userId: actors.parent.id } });
+  actors.outsider.token = app.jwt.sign({
+    id: outsiderUser.id,
+    role: outsiderUser.role,
+    version: outsiderUser.tokenVersion,
+  });
+  const courseId = (
+    await createCourse({
+      title: 'Homework class',
+      description: 'Homework curriculum test',
+      price: 0,
+    })
+  ).json().data.id;
+  const student = await prisma.studentProfile.findUniqueOrThrow({
+    where: { userId: actors.student.id },
+  });
+  const parent = await prisma.parentProfile.findUniqueOrThrow({
+    where: { userId: actors.parent.id },
+  });
   await prisma.studentProfile.update({ where: { id: student.id }, data: { parentId: parent.id } });
   await enroll(courseId, 'student');
   const session = await fixtureSession(courseId, 'Homework');
   const path = `/api/homework/${session.id}`;
   const questions = [
-    { id: randomUUID(), text: 'First letter', type: 'MCQ', options: ['Alif', 'Ba'], correctAnswer: 'Alif', points: 2 },
-    { id: randomUUID(), text: 'Alif is a letter', type: 'TRUE_FALSE', correctAnswer: 'true', points: 1 },
-    { id: randomUUID(), text: 'Match letters', type: 'MATCHING', pairs: [{ left: 'Alif', right: 'أ' }, { left: 'Ba', right: 'ب' }], points: 3 },
+    {
+      id: randomUUID(),
+      text: 'First letter',
+      type: 'MCQ',
+      options: ['Alif', 'Ba'],
+      correctAnswer: 'Alif',
+      points: 2,
+    },
+    {
+      id: randomUUID(),
+      text: 'Alif is a letter',
+      type: 'TRUE_FALSE',
+      correctAnswer: 'true',
+      points: 1,
+    },
+    {
+      id: randomUUID(),
+      text: 'Match letters',
+      type: 'MATCHING',
+      pairs: [
+        { left: 'Alif', right: 'أ' },
+        { left: 'Ba', right: 'ب' },
+      ],
+      points: 3,
+    },
   ];
   const body = { title: 'Letters homework', version: 0, questions };
   assert.equal((await call('GET', path)).statusCode, 401);
   assert.equal((await call('PUT', path, 'teacher', body)).statusCode, 403);
-  assert.equal((await call('PUT', path, 'admin', { ...body, questions: [{...questions[0], correctAnswer:'invalid'}] })).statusCode, 400);
+  assert.equal(
+    (
+      await call('PUT', path, 'admin', {
+        ...body,
+        questions: [{ ...questions[0], correctAnswer: 'invalid' }],
+      })
+    ).statusCode,
+    400
+  );
   assert.equal((await call('PUT', path, 'admin', body)).statusCode, 200);
   assert.equal((await call('PUT', path, 'admin', body)).statusCode, 409);
   assert.equal((await call('GET', path, 'student')).statusCode, 409);
@@ -1975,42 +2272,430 @@ test('class homework freezes before start, hides answer keys, saves once and pub
   assert.equal((await call('PUT', path, 'admin', { ...body, version: 1 })).statusCode, 409);
   await call('POST', '/api/sessions/end', 'teacher', { roomName: courseId });
   // Roster snapshot grants the original pupil access even if enrollment ends later.
-  await prisma.enrollment.update({ where: { courseId_studentId: { courseId, studentId: student.id } }, data: { status: 'CANCELLED' } });
+  await prisma.enrollment.update({
+    where: { courseId_studentId: { courseId, studentId: student.id } },
+    data: { status: 'CANCELLED' },
+  });
   const assignment = await call('GET', path, 'student');
   assert.equal(assignment.statusCode, 200, assignment.body);
   assert.ok(!assignment.body.includes('correctAnswer'));
   assert.ok(!assignment.body.includes('pairs'));
   assert.ok(!assignment.json().data.session.homework);
-  assert.ok((await call('GET', '/api/homework', 'parent')).json().data.some((r: any) => r.sessionTitle === 'Homework' && r.status === 'NOT_SUBMITTED'));
-  const answers = { [questions[0].id]: 'Alif', [questions[1].id]: 'false', [questions[2].id]: ['أ', 'ب'] };
-  assert.equal((await call('POST', path+'/submit', 'outsider', { version: 1, answers })).statusCode, 403);
-  assert.equal((await call('POST', path+'/submit', 'student', { version: 99, answers })).statusCode, 409);
-  assert.equal((await call('POST', path+'/submit', 'student', { version: 1, answers: {...answers,[questions[2].id]:['أ','أ']} })).statusCode, 400);
-  const attempts = await Promise.all([call('POST', path+'/submit','student',{version:1,answers}),call('POST',path+'/submit','student',{version:1,answers})]);
-  assert.deepEqual(attempts.map(r=>r.statusCode), [200,200]);
+  assert.ok(
+    (await call('GET', '/api/homework', 'parent'))
+      .json()
+      .data.some((r: any) => r.sessionTitle === 'Homework' && r.status === 'NOT_SUBMITTED')
+  );
+  const answers = {
+    [questions[0].id]: 'Alif',
+    [questions[1].id]: 'false',
+    [questions[2].id]: ['أ', 'ب'],
+  };
+  assert.equal(
+    (await call('POST', path + '/submit', 'outsider', { version: 1, answers })).statusCode,
+    403
+  );
+  assert.equal(
+    (await call('POST', path + '/submit', 'student', { version: 99, answers })).statusCode,
+    409
+  );
+  assert.equal(
+    (
+      await call('POST', path + '/submit', 'student', {
+        version: 1,
+        answers: { ...answers, [questions[2].id]: ['أ', 'أ'] },
+      })
+    ).statusCode,
+    400
+  );
+  const attempts = await Promise.all([
+    call('POST', path + '/submit', 'student', { version: 1, answers }),
+    call('POST', path + '/submit', 'student', { version: 1, answers }),
+  ]);
+  assert.deepEqual(
+    attempts.map((r) => r.statusCode),
+    [200, 200]
+  );
   assert.equal(attempts[0].json().data.id, attempts[1].json().data.id);
   assert.ok(!attempts[0].json().data.grades);
   const id = attempts[0].json().data.id;
-  assert.equal((await call('POST',path+'/submit','student',{version:1,answers:{...answers,[questions[0].id]:'Ba'}})).statusCode,409);
-  const family = (await call('GET','/api/homework','parent')).json().data;
-  assert.ok(family.some((r:any)=>r.id===id&&!r.grades));
-  assert.ok(!(await call('GET','/api/homework','otherParent')).json().data.some((r:any)=>r.id===id));
-  const review=(await call('GET',path,'teacher')).json().data.submissions[0];
-  assert.equal(review.grades[questions[0].id],2);assert.equal(review.grades[questions[1].id],0);assert.equal(review.grades[questions[2].id],3);
-  const gradePath=`/api/homework/submissions/${id}/grade`;
-  const grade={version:1,grades:review.grades,feedback:'Review Alif',publish:false};
-  assert.equal((await call('PUT',gradePath,'otherTeacher',grade)).statusCode,404);
-  assert.equal((await call('PUT',gradePath,'parent',grade)).statusCode,403);
-  assert.equal((await call('PUT',gradePath,'teacher',{...grade,grades:{...grade.grades,[questions[0].id]:20}})).statusCode,400);
-  assert.equal((await call('PUT',gradePath,'teacher',grade)).statusCode,200);
-  assert.ok(!(await call('GET',path,'student')).json().data.submission.grades);
-  assert.equal((await call('PUT',gradePath,'teacher',{...grade,publish:true})).statusCode,409);
-  const published=await call('PUT',gradePath,'teacher',{...grade,version:2,publish:true});
-  assert.equal(published.statusCode,200,published.body);
-  assert.equal((await call('GET',path,'student')).json().data.submission.feedback,'Review Alif');
-  assert.equal((await call('GET','/api/homework','parent')).json().data.find((r:any)=>r.id===id).grades[questions[0].id],2);
-  assert.equal((await call('PUT',gradePath,'teacher',{...grade,version:3,publish:true})).statusCode,409);
-  assert.equal((await call('GET',path,'otherTeacher')).statusCode,404);
-  assert.equal((await call('GET',path,'parent')).statusCode,403);
-  assert.ok((await call('GET','/api/homework','student')).json().data.some((r:any)=>r.id===session.id&&r.status==='GRADED'));
+  assert.equal(
+    (
+      await call('POST', path + '/submit', 'student', {
+        version: 1,
+        answers: { ...answers, [questions[0].id]: 'Ba' },
+      })
+    ).statusCode,
+    409
+  );
+  const family = (await call('GET', '/api/homework', 'parent')).json().data;
+  assert.ok(family.some((r: any) => r.id === id && !r.grades));
+  assert.ok(
+    !(await call('GET', '/api/homework', 'otherParent')).json().data.some((r: any) => r.id === id)
+  );
+  const review = (await call('GET', path, 'teacher')).json().data.submissions[0];
+  assert.equal(review.grades[questions[0].id], 2);
+  assert.equal(review.grades[questions[1].id], 0);
+  assert.equal(review.grades[questions[2].id], 3);
+  const gradePath = `/api/homework/submissions/${id}/grade`;
+  const grade = { version: 1, grades: review.grades, feedback: 'Review Alif', publish: false };
+  assert.equal((await call('PUT', gradePath, 'otherTeacher', grade)).statusCode, 404);
+  assert.equal((await call('PUT', gradePath, 'parent', grade)).statusCode, 403);
+  assert.equal(
+    (
+      await call('PUT', gradePath, 'teacher', {
+        ...grade,
+        grades: { ...grade.grades, [questions[0].id]: 20 },
+      })
+    ).statusCode,
+    400
+  );
+  assert.equal((await call('PUT', gradePath, 'teacher', grade)).statusCode, 200);
+  assert.ok(!(await call('GET', path, 'student')).json().data.submission.grades);
+  assert.equal(
+    (await call('PUT', gradePath, 'teacher', { ...grade, publish: true })).statusCode,
+    409
+  );
+  const published = await call('PUT', gradePath, 'teacher', {
+    ...grade,
+    version: 2,
+    publish: true,
+  });
+  assert.equal(published.statusCode, 200, published.body);
+  assert.equal((await call('GET', path, 'student')).json().data.submission.feedback, 'Review Alif');
+  assert.equal(
+    (await call('GET', '/api/homework', 'parent')).json().data.find((r: any) => r.id === id).grades[
+      questions[0].id
+    ],
+    2
+  );
+  assert.equal(
+    (await call('PUT', gradePath, 'teacher', { ...grade, version: 3, publish: true })).statusCode,
+    409
+  );
+  assert.equal((await call('GET', path, 'otherTeacher')).statusCode, 404);
+  assert.equal((await call('GET', path, 'parent')).statusCode, 403);
+  assert.ok(
+    (await call('GET', '/api/homework', 'student'))
+      .json()
+      .data.some((r: any) => r.id === session.id && r.status === 'GRADED')
+  );
+});
+
+test('class phases use the actual start, preserve it on re-entry and reject stale or unauthorized plans', async () => {
+  const courseId = (
+    await createCourse({ title: 'Clock', description: 'Clock checks', price: 0 })
+  ).json().data.id;
+  await enroll(courseId, 'student');
+  const session = await fixtureSession(courseId, 'Forty minutes', 40);
+  const started = await call('PATCH', `/api/sessions/${session.id}/start`, 'teacher');
+  assert.equal(started.statusCode, 200, started.body);
+  const path = `/api/sessions/clock/${courseId}`;
+  const clock = (await call('GET', path, 'teacher')).json().data;
+  assert.deepEqual(clock.minutes, [8, 20, 8, 4]);
+  assert.ok(clock.startedAt);
+  assert.equal((await call('GET', path, 'student')).statusCode, 200);
+  assert.equal(
+    (await call('PUT', path, 'student', { version: 0, minutes: [5, 20, 10, 5] })).statusCode,
+    403
+  );
+  assert.equal(
+    (await call('PUT', path, 'teacher', { version: 0, minutes: [10, 25, 10, 5] })).statusCode,
+    400
+  );
+  const saved = await call('PUT', path, 'teacher', { version: 0, minutes: [5, 20, 10, 5] });
+  assert.equal(saved.statusCode, 200, saved.body);
+  assert.equal(saved.json().data.startedAt, clock.startedAt);
+  assert.equal(
+    (await call('PUT', path, 'teacher', { version: 0, minutes: [5, 20, 10, 5] })).statusCode,
+    409
+  );
+  await call('PATCH', `/api/sessions/${session.id}/start`, 'teacher');
+  assert.equal((await call('GET', path, 'teacher')).json().data.startedAt, clock.startedAt);
+  await call('POST', '/api/sessions/end', 'teacher', { roomName: courseId });
+  assert.equal((await call('GET', path, 'admin')).statusCode, 403);
+  const { phaseAt } = await import('../apps/web/src/lib/class-clock');
+  const at = Date.parse(clock.startedAt);
+  assert.equal(phaseAt(clock.startedAt, [5, 20, 10, 5], at + 300_000).index, 1);
+  assert.equal(phaseAt(clock.startedAt, [5, 20, 10, 5], at + 2_400_000).ended, true);
+});
+
+test('audio answers are private, validated, immutable after submission and manually approved after listening', async () => {
+  const { v2: cloudinary } = await import('cloudinary');
+  const { Writable } = await import('node:stream');
+  const { config } = await import('../apps/api/src/config');
+  const previous = { ...config };
+  const uploader = cloudinary.uploader.upload_stream;
+  const destroy = cloudinary.uploader.destroy;
+  const download = cloudinary.utils.private_download_url;
+  let duration = 12,
+    width = 0;
+  const discarded: string[] = [];
+  Object.assign(config, {
+    CLOUDINARY_CLOUD_NAME: 'mock',
+    CLOUDINARY_API_KEY: 'mock',
+    CLOUDINARY_API_SECRET: 'mock',
+  });
+  cloudinary.uploader.upload_stream = ((options: any, callback: any) =>
+    new Writable({
+      write(_chunk, _enc, done) {
+        done();
+      },
+      final(done) {
+        callback(null, {
+          duration,
+          width,
+          height: 0,
+          bytes: 1024,
+          format: 'mp3',
+          public_id: options.public_id,
+        });
+        done();
+      },
+    })) as any;
+  cloudinary.uploader.destroy = (async (id: string) => {
+    discarded.push(id);
+    return {} as any;
+  }) as any;
+  cloudinary.utils.private_download_url = (() => 'https://example.test/private-audio') as any;
+  try {
+    const outsider = await prisma.user.findUniqueOrThrow({ where: { id: actors.outsider.id } });
+    actors.outsider.token = app.jwt.sign({
+      id: outsider.id,
+      role: outsider.role,
+      version: outsider.tokenVersion,
+    });
+    const courseId = (
+      await createCourse({ title: 'Audio', description: 'Private recording', price: 0 })
+    ).json().data.id;
+    await enroll(courseId, 'student');
+    const session = await fixtureSession(courseId, 'Audio homework');
+    const student = await prisma.studentProfile.findUniqueOrThrow({
+      where: { userId: actors.student.id },
+    });
+    const parent = await prisma.parentProfile.findUniqueOrThrow({
+      where: { userId: actors.parent.id },
+    });
+    await prisma.studentProfile.update({
+      where: { id: student.id },
+      data: { parentId: parent.id },
+    });
+    const question = {
+      id: randomUUID(),
+      text: 'اقرأ الحروف',
+      type: 'AUDIO',
+      points: 5,
+      maxSeconds: 30,
+    };
+    const hwPath = `/api/homework/${session.id}`;
+    const defined = await call('PUT', hwPath, 'admin', {
+      title: 'واجب القراءة',
+      questions: [question],
+      version: 0,
+    });
+    assert.equal(defined.statusCode, 200, defined.body);
+    await prisma.classSession.update({ where: { id: session.id }, data: { status: 'COMPLETED' } });
+    const multipart = Buffer.from(
+      '--audio-test\r\nContent-Disposition: form-data; name="file"; filename="voice.wav"\r\nContent-Type: audio/wav\r\n\r\nmock-audio\r\n--audio-test--\r\n'
+    );
+    const upload = (role: string) =>
+      app.inject({
+        method: 'POST',
+        url: `/api/homework-audio/${session.id}/${question.id}`,
+        remoteAddress,
+        headers: {
+          authorization: `Bearer ${actors[role].token}`,
+          'content-type': 'multipart/form-data; boundary=audio-test',
+        },
+        payload: multipart,
+      });
+    assert.equal((await upload('outsider')).statusCode, 403);
+    duration = 60;
+    assert.equal((await upload('student')).statusCode, 400);
+    assert.equal(discarded.length, 1);
+    duration = 12;
+    width = 100;
+    assert.equal((await upload('student')).statusCode, 400);
+    width = 0;
+    const first = await upload('student');
+    assert.equal(first.statusCode, 201, first.body);
+    const second = await upload('student');
+    assert.equal(second.statusCode, 201, second.body);
+    assert.notEqual(second.json().data.id, first.json().data.id);
+    const audioId = second.json().data.id;
+    const path = `/api/homework-audio/${audioId}`;
+    assert.equal((await call('GET', path, 'student')).statusCode, 200);
+    for (const role of ['outsider', 'teacher', 'parent', 'otherParent'])
+      assert.equal((await call('GET', path, role)).statusCode, 404);
+    assert.equal(
+      (
+        await call('POST', hwPath + '/submit', 'student', {
+          version: 1,
+          answers: { [question.id]: first.json().data.id },
+        })
+      ).statusCode,
+      400
+    );
+    const submitted = await call('POST', hwPath + '/submit', 'student', {
+      version: 1,
+      answers: { [question.id]: audioId },
+    });
+    assert.equal(submitted.statusCode, 200, submitted.body);
+    assert.equal((await upload('student')).statusCode, 409);
+    assert.equal((await call('GET', path, 'teacher')).statusCode, 200);
+    const gradePath = `/api/homework/submissions/${submitted.json().data.id}/grade`;
+    const grade = {
+      version: 1,
+      grades: { [question.id]: 4 },
+      feedback: 'قراءة جيدة',
+      publish: true,
+    };
+    assert.equal((await call('PUT', gradePath, 'teacher', grade)).statusCode, 400);
+    const approved = await call('PUT', gradePath, 'teacher', {
+      ...grade,
+      reviewedAudio: [question.id],
+    });
+    assert.equal(approved.statusCode, 200, approved.body);
+    assert.equal((await call('GET', path, 'parent')).statusCode, 200);
+    assert.equal((await call('GET', path, 'otherParent')).statusCode, 404);
+    assert.ok(
+      (await call('GET', '/api/homework', 'parent'))
+        .json()
+        .data.some((item: any) => item.audioAnswers?.includes(audioId))
+    );
+  } finally {
+    Object.assign(config, previous);
+    cloudinary.uploader.upload_stream = uploader;
+    cloudinary.uploader.destroy = destroy;
+    cloudinary.utils.private_download_url = download;
+  }
+});
+
+test('WhatsApp consent, durable deduplication, reminders and ambiguous failures protect families from incorrect repeated sends', async () => {
+  const { config } = await import('../apps/api/src/config');
+  const { queueFamilyNotification, enqueueReminders, dispatchNotifications } =
+    await import('../apps/api/src/lib/notifications');
+  const previous = { ...config };
+  const originalFetch = globalThis.fetch;
+  const parent = await prisma.parentProfile.findUniqueOrThrow({
+    where: { userId: actors.parent.id },
+  });
+  const student = await prisma.studentProfile.findUniqueOrThrow({
+    where: { userId: actors.student.id },
+  });
+  await prisma.studentProfile.update({ where: { id: student.id }, data: { parentId: parent.id } });
+  await prisma.user.update({
+    where: { id: actors.parent.id },
+    data: { whatsappPhone: '201000000000', whatsappOptIn: true },
+  });
+  assert.equal((await call('GET', '/api/notifications/status', 'student')).statusCode, 403);
+  assert.equal(
+    (await call('PUT', '/api/notifications/preferences', 'student', { whatsappOptIn: true }))
+      .statusCode,
+    403
+  );
+  assert.equal(
+    (await app.inject({ method: 'POST', url: '/api/notifications/dispatch' })).statusCode,
+    401
+  );
+  const courseId = (
+    await createCourse({ title: 'Notification course', description: 'Message checks', price: 0 })
+  ).json().data.id;
+  await enroll(courseId, 'student');
+  const session = await fixtureSession(courseId, 'Reminder');
+  await prisma.classSession.update({
+    where: { id: session.id },
+    data: { scheduledAt: new Date(Date.now() + 300_000) },
+  });
+  try {
+    Object.assign(config, {
+      WHATSAPP_ENABLED: true,
+      WHATSAPP_ACCESS_TOKEN: 'mock',
+      WHATSAPP_PHONE_NUMBER_ID: '1234',
+      WHATSAPP_API_VERSION: 'v25.0',
+      WHATSAPP_TEMPLATE_NAME: 'academy_update',
+    });
+    await enqueueReminders();
+    await enqueueReminders();
+    assert.equal(
+      await prisma.whatsAppNotification.count({
+        where: { referenceId: session.id, kind: 'REMINDER' },
+      }),
+      1
+    );
+    // Limit dispatch to this scenario; older publications were intentionally skipped without consent.
+    let requests = 0;
+    globalThis.fetch = (async (_url: any, options: any) => {
+      requests++;
+      const payload = JSON.parse(options.body);
+      assert.equal(payload.to, '201000000000');
+      assert.equal(payload.template.components[0].parameters.length, 4);
+      return new Response(JSON.stringify({ messages: [{ id: 'provider-1' }] }), { status: 200 });
+    }) as any;
+    await dispatchNotifications();
+    assert.equal(requests, 1);
+    await dispatchNotifications();
+    assert.equal(requests, 1);
+    assert.equal(
+      (await prisma.whatsAppNotification.findFirst({ where: { referenceId: session.id } })).status,
+      'ACCEPTED'
+    );
+    const reportSession = await fixtureSession(courseId, 'Report');
+    await prisma.classSession.update({
+      where: { id: reportSession.id },
+      data: { status: 'COMPLETED' },
+    });
+    const report = await prisma.sessionReport.create({
+      data: {
+        sessionId: reportSession.id,
+        studentId: student.id,
+        note: 'قدم الطالب أداء جيدًا',
+        publishedAt: new Date(),
+      },
+    });
+    await prisma.$transaction((tx: any) =>
+      queueFamilyNotification(tx, 'REPORT', report.id, student.id)
+    );
+    await prisma.$transaction((tx: any) =>
+      queueFamilyNotification(tx, 'REPORT', report.id, student.id)
+    );
+    assert.equal(await prisma.whatsAppNotification.count({ where: { referenceId: report.id } }), 1);
+    globalThis.fetch = (async () => {
+      requests++;
+      throw Error('transport timeout');
+    }) as any;
+    await dispatchNotifications();
+    assert.equal(
+      (await prisma.whatsAppNotification.findFirst({ where: { referenceId: report.id } })).status,
+      'UNKNOWN'
+    );
+    const before = requests;
+    await dispatchNotifications();
+    assert.equal(requests, before);
+    const pending = await fixtureSession(courseId, 'Cancelled reminder');
+    await prisma.classSession.update({
+      where: { id: pending.id },
+      data: { scheduledAt: new Date(Date.now() + 240_000) },
+    });
+    await enqueueReminders();
+    await prisma.classSession.update({ where: { id: pending.id }, data: { status: 'CANCELLED' } });
+    await dispatchNotifications();
+    assert.equal(
+      (await prisma.whatsAppNotification.findFirst({ where: { referenceId: pending.id } })).status,
+      'SKIPPED'
+    );
+    assert.equal(requests, before);
+    assert.equal(
+      (await call('PUT', '/api/notifications/preferences', 'parent', { whatsappOptIn: false }))
+        .statusCode,
+      200
+    );
+    assert.equal(
+      (await call('GET', '/api/notifications/preferences', 'parent')).json().data.whatsappOptIn,
+      false
+    );
+  } finally {
+    Object.assign(config, previous);
+    globalThis.fetch = originalFetch;
+  }
 });

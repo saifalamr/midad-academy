@@ -78,7 +78,13 @@ test('teacher saves and reloads private drafts, publishes a report once, and the
     await expect(editor).toBeVisible();
     const absentEditor = page.getByRole('article', { name: 'تقرير طالب غائب' });
     await expect(absentEditor.getByRole('combobox', { name: 'مستوى طالب غائب' })).toBeDisabled();
-    await editor.getByRole('combobox', { name: 'مستوى Preview Student' }).selectOption('GOOD');
+    await editor.getByRole('combobox', { name: 'قالب Preview Student' }).selectOption('good');
+    await expect(editor.getByRole('textbox', { name: 'ملاحظة Preview Student' })).toHaveValue(
+      /\[اكتب المهارة\]/
+    );
+    await expect(
+      absentEditor.getByRole('combobox', { name: 'قالب طالب غائب' }).locator('option')
+    ).toHaveCount(2);
     await editor.getByRole('spinbutton', { name: 'مشاركات Preview Student' }).fill('4');
     await editor.getByRole('combobox', { name: 'واجب Preview Student' }).selectOption('COMPLETED');
     const note = 'أتقن الطالب الحروف وشارك أربع مرات. يحتاج مراجعة الكلمات في البيت.';

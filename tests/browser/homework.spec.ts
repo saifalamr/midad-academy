@@ -81,6 +81,11 @@ test('admin prepares homework, pupil recovers a draft and retries one submission
     await third.getByLabel('نوع السؤال').selectOption('MATCHING');
     await third.getByLabel('نص السؤال').fill('صل الحروف');
     await third.getByLabel('الأزواج الصحيحة').fill('ألف = أ\nباء = ب');
+    await editor.getByRole('button', { name: 'إضافة سؤال', exact: true }).click();
+    const fourth = editor.getByRole('article', { name: 'سؤال 4', exact: true });
+    await fourth.getByLabel('نوع السؤال').selectOption('AUDIO');
+    await fourth.getByLabel('نص السؤال').fill('اقرأ الحروف');
+    await fourth.getByLabel('الحد الأقصى للتسجيل بالثواني').fill('30');
     await editor.getByRole('button', { name: 'حفظ الواجب', exact: true }).click();
     await expect(editor.getByRole('status')).toContainText('حُفظ');
     await page.reload();
@@ -105,6 +110,45 @@ test('admin prepares homework, pupil recovers a draft and retries one submission
     await solver.getByRole('radio', { name: 'صح', exact: true }).check();
     await solver.getByLabel('صل الحروف: ألف', { exact: true }).selectOption('أ');
     await solver.getByLabel('صل الحروف: باء', { exact: true }).selectOption('ب');
+    await pupil.addInitScript(() => {
+      navigator.mediaDevices.getUserMedia = async () => {
+        throw Error('لا توجد صلاحية للميكروفون');
+      };
+    });
+    await pupil.reload();
+    await solver.getByRole('button', { name: 'بدء التسجيل', exact: true }).click();
+    await expect(solver.getByRole('alert')).toContainText('صلاحية');
+    await solver
+      .getByLabel('رفع ملف صوتي')
+      .setInputFiles({
+        name: 'answer.wav',
+        mimeType: 'audio/wav',
+        buffer: Buffer.from('test audio'),
+      });
+    await expect(solver.getByRole('button', { name: 'تسليم الواجب', exact: true })).toBeDisabled();
+    const audioQuestion = (
+      await prisma.sessionHomework.findUniqueOrThrow({ where: { sessionId: session.id } })
+    ).questions as any[];
+    const audioQ = audioQuestion.find((q) => q.type === 'AUDIO');
+    // Storage is mocked in the browser; the server upload validation is tested independently.
+    await pupil.route(`**/api/homework-audio/${session.id}/${audioQ.id}`, async (route) => {
+      const audio = await prisma.homeworkAudio.create({
+        data: {
+          sessionId: session.id,
+          studentId: student.id,
+          questionId: audioQ.id,
+          publicId: 'browser-local-audio',
+          format: 'mp3',
+          duration: 12,
+          bytes: 1024,
+        },
+      });
+      await route.fulfill({ status: 201, json: { data: { id: audio.id, duration: 12 } } });
+    });
+    await solver.getByRole('button', { name: 'حفظ التسجيل الصوتي', exact: true }).click();
+    await expect(solver.getByText('التسجيل محفوظ.', { exact: true })).toBeVisible();
+    await pupil.reload();
+    await expect(solver.getByText('التسجيل محفوظ.', { exact: true })).toBeVisible();
     // The server commits but the reply is lost: resubmitting must return the same saved attempt.
     const submitPath = `**/api/homework/${session.id}/submit`;
     await pupil.route(submitPath, async (route) => {
@@ -128,6 +172,8 @@ test('admin prepares homework, pupil recovers a draft and retries one submission
     const tutor = await as('teacher@preview.midad.test');
     await tutor.goto(`/teacher/homework/${session.id}`);
     const grader = tutor.getByRole('article').filter({ hasText: 'بانتظار الاعتماد' });
+    await grader.getByLabel('الدرجة — اقرأ الحروف').fill('1');
+    await grader.getByRole('checkbox', { name: 'استمعت للتسجيل وراجعت درجته' }).check();
     await grader.getByLabel('ملاحظة للطالب وولي الأمر').fill('أحسنت يا بطل');
     await grader.getByRole('button', { name: 'حفظ مسودة التصحيح' }).click();
     await expect(grader.getByRole('status')).toContainText('مسودة');
@@ -137,10 +183,10 @@ test('admin prepares homework, pupil recovers a draft and retries one submission
     await grader.getByRole('button', { name: 'اعتماد النتيجة', exact: true }).click();
     await expect(tutor.getByRole('status')).toContainText('اعتمدت النتيجة');
     await family.reload();
-    await expect(familyCard).toContainText('الدرجة: 3 / 3');
+    await expect(familyCard).toContainText('الدرجة: 4 / 4');
     await expect(familyCard).toContainText('أحسنت يا بطل');
     await pupil.reload();
-    await expect(solver.getByRole('status')).toContainText('3 / 3');
+    await expect(solver.getByRole('status')).toContainText('4 / 4');
     await pupil.screenshot({ path: 'test-results/homework-student-mobile.png', fullPage: true });
     await family.screenshot({ path: 'test-results/homework-parent-mobile.png', fullPage: true });
   } finally {

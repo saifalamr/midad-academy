@@ -2,8 +2,9 @@ import { API_URL } from './config';
 export type HomeworkQuestion = {
   id: string;
   text: string;
-  type: 'MCQ' | 'TRUE_FALSE' | 'MATCHING';
+  type: 'MCQ' | 'TRUE_FALSE' | 'MATCHING' | 'AUDIO';
   points: number;
+  maxSeconds?: number;
   options?: string[];
   correctAnswer?: string;
   pairs?: { left: string; right: string }[];
@@ -15,6 +16,7 @@ export type Submission = {
   studentName?: string;
   answers: Record<string, HomeworkAnswer>;
   grades?: Record<string, number>;
+  reviewedAudio?: string[];
   feedback?: string;
   version: number;
   publishedAt: string | null;

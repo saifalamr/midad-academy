@@ -11,6 +11,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [whatsappPhone, setWhatsappPhone] = useState('');
+  const [whatsappOptIn, setWhatsappOptIn] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -23,7 +24,14 @@ export default function RegisterPage() {
       const res = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, role: 'parent', whatsappPhone }),
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          role: 'parent',
+          whatsappPhone,
+          whatsappOptIn,
+        }),
       });
 
       const data = await res.json();
@@ -148,6 +156,15 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            <label className="check check-block">
+              <input
+                type="checkbox"
+                checked={whatsappOptIn}
+                onChange={(e) => setWhatsappOptIn(e.target.checked)}
+              />{' '}
+              أوافق على استلام تذكيرات الحصص وتقارير أبنائي ونتائج واجباتهم عبر واتساب. أقدر أوقفها
+              من إعدادات الإشعارات.
+            </label>
             <label className="check check-block">
               <input type="checkbox" required />I agree to the{' '}
               <Link href="/terms" className="link-gold">

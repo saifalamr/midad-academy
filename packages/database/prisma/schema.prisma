@@ -75,6 +75,8 @@ model User {
   id           String   @id @default(cuid())
   email        String   @unique
   username     String?  @unique
+  whatsappOptIn Boolean @default(false)
+  notifications WhatsAppNotification[]
   whatsappPhone String?
   passwordHash String
   tokenVersion Int      @default(0)
@@ -128,6 +130,7 @@ model StudentProfile {
   attendance SessionAttendance[]
   sessionReports SessionReport[]
   homeworkSubmissions HomeworkSubmission[]
+  homeworkAudio HomeworkAudio[]
   learningStates LearningState[]
   seatReservations SeatReservation[]
 }
@@ -288,6 +291,9 @@ model ClassSession {
   scheduledAt     DateTime
   durationMinutes Int                @default(60)
   status          ClassSessionStatus @default(SCHEDULED)
+  startedAt       DateTime?
+  phaseMinutes    Int[]              @default([])
+  clockVersion    Int                @default(0)
   liveKitRoomId   String?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
@@ -299,6 +305,7 @@ model ClassSession {
   materialsVersion Int @default(0)
   materials SessionMaterial[]
   homework SessionHomework?
+  homeworkAudio HomeworkAudio[]
 
   @@index([courseId, scheduledAt])
   @@index([teacherId, scheduledAt])
@@ -492,6 +499,7 @@ model SessionHomework {
 }
 
 model HomeworkSubmission {
+  reviewedAudio String[] @default([])
   id String @id @default(cuid())
   sessionId String
   studentId String
@@ -505,4 +513,39 @@ model HomeworkSubmission {
   student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
   @@unique([sessionId, studentId])
   @@index([studentId, submittedAt])
+}
+
+model HomeworkAudio {
+  id String @id @default(uuid())
+  sessionId String
+  studentId String
+  questionId String
+  publicId String
+  format String
+  duration Float
+  bytes Int
+  createdAt DateTime @default(now())
+  session ClassSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  @@unique([sessionId, studentId, questionId])
+  @@index([studentId])
+}
+
+model WhatsAppNotification {
+  id String @id @default(cuid())
+  key String @unique
+  recipientUserId String
+  kind String
+  referenceId String
+  studentId String
+  status String @default("PENDING")
+  attempts Int @default(0)
+  availableAt DateTime @default(now())
+  lockedAt DateTime?
+  acceptedAt DateTime?
+  providerId String?
+  lastError String @default("")
+  createdAt DateTime @default(now())
+  recipient User @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  @@index([status, availableAt])
 }

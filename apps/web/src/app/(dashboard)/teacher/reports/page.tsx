@@ -3,7 +3,12 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { API_URL } from '@/lib/config';
 import { sessionDate } from '@/lib/academy-contact';
-import { performanceLabels, homeworkLabels, type Report } from '@/lib/session-reports';
+import {
+  performanceLabels,
+  homeworkLabels,
+  reportTemplates,
+  type Report,
+} from '@/lib/session-reports';
 import './reports.css';
 
 type Session = {
@@ -128,6 +133,36 @@ function ReportEditor({
         </p>
       )}
       <fieldset disabled={busy || published}>
+        <label className="report-comment">
+          قالب التقرير
+          <select
+            aria-label={'قالب ' + student.name}
+            value=""
+            onChange={(e) => {
+              const template = reportTemplates.find((t) => t.id === e.target.value);
+              if (
+                !template ||
+                (values.note.trim() &&
+                  !window.confirm('استبدال الملاحظة بالقالب؟ تقدر تعدله قبل الحفظ.'))
+              )
+                return;
+              change({
+                note: template.note.replaceAll('{name}', student.name),
+                performance: template.performance,
+              });
+            }}
+          >
+            <option value="">اختر قالبًا ثم عدّل الملاحظة</option>
+            {reportTemplates
+              .filter((t) => t.attended === student.attended)
+              .map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.title}
+                </option>
+              ))}
+          </select>
+          <small>القالب لا يحدد عدد المشاركات أو حالة الواجب؛ سجلها حسب ما حدث فعلًا.</small>
+        </label>
         <div className="report-fields">
           <label>
             المستوى في هذه الحصة

@@ -24,6 +24,8 @@ import { sessionRoutes } from './routes/sessions';
 import { accountRoutes } from './routes/account';
 import { startWhiteboardWebSocketServer } from './ws-server';
 import { rateLimitKey } from './lib/rate-limit';
+import { notificationRoutes } from './routes/notifications';
+import { homeworkAudioRoutes } from './routes/homework-audio';
 import { homeworkRoutes } from './routes/homework';
 import { adminRoutes } from './routes/admin';
 import { bootstrapAdmin } from './lib/bootstrap-admin';
@@ -106,14 +108,12 @@ export async function buildApp() {
     if (failure.code === 'P2002')
       return void reply.status(409).send({ error: 'This record already exists' });
     const statusCode = failure.statusCode ?? 500;
-    reply
-      .status(statusCode)
-      .send({
-        error:
-          statusCode >= 500
-            ? 'An unexpected server error occurred'
-            : (failure.message ?? 'Invalid request'),
-      });
+    reply.status(statusCode).send({
+      error:
+        statusCode >= 500
+          ? 'An unexpected server error occurred'
+          : (failure.message ?? 'Invalid request'),
+    });
   });
 
   // ── Routes ───────────────────────────────────────────────────────────────
@@ -121,6 +121,8 @@ export async function buildApp() {
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(accountRoutes, { prefix: '/api/account' });
   await app.register(homeworkRoutes, { prefix: '/api/homework' });
+  await app.register(homeworkAudioRoutes, { prefix: '/api/homework-audio' });
+  await app.register(notificationRoutes, { prefix: '/api/notifications' });
   await app.register(adminRoutes, { prefix: '/api/admin' });
   await app.register(courseRoutes, { prefix: '/api/courses' });
   await app.register(lessonRoutes, { prefix: '/api/lessons' });

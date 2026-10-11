@@ -638,6 +638,11 @@ export default function AdminPage() {
                       >
                         واجب الحصة
                       </Link>
+                      {s.status === 'LIVE' && (
+                        <Link className="btn btn-gold btn-sm" href={`/classroom/${course.id}`}>
+                          مراقبة الحصة
+                        </Link>
+                      )}
                       {s.status === 'SCHEDULED' && (
                         <button
                           className="btn btn-outline btn-sm"

@@ -33,8 +33,17 @@ export async function canObserveCourse(actor: Actor, courseId: string): Promise<
   }));
 }
 export async function canReadClassroom(actor: Actor, courseId: string): Promise<boolean> {
+  if (actor.role === 'ADMIN')
+    return !!(await prisma.classSession.findFirst({
+      where: { courseId, status: 'LIVE' },
+      select: { id: true },
+    }));
   if (actor.role !== 'PARENT') return canAccessCourse(actor, courseId);
-  return await canObserveCourse(actor, courseId) && !!(await prisma.classSession.findFirst({
-    where: { courseId, status: 'LIVE' }, select: { id: true },
-  }));
+  return (
+    (await canObserveCourse(actor, courseId)) &&
+    !!(await prisma.classSession.findFirst({
+      where: { courseId, status: 'LIVE' },
+      select: { id: true },
+    }))
+  );
 }

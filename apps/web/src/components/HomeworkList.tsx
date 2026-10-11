@@ -1,4 +1,5 @@
 'use client';
+import { AudioPlayback } from './AudioAnswer';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from './AuthProvider';
@@ -16,6 +17,7 @@ type Item = {
   grades?: Record<string, number>;
   feedback?: string;
   maxPoints?: number;
+  audioAnswers?: string[];
   pending?: number;
   submissions?: number;
 };
@@ -93,6 +95,8 @@ export default function HomeworkList() {
                       ? 'لم يسلم الواجب بعد'
                       : 'تم التسليم · بانتظار مراجعة المعلم'}
                 </p>
+                {item.publishedAt &&
+                  item.audioAnswers?.map((id) => <AudioPlayback key={id} audioId={id} />)}
                 {item.publishedAt && item.feedback && (
                   <p className="homework-feedback">{item.feedback}</p>
                 )}

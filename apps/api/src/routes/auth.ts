@@ -19,6 +19,7 @@ const registerSchema = z.object({
     .pipe(z.enum(['TEACHER', 'STUDENT', 'PARENT'])),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   inviteCode: z.string().optional(),
+  whatsappOptIn: z.boolean().default(false),
   whatsappPhone: z
     .string()
     .trim()
@@ -67,6 +68,7 @@ export async function authRoutes(app: FastifyInstance) {
         name: body.name,
         email: body.email,
         whatsappPhone: body.whatsappPhone,
+        whatsappOptIn: body.whatsappOptIn,
         passwordHash,
         role: body.role,
         parentProfile: { create: {} },
@@ -135,10 +137,12 @@ export async function authRoutes(app: FastifyInstance) {
     '/change-password',
     { preHandler: [app.authenticate], config: { rateLimit: { max: 5, timeWindow: '15 minutes' } } },
     async (request, reply) => {
-      const { currentPassword, password } = z.object({
-        currentPassword: z.string().min(1).max(128),
-        password: z.string().min(10).max(128),
-      }).parse(request.body);
+      const { currentPassword, password } = z
+        .object({
+          currentPassword: z.string().min(1).max(128),
+          password: z.string().min(10).max(128),
+        })
+        .parse(request.body);
       const user = await prisma.user.findUnique({ where: { id: request.user.id } });
       if (!user || !(await bcrypt.compare(currentPassword, user.passwordHash)))
         return reply.status(401).send({ error: 'Invalid credentials' });

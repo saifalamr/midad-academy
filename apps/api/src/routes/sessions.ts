@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { AccessToken, RoomServiceClient, WebhookReceiver } from 'livekit-server-sdk';
+import { classClockRoutes } from './class-clock';
 import { teacherMaterialRoutes } from './session-materials';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
@@ -25,6 +26,7 @@ function toHttpUrl(wsUrl: string) {
 
 export async function sessionRoutes(app: FastifyInstance) {
   await teacherMaterialRoutes(app);
+  await classClockRoutes(app);
   // ── POST /api/sessions/create ─────────────────────────────────────────────
   // Creates (or reuses) a LiveKit room and returns a signed participant token.
   // The caller's identity, display name, and role come from the verified JWT —
@@ -154,21 +156,47 @@ export async function sessionRoutes(app: FastifyInstance) {
 
   app.post('/observe', { preHandler: [app.authenticate] }, async (request, reply) => {
     const { roomName } = joinSessionSchema.parse(request.body);
-    if (!(await canObserveCourse(request.user, roomName)))
-      return reply.status(403).send({ error: 'Only parents of enrolled children can observe this classroom' });
-    const live = await prisma.classSession.findFirst({ where: { courseId: roomName, status: 'LIVE' } });
+    if (request.user.role !== 'ADMIN' && !(await canObserveCourse(request.user, roomName)))
+      return reply
+        .status(403)
+        .send({ error: 'Only parents of enrolled children can observe this classroom' });
+    const live = await prisma.classSession.findFirst({
+      where: { courseId: roomName, status: 'LIVE' },
+    });
     if (!live?.liveKitRoomId) return reply.status(409).send({ error: 'This class is not live' });
     if (!config.LIVEKIT_URL || !config.LIVEKIT_API_KEY || !config.LIVEKIT_API_SECRET)
       return reply.status(503).send({ error: 'Live classroom service is not configured' });
-    const service = new RoomServiceClient(toHttpUrl(config.LIVEKIT_URL), config.LIVEKIT_API_KEY, config.LIVEKIT_API_SECRET);
+    const service = new RoomServiceClient(
+      toHttpUrl(config.LIVEKIT_URL),
+      config.LIVEKIT_API_KEY,
+      config.LIVEKIT_API_SECRET
+    );
     if (!(await service.listRooms([live.liveKitRoomId])).length)
       return reply.status(409).send({ error: 'This class has ended' });
-    const user = await prisma.user.findUniqueOrThrow({ where: { id: request.user.id }, select: { name: true } });
-    const at = new AccessToken(config.LIVEKIT_API_KEY, config.LIVEKIT_API_SECRET, {
-      identity: request.user.id, name: user.name, ttl: '15m', metadata: JSON.stringify({ role: 'parent' }),
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { id: request.user.id },
+      select: { name: true },
     });
-    at.addGrant({ roomJoin: true, room: live.liveKitRoomId, canSubscribe: true,
-      canPublish: false, canPublishData: false, canUpdateOwnMetadata: false });
+    const at = new AccessToken(config.LIVEKIT_API_KEY, config.LIVEKIT_API_SECRET, {
+      identity: request.user.id,
+      name: user.name,
+      ttl: '15m',
+      metadata: JSON.stringify({ role: request.user.role.toLowerCase() }),
+    });
+    at.addGrant({
+      roomJoin: true,
+      room: live.liveKitRoomId,
+      canSubscribe: true,
+      canPublish: false,
+      canPublishData: false,
+      canUpdateOwnMetadata: false,
+      hidden: request.user.role === 'ADMIN',
+    });
+    if (request.user.role === 'ADMIN')
+      request.log.info(
+        { actorId: request.user.id, sessionId: live.id },
+        'Administration observation started'
+      );
     return { data: { token: await at.toJwt(), roomName, livekitUrl: config.LIVEKIT_URL } };
   });
 
@@ -184,14 +212,39 @@ export async function sessionRoutes(app: FastifyInstance) {
   app.get('/upcoming', { preHandler: [app.authenticate] }, async (request, reply) => {
     const { id: userId, role } = request.user;
 
+    if (role === 'ADMIN') {
+      return {
+        data: await prisma.classSession.findMany({
+          where: { status: 'LIVE' },
+          include: { course: { select: { title: true } } },
+          orderBy: { scheduledAt: 'asc' },
+        }),
+      };
+    }
+
     if (role === 'PARENT') {
       const sessions = await prisma.classSession.findMany({
-        where: { status: 'LIVE', course: { enrollments: { some: { status: 'ACTIVE', student: { parent: { userId } } } } } },
-        select: { id: true, courseId: true, title: true, scheduledAt: true, status: true,
-          course: { select: { title: true } }, teacher: { select: { user: { select: { name: true } } } } },
+        where: {
+          status: 'LIVE',
+          course: { enrollments: { some: { status: 'ACTIVE', student: { parent: { userId } } } } },
+        },
+        select: {
+          id: true,
+          courseId: true,
+          title: true,
+          scheduledAt: true,
+          status: true,
+          course: { select: { title: true } },
+          teacher: { select: { user: { select: { name: true } } } },
+        },
         orderBy: { scheduledAt: 'asc' },
       });
-      return { data: sessions.map(({ teacher, ...session }) => ({ ...session, teacherName: teacher.user.name })) };
+      return {
+        data: sessions.map(({ teacher, ...session }) => ({
+          ...session,
+          teacherName: teacher.user.name,
+        })),
+      };
     }
 
     if (role === 'TEACHER') {
@@ -325,15 +378,21 @@ export async function sessionRoutes(app: FastifyInstance) {
           await service.createRoom({
             name: liveKitRoomId,
             emptyTimeout: 600,
-            maxParticipants: course.maxStudents * 2 + 1,
+            maxParticipants: course.maxStudents * 2 + 2,
           });
           // Snapshot the starting roster so later enrollment changes do not erase
           // students who still need an end-of-class report. Empty drafts stay private.
-          const roster = await tx.enrollment.findMany({ where: { courseId: current.courseId, status: 'ACTIVE' }, select: { studentId: true } });
-          await tx.sessionReport.createMany({ data: roster.map(({ studentId }) => ({ sessionId, studentId, version: 0 })), skipDuplicates: true });
+          const roster = await tx.enrollment.findMany({
+            where: { courseId: current.courseId, status: 'ACTIVE' },
+            select: { studentId: true },
+          });
+          await tx.sessionReport.createMany({
+            data: roster.map(({ studentId }) => ({ sessionId, studentId, version: 0 })),
+            skipDuplicates: true,
+          });
           return tx.classSession.update({
             where: { id: sessionId },
-            data: { status: 'LIVE', liveKitRoomId },
+            data: { status: 'LIVE', liveKitRoomId, startedAt: new Date() },
           });
         },
         { timeout: 20_000, maxWait: 20_000 }
@@ -418,7 +477,8 @@ export async function sessionRoutes(app: FastifyInstance) {
           pdfPage: state?.pdfPage ?? 1,
           revision: state?.revision ?? 0,
           canDraw:
-            request.user.role === 'TEACHER' || (request.user.role === 'STUDENT' && grants.some((g) => g.userId === request.user.id)),
+            request.user.role === 'TEACHER' ||
+            (request.user.role === 'STUDENT' && grants.some((g) => g.userId === request.user.id)),
           permittedStudents: request.user.role === 'TEACHER' ? grants.map((g) => g.userId) : [],
         },
       };

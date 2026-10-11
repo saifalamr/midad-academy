@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Prisma, HomeworkSubmission } from '@prisma/client';
 import { z } from 'zod';
+import { queueFamilyNotification } from '../lib/notifications';
 import { prisma } from '../lib/prisma';
 import { httpError } from '../lib/access';
 import { lockCourse } from '../lib/enrollment';
@@ -9,7 +10,8 @@ const questionDefinition = z
   .object({
     id: z.string().uuid(),
     text: z.string().trim().min(2).max(2000),
-    type: z.enum(['MCQ', 'TRUE_FALSE', 'MATCHING']),
+    type: z.enum(['MCQ', 'TRUE_FALSE', 'MATCHING', 'AUDIO']),
+    maxSeconds: z.number().int().min(10).max(120).optional(),
     points: z.number().int().min(1).max(100),
     options: z.array(z.string().trim().min(1).max(300)).min(2).max(8).optional(),
     correctAnswer: z.string().trim().max(300).optional(),
@@ -26,7 +28,8 @@ const questionDefinition = z
   })
   .superRefine((q, ctx) => {
     let valid = false;
-    if (q.type === 'MATCHING')
+    if (q.type === 'AUDIO') valid = true;
+    else if (q.type === 'MATCHING')
       valid =
         !!q.pairs &&
         new Set(q.pairs.map((p) => p.left)).size === q.pairs.length &&
@@ -49,7 +52,7 @@ const question = z.preprocess((value) => {
   const input = { ...(value as Record<string, unknown>) };
   if (input.type !== 'MCQ') delete input.options;
   if (input.type !== 'MATCHING') delete input.pairs;
-  else delete input.correctAnswer;
+  if (input.type === 'MATCHING' || input.type === 'AUDIO') delete input.correctAnswer;
   return input;
 }, questionDefinition);
 const definition = z.object({
@@ -69,6 +72,7 @@ function questionsForStudent(questions: Question[]) {
     text: q.text,
     type: q.type,
     points: q.points,
+    ...(q.type === 'AUDIO' ? { maxSeconds: q.maxSeconds ?? 60 } : {}),
     ...(q.type === 'MATCHING'
       ? { left: q.pairs!.map((p) => p.left), options: q.pairs!.map((p) => p.right).sort() }
       : { options: q.type === 'TRUE_FALSE' ? ['true', 'false'] : q.options }),
@@ -84,7 +88,10 @@ function score(questions: Question[], answers: Answers) {
     questions.map((q) => {
       const value = answers[q.id];
       let correct = false;
-      if (q.type === 'MATCHING') {
+      if (q.type === 'AUDIO') {
+        if (typeof value !== 'string' || !z.string().uuid().safeParse(value).success)
+          throw httpError(400, 'احفظ التسجيل الصوتي لكل سؤال قبل التسليم');
+      } else if (q.type === 'MATCHING') {
         if (
           !Array.isArray(value) ||
           value.length !== q.pairs!.length ||
@@ -103,7 +110,7 @@ function score(questions: Question[], answers: Answers) {
     })
   );
 }
-async function eligible(
+export async function eligible(
   tx: Prisma.TransactionClient | typeof prisma,
   studentId: string,
   session: { id: string; courseId: string; scheduledAt: Date }
@@ -206,6 +213,13 @@ export async function homeworkRoutes(app: FastifyInstance) {
                   : submission.publishedAt
                     ? 'GRADED'
                     : 'PENDING',
+                ...(submission?.publishedAt
+                  ? {
+                      audioAnswers: (session.homework!.questions as Question[])
+                        .filter((q) => q.type === 'AUDIO')
+                        .map((q) => (submission.answers as Answers)[q.id]),
+                    }
+                  : {}),
                 maxPoints: (session.homework!.questions as Question[]).reduce(
                   (sum, q) => sum + q.points,
                   0
@@ -379,6 +393,18 @@ export async function homeworkRoutes(app: FastifyInstance) {
       if (body.version !== session.homework.version)
         throw httpError(409, 'حدّث الواجب قبل التسليم');
       const grades = score(session.homework.questions as Question[], body.answers);
+      for (const q of session.homework.questions as Question[]) {
+        if (q.type !== 'AUDIO') continue;
+        const audio = await tx.homeworkAudio.findFirst({
+          where: {
+            id: body.answers[q.id] as string,
+            sessionId: session.id,
+            studentId: student.id,
+            questionId: q.id,
+          },
+        });
+        if (!audio) throw httpError(400, 'سجل السؤال الصوتي من حسابك لهذه الحصة أولًا');
+      }
       const existing = await tx.homeworkSubmission.findUnique({
         where: { sessionId_studentId: { sessionId: session.id, studentId: student.id } },
       });
@@ -406,6 +432,7 @@ export async function homeworkRoutes(app: FastifyInstance) {
         grades: z.record(z.string(), z.number().int().min(0).max(100)),
         feedback: z.string().trim().max(3000),
         publish: z.boolean(),
+        reviewedAudio: z.array(z.string().uuid()).max(30).default([]),
       })
       .parse(request.body);
     const result = await prisma.$transaction(async (tx) => {
@@ -425,15 +452,24 @@ export async function homeworkRoutes(app: FastifyInstance) {
         Object.keys(body.grades).some((id) => !questions.some((q) => q.id === id))
       )
         throw httpError(400, 'راجع درجات جميع الأسئلة وحدودها');
-      return tx.homeworkSubmission.update({
+      const audioIds = questions.filter((q) => q.type === 'AUDIO').map((q) => q.id);
+      if (
+        body.reviewedAudio.some((id) => !audioIds.includes(id)) ||
+        (body.publish && audioIds.some((id) => !body.reviewedAudio.includes(id)))
+      )
+        throw httpError(400, 'استمع لكل تسجيل صوتي وحدد درجته وأكد مراجعته قبل اعتماد النتيجة');
+      const graded = await tx.homeworkSubmission.update({
         where: { id: submission.id },
         data: {
           grades: body.grades,
+          reviewedAudio: body.reviewedAudio,
           feedback: body.feedback,
           version: { increment: 1 },
           ...(body.publish ? { publishedAt: new Date() } : {}),
         },
       });
+      if (body.publish) await queueFamilyNotification(tx, 'GRADE', graded.id, graded.studentId);
+      return graded;
     });
     return { data: result };
   });

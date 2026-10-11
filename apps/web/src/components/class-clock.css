@@ -1,0 +1,98 @@
+.class-clock {
+  background: #fffdf8;
+  color: #1f3b65;
+  border-bottom: 1px solid #e6dfd0;
+  padding: 10px 20px;
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+.class-clock-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.class-clock-time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  color: #9c711d;
+}
+.class-clock button {
+  border: 1px solid #d9c495;
+  border-radius: 8px;
+  background: #fff;
+  color: #1f3b65;
+  padding: 8px 12px;
+  cursor: pointer;
+  min-height: 36px;
+}
+.class-clock button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.class-clock-phases {
+  display: flex;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  flex-wrap: wrap;
+}
+.class-clock-phases li {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #f1f3f6;
+}
+.class-clock-phases li[aria-current='step'] {
+  background: #f4e4bf;
+  font-weight: bold;
+}
+.class-clock-phases span {
+  margin-inline-start: 6px;
+}
+.class-clock fieldset {
+  border: 0;
+  min-width: 0;
+  padding: 12px 0;
+}
+.class-clock-inputs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.class-clock label {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
+.class-clock input {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  border: 1px solid #d9c495;
+  padding: 8px;
+  border-radius: 6px;
+}
+.class-clock [role='alert'] {
+  font-size: 13px;
+  color: #9a3024;
+  margin: 8px 0;
+}
+@media (max-width: 650px) {
+  .class-clock {
+    padding: 8px 12px;
+  }
+  .class-clock-inputs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .class-clock button {
+    min-height: 44px;
+  }
+  .class-clock-phases li {
+    font-size: 11px;
+  }
+  .class-clock-head strong {
+    font-size: 13px;
+  }
+}

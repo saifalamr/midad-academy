@@ -1,4 +1,5 @@
 'use client';
+import AudioAnswer, { AudioPlayback } from './AudioAnswer';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from './AuthProvider';
@@ -11,7 +12,7 @@ import {
   type Submission,
 } from '@/lib/homework';
 import './homework.css';
-const kind = { MCQ: 'اختيارات', TRUE_FALSE: 'صح أو خطأ', MATCHING: 'توصيل' };
+const kind = { MCQ: 'اختيارات', TRUE_FALSE: 'صح أو خطأ', MATCHING: 'توصيل', AUDIO: 'تسجيل صوتي' };
 export default function HomeworkWorkspace({ sessionId }: { sessionId: string }) {
   const { user } = useAuth();
   const [data, setData] = useState<HomeworkData | null>(null);
@@ -234,7 +235,20 @@ function HomeworkEditor({ data, sessionId }: { data: HomeworkData; sessionId: st
                 />
               </label>
             )}
-            {q.type === 'MATCHING' ? (
+            {q.type === 'AUDIO' ? (
+              <label className="field">
+                الحد الأقصى للتسجيل بالثواني
+                <input
+                  className="input"
+                  type="number"
+                  min={10}
+                  max={120}
+                  value={q.maxSeconds ?? 60}
+                  onChange={(e) => change(q.id, { maxSeconds: Number(e.target.value) })}
+                />
+                <small>التسجيل يصححه المعلم يدويًا بعد الاستماع.</small>
+              </label>
+            ) : q.type === 'MATCHING' ? (
               <label className="field">
                 الأزواج الصحيحة — كل زوج بسطر، مثل: ألف = أ
                 <textarea
@@ -352,6 +366,7 @@ function HomeworkSolver({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [restored, setRestored] = useState(false);
+  const [audioBusy, setAudioBusy] = useState<Record<string, boolean>>({});
   useEffect(() => {
     if (!data.submission) {
       try {
@@ -373,7 +388,7 @@ function HomeworkSolver({
   }, [answers, restored, submission, storageKey]);
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (busy) return;
+    if (busy || Object.values(audioBusy).some(Boolean)) return;
     setBusy(true);
     setError('');
     try {
@@ -415,55 +430,73 @@ function HomeworkSolver({
         </p>
       )}
       <form onSubmit={submit}>
-        <fieldset disabled={busy || !!submission || !restored} className="homework-fields">
+        <fieldset disabled={busy || !restored} className="homework-fields">
           {hw.questions.map((q, index) => (
             <fieldset key={q.id} className="card pad homework-question">
               <legend>
                 {index + 1}. {q.text} <small>({q.points} درجات)</small>
               </legend>
-              {q.type === 'MATCHING'
-                ? q.left!.map((label, i) => (
-                    <label key={i} className="field">
-                      {label}
-                      <select
-                        className="input"
-                        required
-                        aria-label={`${q.text}: ${label}`}
-                        value={
-                          Array.isArray(answers[q.id]) ? ((answers[q.id] as string[])[i] ?? '') : ''
-                        }
-                        onChange={(e) =>
-                          setAnswers((old) => {
-                            const values = Array.isArray(old[q.id])
-                              ? [...(old[q.id] as string[])]
-                              : Array(q.left!.length).fill('');
-                            values[i] = e.target.value;
-                            return { ...old, [q.id]: values };
-                          })
-                        }
-                      >
-                        <option value="">اختر المقابل</option>
-                        {q.options!.map((v) => (
-                          <option key={v} value={v}>
-                            {v}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  ))
-                : q.options!.map((v) => (
-                    <label key={v} className="homework-choice">
-                      <input
-                        type="radio"
-                        required
-                        name={q.id}
-                        value={v}
-                        checked={answers[q.id] === v}
-                        onChange={() => setAnswers((old) => ({ ...old, [q.id]: v }))}
-                      />
-                      <span>{answerLabel(v)}</span>
-                    </label>
-                  ))}
+              {q.type === 'AUDIO' ? (
+                <AudioAnswer
+                  sessionId={sessionId}
+                  questionId={q.id}
+                  maxSeconds={q.maxSeconds ?? 60}
+                  audioId={
+                    typeof answers[q.id] === 'string' ? (answers[q.id] as string) : undefined
+                  }
+                  disabled={!!submission}
+                  onUploaded={(id) => setAnswers((old) => ({ ...old, [q.id]: id }))}
+                  onBusy={(value) =>
+                    setAudioBusy((old) => (old[q.id] === value ? old : { ...old, [q.id]: value }))
+                  }
+                />
+              ) : q.type === 'MATCHING' ? (
+                q.left!.map((label, i) => (
+                  <label key={i} className="field">
+                    {label}
+                    <select
+                      className="input"
+                      required
+                      disabled={!!submission}
+                      aria-label={`${q.text}: ${label}`}
+                      value={
+                        Array.isArray(answers[q.id]) ? ((answers[q.id] as string[])[i] ?? '') : ''
+                      }
+                      onChange={(e) =>
+                        setAnswers((old) => {
+                          const values = Array.isArray(old[q.id])
+                            ? [...(old[q.id] as string[])]
+                            : Array(q.left!.length).fill('');
+                          values[i] = e.target.value;
+                          return { ...old, [q.id]: values };
+                        })
+                      }
+                    >
+                      <option value="">اختر المقابل</option>
+                      {q.options!.map((v) => (
+                        <option key={v} value={v}>
+                          {v}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))
+              ) : (
+                q.options!.map((v) => (
+                  <label key={v} className="homework-choice">
+                    <input
+                      type="radio"
+                      disabled={!!submission}
+                      required
+                      name={q.id}
+                      value={v}
+                      checked={answers[q.id] === v}
+                      onChange={() => setAnswers((old) => ({ ...old, [q.id]: v }))}
+                    />
+                    <span>{answerLabel(v)}</span>
+                  </label>
+                ))
+              )}
               {submission?.publishedAt && (
                 <p>
                   درجتك: {submission.grades?.[q.id]} / {q.points}
@@ -472,7 +505,11 @@ function HomeworkSolver({
             </fieldset>
           ))}
           {!submission && (
-            <button className="btn btn-gold" type="submit">
+            <button
+              className="btn btn-gold"
+              type="submit"
+              disabled={Object.values(audioBusy).some(Boolean)}
+            >
               {busy ? 'جارٍ تسليم الواجب…' : 'تسليم الواجب'}
             </button>
           )}
@@ -491,6 +528,7 @@ function GradeEditor({
   const [submission, setSubmission] = useState(initial);
   const [grades, setGrades] = useState(initial.grades ?? {});
   const [feedback, setFeedback] = useState(initial.feedback ?? '');
+  const [reviewedAudio, setReviewedAudio] = useState(initial.reviewedAudio ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -507,7 +545,13 @@ function GradeEditor({
     try {
       const saved = await homeworkApi('/submissions/' + submission.id + '/grade', {
         method: 'PUT',
-        body: JSON.stringify({ version: submission.version, grades, feedback, publish }),
+        body: JSON.stringify({
+          version: submission.version,
+          grades,
+          feedback,
+          publish,
+          reviewedAudio,
+        }),
       });
       setSubmission(saved);
       setMessage(publish ? 'اعتمدت النتيجة وأصبحت ظاهرة للأسرة' : 'حُفظت مسودة التصحيح');
@@ -534,16 +578,37 @@ function GradeEditor({
           {message}
         </p>
       )}
-      <fieldset disabled={busy || !!submission.publishedAt} className="homework-fields">
+      <fieldset disabled={busy} className="homework-fields">
         {questions.map((q) => (
           <div className="homework-grade" key={q.id}>
             <b>{q.text}</b>
-            <p>إجابة الطالب: {answerLabel(initial.answers[q.id])}</p>
+            {q.type === 'AUDIO' ? (
+              <>
+                <AudioPlayback audioId={initial.answers[q.id] as string} />
+                <label>
+                  <input
+                    type="checkbox"
+                    disabled={!!submission.publishedAt}
+                    checked={reviewedAudio.includes(q.id)}
+                    onChange={(e) =>
+                      setReviewedAudio((ids) =>
+                        e.target.checked ? [...ids, q.id] : ids.filter((id) => id !== q.id)
+                      )
+                    }
+                  />{' '}
+                  استمعت للتسجيل وراجعت درجته
+                </label>
+              </>
+            ) : (
+              <p>إجابة الطالب: {answerLabel(initial.answers[q.id])}</p>
+            )}
             <p>
               الإجابة الصحيحة:{' '}
-              {q.type === 'MATCHING'
-                ? q.pairs!.map((p) => `${p.left} ← ${p.right}`).join(' · ')
-                : answerLabel(q.correctAnswer!)}
+              {q.type === 'AUDIO'
+                ? 'تصحيح يدوي بعد الاستماع'
+                : q.type === 'MATCHING'
+                  ? q.pairs!.map((p) => `${p.left} ← ${p.right}`).join(' · ')
+                  : answerLabel(q.correctAnswer!)}
             </p>
             <label className="field">
               الدرجة — {q.text}
@@ -552,6 +617,7 @@ function GradeEditor({
                 type="number"
                 min={0}
                 max={q.points}
+                disabled={!!submission.publishedAt}
                 value={grades[q.id] ?? 0}
                 onChange={(e) => setGrades((g) => ({ ...g, [q.id]: Number(e.target.value) }))}
               />
@@ -565,6 +631,7 @@ function GradeEditor({
             className="input"
             rows={3}
             maxLength={3000}
+            disabled={!!submission.publishedAt}
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
           />

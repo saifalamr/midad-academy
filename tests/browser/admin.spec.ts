@@ -12,7 +12,7 @@ test('parent registration, admin child account, monthly course, enrollment and s
   await page.locator('#email').fill('browser-parent@midad.test');
   await page.locator('#password').fill('TestingPassword2026!');
   await page.locator('#whatsappPhone').fill('+905001234567');
-  await page.getByRole('checkbox').check();
+  await page.getByRole('checkbox').last().check();
   await page.getByRole('button', { name: 'Create account', exact: true }).click();
   await expect(page).toHaveURL(/login$/);
   await page.locator('#email').fill('admin@preview.midad.test');
