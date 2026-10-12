@@ -124,6 +124,8 @@ export async function buildApp() {
   await app.register(homeworkAudioRoutes, { prefix: '/api/homework-audio' });
   await app.register(notificationRoutes, { prefix: '/api/notifications' });
   await app.register(adminRoutes, { prefix: '/api/admin' });
+  const { previewResetRoutes } = await import('./routes/preview-reset');
+  await app.register(previewResetRoutes, { prefix: '/api/preview-maintenance' });
   await app.register(courseRoutes, { prefix: '/api/courses' });
   await app.register(lessonRoutes, { prefix: '/api/lessons' });
   await app.register(learningRoutes, { prefix: '/api/learning' });
