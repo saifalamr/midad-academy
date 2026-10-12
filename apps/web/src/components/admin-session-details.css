@@ -1,0 +1,139 @@
+.admin-session-page {
+  max-width: 1180px;
+  margin: auto;
+  padding: 24px;
+  color: #1b3a6b;
+  line-height: 1.7;
+  min-width: 0;
+}
+.admin-session-page h1 {
+  font-size: clamp(24px, 4vw, 36px);
+  margin: 14px 0 4px;
+  overflow-wrap: anywhere;
+}
+.admin-session-page h2 {
+  font-size: 20px;
+}
+.admin-session-page h3 {
+  font-size: 18px;
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+.session-detail-card {
+  background: #fff;
+  border: 1px solid #dde3ec;
+  border-radius: 14px;
+  padding: 20px;
+  margin: 16px 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.session-detail-metadata {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.session-detail-metadata dt {
+  color: #65728a;
+  font-size: 13px;
+}
+.session-detail-metadata dd {
+  margin: 0;
+  font-weight: 600;
+}
+.session-detail-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.session-attendance-counts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+.session-attendance-counts article {
+  border: 1px solid #dde3ec;
+  border-radius: 12px;
+  background: #fff;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.session-attendance-counts b {
+  font-size: 28px;
+}
+.session-attendance-counts span {
+  font-size: 13px;
+  color: #65728a;
+}
+.session-students-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.session-students-grid .session-detail-card {
+  margin: 0;
+}
+.session-presence {
+  display: inline-block;
+  font-size: 13px;
+  padding: 6px 10px;
+  background: #f0f2f6;
+  border-radius: 8px;
+}
+.session-presence.present {
+  background: #e2f0e7;
+  color: #286446;
+}
+.session-visit-history {
+  border-top: 1px solid #e2e7ee;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+.session-visit-history summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 6px 0;
+}
+.session-visit-history ol {
+  padding-inline-start: 20px;
+}
+.session-visit-history li {
+  padding: 8px 0;
+}
+.session-visit-history p {
+  margin: 2px 0;
+}
+.session-detail-error {
+  background: #fff0ed;
+  color: #9d3529;
+  border: 1px solid #efd1ca;
+  padding: 12px;
+  border-radius: 10px;
+}
+.session-detail-footnote {
+  color: #65728a;
+  font-size: 13px;
+}
+.session-detail-card small {
+  color: #65728a;
+}
+@media (max-width: 700px) {
+  .admin-session-page {
+    padding: 16px;
+  }
+  .session-students-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .session-attendance-counts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .session-detail-card {
+    padding: 16px;
+  }
+  .session-detail-metadata {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

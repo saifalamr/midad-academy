@@ -1,5 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { AccessToken, RoomServiceClient, WebhookReceiver } from 'livekit-server-sdk';
+import { classroomModerationRoutes } from './classroom-moderation';
+import {
+  studentPublishSources,
+  recordPresence,
+  providerTime,
+  applySpeakingState,
+} from '../lib/classroom-control';
 import { classClockRoutes } from './class-clock';
 import { teacherMaterialRoutes } from './session-materials';
 import { z } from 'zod';
@@ -27,6 +34,7 @@ function toHttpUrl(wsUrl: string) {
 export async function sessionRoutes(app: FastifyInstance) {
   await teacherMaterialRoutes(app);
   await classClockRoutes(app);
+  await classroomModerationRoutes(app);
   // ── POST /api/sessions/create ─────────────────────────────────────────────
   // Creates (or reuses) a LiveKit room and returns a signed participant token.
   // The caller's identity, display name, and role come from the verified JWT —
@@ -146,6 +154,7 @@ export async function sessionRoutes(app: FastifyInstance) {
       roomJoin: true,
       room: live.liveKitRoomId,
       canPublish: true,
+      canPublishSources: studentPublishSources(false),
       canSubscribe: true,
       canPublishData: true,
     });
@@ -572,39 +581,38 @@ export async function sessionRoutes(app: FastifyInstance) {
       }
       const roomName = event.room?.name;
       if (!roomName) return { received: true };
-      if (event.event === 'participant_joined' && event.participant?.identity) {
-        const student = await prisma.studentProfile.findUnique({
-          where: { userId: event.participant.identity },
-        });
+      if (
+        ['participant_joined', 'participant_left'].includes(event.event) &&
+        event.participant?.identity
+      ) {
         const session = await prisma.classSession.findFirst({
-          where: { liveKitRoomId: roomName, status: 'LIVE' },
+          where: { liveKitRoomId: roomName, status: { in: ['LIVE', 'COMPLETED'] } },
         });
+        const occurredAt = providerTime(event.createdAt, new Date())!;
         if (
-          student &&
           session &&
-          (await canAccessCourse({ id: student.userId, role: 'STUDENT' }, session.courseId))
+          (session.status === 'LIVE' || (session.endedAt && occurredAt <= session.endedAt))
         ) {
           await prisma.$transaction(async (tx) => {
-            await tx.sessionAttendance.upsert({
-              where: { sessionId_studentId: { sessionId: session.id, studentId: student.id } },
-              create: { sessionId: session.id, studentId: student.id },
-              update: {},
-            });
-            const award = await tx.pointTransaction.createMany({
-              data: {
-                studentId: student.id,
-                points: 10,
-                event: 'Class attendance',
-                eventKey: `attendance:${session.id}:${student.id}`,
-              },
-              skipDuplicates: true,
-            });
-            if (award.count)
-              await tx.studentProfile.update({
-                where: { id: student.id },
-                data: { totalPoints: { increment: 10 } },
-              });
+            await lockCourse(tx, session.courseId);
+            const current = await tx.classSession.findUniqueOrThrow({ where: { id: session.id } });
+            await recordPresence(
+              tx,
+              current,
+              event.participant!,
+              event.event === 'participant_left' ? 'LEAVE' : 'JOIN',
+              occurredAt
+            );
           });
+          if (event.event === 'participant_joined' && session.status === 'LIVE') {
+            try {
+              await applySpeakingState(session.courseId, session.id, event.participant.identity);
+            } catch {
+              request.log.warn(
+                'Participant permission synchronization will retry from the classroom'
+              );
+            }
+          }
         }
       }
       if (event.event === 'room_finished') {

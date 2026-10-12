@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { adminSessionRoutes } from './admin-sessions';
 import { adminMaterialRoutes } from './session-materials';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
@@ -61,6 +62,7 @@ export async function adminRoutes(app: FastifyInstance) {
       return reply.status(403).send({ error: 'هذه الصفحة لإدارة الأكاديمية فقط' });
   });
   await adminMaterialRoutes(app);
+  await adminSessionRoutes(app);
   app.get('/overview', async () => {
     const [teachers, parents, students, courses] = await Promise.all([
       prisma.teacherProfile.findMany({

@@ -1,0 +1,111 @@
+.microphone-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: #10223db3;
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.microphone-modal {
+  width: min(540px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  background: #fff;
+  color: #1b3a6b;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 12px 45px #11223b33;
+  line-height: 1.7;
+}
+.microphone-modal header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.microphone-modal h2 {
+  font-size: 20px;
+  margin: 0;
+}
+.microphone-modal header button {
+  border: 1px solid #dde3ec;
+  background: #fff;
+  border-radius: 9px;
+  min-width: 44px;
+  min-height: 44px;
+  color: #1b3a6b;
+}
+.microphone-modal header svg {
+  width: 20px;
+  height: 20px;
+}
+.microphone-modal ul {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+}
+.microphone-modal li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid #e7eaf0;
+}
+.microphone-modal li div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.microphone-modal small {
+  display: block;
+  color: #64728a;
+}
+.microphone-modal .btn {
+  min-height: 44px;
+  flex-shrink: 0;
+}
+.microphone-modal .microphone-mute-all {
+  width: 100%;
+  border-color: #b94139;
+  color: #a12f2c;
+}
+.microphone-error {
+  color: #a12f2c;
+  background: #fff0ed;
+  border-radius: 8px;
+  padding: 10px;
+}
+.microphone-hint {
+  font-size: 12px;
+  color: #64728a;
+}
+.classroom-presence-notice {
+  position: fixed;
+  top: 76px;
+  left: 12px;
+  right: 12px;
+  z-index: 45;
+  background: #fff7dd;
+  color: #705318;
+  border: 1px solid #e2cb85;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+@media (max-width: 420px) {
+  .microphone-modal {
+    padding: 14px;
+  }
+  .microphone-modal h2 {
+    font-size: 17px;
+  }
+  .microphone-modal .btn {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+  .microphone-modal li {
+    gap: 8px;
+  }
+}

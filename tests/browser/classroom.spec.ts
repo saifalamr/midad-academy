@@ -9,7 +9,7 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   browser,
   request,
 }) => {
-  test.setTimeout(120000);
+  test.setTimeout(180000);
   const login = async (email: string) => {
     const res = await request.post('http://127.0.0.1:4000/api/auth/login', {
       data: { email, password: 'MidadPreview2026!' },
@@ -104,6 +104,14 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   await teacher.getByRole('button', { name: 'تشغيل الكاميرا' }).click();
   await student.getByRole('button', { name: 'تشغيل الكاميرا' }).click();
   await teacher.getByRole('button', { name: 'تشغيل الصوت', exact: true }).click();
+  await expect(student.getByRole('button', { name: 'المايك مقفول من المعلم' })).toBeDisabled();
+  await teacher.getByRole('button', { name: 'مايكات الطلاب', exact: true }).click();
+  const microphones = teacher.getByRole('dialog', { name: 'إدارة مايكات الطلاب' });
+  await microphones
+    .getByRole('button', { name: 'السماح بالكلام لـ Preview Student', exact: true })
+    .click();
+  await expect(student.getByRole('button', { name: 'تشغيل الصوت', exact: true })).toBeEnabled();
+  await microphones.getByRole('button', { name: 'إغلاق إدارة المايكات' }).click();
   await student.getByRole('button', { name: 'تشغيل الصوت', exact: true }).click();
   const remoteMedia = (page: Page) =>
     page.evaluate(() => {
@@ -121,6 +129,46 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   await expect.poll(async () => (await remoteMedia(teacher)).videos).toBeGreaterThanOrEqual(2);
   await expect.poll(async () => (await remoteMedia(student)).audio).toBeGreaterThan(0);
   await expect.poll(async () => (await remoteMedia(teacher)).audio).toBeGreaterThan(0);
+  await teacher.getByRole('button', { name: 'مايكات الطلاب', exact: true }).click();
+  await microphones.getByRole('button', { name: 'قفل مايكات الجميع', exact: true }).click();
+  await expect(student.getByRole('button', { name: 'المايك مقفول من المعلم' })).toBeDisabled();
+  await expect.poll(async () => (await remoteMedia(teacher)).audio).toBe(0);
+  await microphones
+    .getByRole('button', { name: 'السماح بالكلام لـ Preview Student', exact: true })
+    .click();
+  await expect(student.getByRole('button', { name: 'تشغيل الصوت', exact: true })).toBeEnabled();
+  await expect.poll(async () => (await remoteMedia(teacher)).audio).toBe(0);
+  await student.getByRole('button', { name: 'تشغيل الصوت', exact: true }).click();
+  await expect.poll(async () => (await remoteMedia(teacher)).audio).toBeGreaterThan(0);
+  await microphones.getByRole('button', { name: 'إغلاق إدارة المايكات' }).click();
+  const attendance = await request.get(
+    `http://127.0.0.1:4000/api/admin/sessions/${scheduled.data.id}/details`,
+    { headers: { Authorization: `Bearer ${adminToken}` } }
+  );
+  expect(attendance.ok(), await attendance.text()).toBeTruthy();
+  const details = (await attendance.json()).data;
+  expect(details.teacher.present).toBe(true);
+  expect(details.teacher.hasJoined).toBe(true);
+  expect(details.students[0].present).toBe(true);
+  const adminContext = await browser.newContext({ viewport: { width: 820, height: 1180 } });
+  await adminContext.addInitScript((token) => localStorage.setItem('token', token), adminToken);
+  const administrator = await adminContext.newPage();
+  await administrator.goto(`/admin/sessions/${scheduled.data.id}/details`);
+  await expect(administrator.getByRole('region', { name: 'حضور المعلم' })).toContainText(
+    'داخل الحصة الآن'
+  );
+  await administrator.getByRole('link', { name: 'مراقبة الحصة', exact: true }).click();
+  await administrator.getByRole('button', { name: 'دخول للمشاهدة', exact: true }).click();
+  await expect(
+    administrator.getByText('وضع المشاهدة · بدون كاميرا أو ميكروفون أو تفاعل')
+  ).toBeVisible();
+  await expect(teacher.locator('.rt-count')).toContainText('2');
+  await expect(student.locator('.rt-count')).toContainText('2');
+  await expect(
+    administrator.getByRole('button', { name: 'مايكات الطلاب', exact: true })
+  ).toHaveCount(0);
+  await adminContext.close();
+
   const videoFrames = (page: Page) =>
     page.evaluate(() =>
       [...document.querySelectorAll<HTMLVideoElement>('.video-strip video')].map(
@@ -224,13 +272,11 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   expect(await ink(teacher)).toBeGreaterThan(before + 100);
   await teacher.getByRole('button', { name: 'إضافة محتوى', exact: true }).click();
   await teacher.getByRole('button', { name: 'رفع ملف', exact: true }).click();
-  await teacher
-    .locator('#class-file')
-    .setInputFiles({
-      name: 'نشاط.html',
-      mimeType: 'text/html',
-      buffer: Buffer.from('<h1>نشاط جديد</h1>'),
-    });
+  await teacher.locator('#class-file').setInputFiles({
+    name: 'نشاط.html',
+    mimeType: 'text/html',
+    buffer: Buffer.from('<h1>نشاط جديد</h1>'),
+  });
   await expect(
     teacher.frameLocator('iframe[title="نشاط.html"]').getByText('نشاط جديد')
   ).toBeVisible();
@@ -246,6 +292,16 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   await api('post', '/api/sessions/end', teacherToken, { roomName: 'preview-arabic' });
   await expect(student.getByRole('heading', { name: 'انتهت الحصة', exact: true })).toBeVisible();
   await expect(student.locator('video')).toHaveCount(0);
+  const after = await request.get(
+    `http://127.0.0.1:4000/api/admin/sessions/${scheduled.data.id}/details`,
+    { headers: { Authorization: `Bearer ${adminToken}` } }
+  );
+  const completed = (await after.json()).data;
+  expect(completed.teacher.hasJoined).toBe(true);
+  expect(completed.teacher.present).toBe(false);
+  expect(completed.students[0].entryCount).toBeGreaterThan(1);
+  expect(completed.endedAt).toBeTruthy();
+
   await student.getByRole('button', { name: 'الرجوع للوحة التحكم', exact: true }).click();
   await expect(student).toHaveURL(/\/student/);
   expect(errors).toEqual([]);

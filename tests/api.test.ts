@@ -29,6 +29,9 @@ RoomServiceClient.prototype.listRooms = async (names) =>
 RoomServiceClient.prototype.deleteRoom = async (name) => {
   deletedRooms.push(name);
 };
+RoomServiceClient.prototype.listParticipants = async () => [];
+RoomServiceClient.prototype.mutePublishedTrack = async () => ({}) as any;
+RoomServiceClient.prototype.updateParticipant = async () => ({}) as any;
 RoomServiceClient.prototype.updateRoomMetadata = async () => ({}) as any;
 process.env.LIVEKIT_API_KEY = 'preview-key';
 process.env.LIVEKIT_API_SECRET = 'preview-secret-at-least-32-characters';
@@ -2697,5 +2700,276 @@ test('WhatsApp consent, durable deduplication, reminders and ambiguous failures 
   } finally {
     Object.assign(config, previous);
     globalThis.fetch = originalFetch;
+  }
+});
+
+async function isolatedControlActors() {
+  const originalTeacher = actors.teacher,
+    originalAdmin = actors.admin;
+  for (const role of ['teacher', 'admin']) {
+    const email = `control-${role}-${randomUUID()}@midad.test`;
+    const user = await prisma.user.create({
+      data: {
+        email,
+        name: `Control ${role}`,
+        passwordHash: 'isolated-test-account',
+        role: role === 'teacher' ? 'TEACHER' : 'ADMIN',
+        ...(role === 'teacher'
+          ? { teacherProfile: { create: { bio: '', qualifications: [], hourlyRate: 0 } } }
+          : {}),
+      },
+    });
+    actors[role] = {
+      id: user.id,
+      email,
+      token: app.jwt.sign({ id: user.id, role: user.role, version: user.tokenVersion }),
+    };
+  }
+  return () => {
+    actors.teacher = originalTeacher;
+    actors.admin = originalAdmin;
+  };
+}
+
+test('teacher-controlled microphones enforce locked fresh tokens, scoped grants, immediate muting and versioned re-entry', async () => {
+  const restoreActors = await isolatedControlActors();
+  const courseId = (
+    await createCourse({
+      title: 'Speaking control',
+      description: 'Microphone permissions',
+      price: 0,
+    })
+  ).json().data.id;
+  await enroll(courseId, 'student');
+  const session = await fixtureSession(courseId, 'Controlled speaking');
+  await call('PATCH', `/api/sessions/${session.id}/start`, 'teacher');
+  const list = RoomServiceClient.prototype.listParticipants,
+    update = RoomServiceClient.prototype.updateParticipant,
+    mute = RoomServiceClient.prototype.mutePublishedTrack;
+  let providerFail = false;
+  const mutations: string[] = [];
+  const participant: any = {
+    identity: actors.student.id,
+    sid: 'PA_control',
+    joinedAt: BigInt(Math.floor(Date.now() / 1000)),
+    tracks: [{ sid: 'TR_microphone', source: 2, muted: false }],
+  };
+  RoomServiceClient.prototype.listParticipants = async () => [participant];
+  RoomServiceClient.prototype.updateParticipant = (async (
+    _room: string,
+    identity: string,
+    options: any
+  ) => {
+    if (providerFail) throw Error('offline');
+    mutations.push(identity);
+    participant.permission = options.permission;
+    return participant;
+  }) as any;
+  RoomServiceClient.prototype.mutePublishedTrack = (async (
+    _room: string,
+    _identity: string,
+    _sid: string,
+    muted: boolean
+  ) => {
+    participant.tracks[0].muted = muted;
+    return participant.tracks[0];
+  }) as any;
+  try {
+    const path = `/api/sessions/microphones/${courseId}`;
+    for (const role of ['student', 'parent', 'admin'])
+      assert.equal(
+        (
+          await call('PUT', path, role, {
+            sessionId: session.id,
+            version: 0,
+            userId: actors.student.id,
+            allowed: true,
+          })
+        ).statusCode,
+        403
+      );
+    assert.equal((await call('GET', path, 'otherTeacher')).statusCode, 409);
+    assert.equal((await call('GET', path, 'teacher')).json().data.students[0].allowed, false);
+    const join = await call('POST', '/api/sessions/join', 'student', { roomName: courseId });
+    assert.equal(join.statusCode, 200);
+    const token = JSON.parse(
+      Buffer.from(join.json().data.token.split('.')[1], 'base64url').toString()
+    );
+    assert.ok(!token.video.canPublishSources.includes('microphone'));
+    assert.ok(!token.video.canPublishSources.includes('screen_share_audio'));
+    const body = { sessionId: session.id, version: 0, userId: actors.student.id, allowed: true };
+    assert.equal(
+      (await call('PUT', path, 'teacher', { ...body, userId: actors.outsider.id })).statusCode,
+      404
+    );
+    assert.equal((await call('PUT', path, 'teacher', body)).statusCode, 200);
+    assert.ok(participant.permission.canPublishSources.includes(2));
+    assert.equal((await call('PUT', path, 'teacher', body)).statusCode, 409);
+    const rejoin = await call('POST', '/api/sessions/join', 'student', { roomName: courseId });
+    assert.ok(
+      !JSON.parse(
+        Buffer.from(rejoin.json().data.token.split('.')[1], 'base64url').toString()
+      ).video.canPublishSources.includes('microphone')
+    );
+    assert.equal(
+      (
+        await call('POST', `/api/sessions/presence/${courseId}`, 'student', {
+          roomName: 'old-room',
+        })
+      ).statusCode,
+      409
+    );
+    const pulse = await call('POST', `/api/sessions/presence/${courseId}`, 'student', {
+      roomName: `class-${session.id}`,
+    });
+    assert.equal(pulse.statusCode, 200, pulse.body);
+    assert.equal(
+      (await call('PUT', path, 'teacher', { sessionId: session.id, version: 1, allowed: false }))
+        .statusCode,
+      200
+    );
+    assert.ok(!participant.permission.canPublishSources.includes(2));
+    assert.equal(participant.tracks[0].muted, true);
+    providerFail = true;
+    const failed = await call('PUT', path, 'teacher', { ...body, version: 2 });
+    assert.equal(failed.statusCode, 502);
+    assert.ok(failed.json().error.includes('تعذر تأكيد'));
+    assert.equal((await call('GET', path, 'teacher')).json().data.students[0].applied, false);
+    providerFail = false;
+    const resumed = await call('POST', `/api/sessions/presence/${courseId}`, 'student', {
+      roomName: `class-${session.id}`,
+    });
+    assert.equal(resumed.statusCode, 200);
+    assert.ok(participant.permission.canPublishSources.includes(2));
+    await call('POST', '/api/sessions/end', 'teacher', { roomName: courseId });
+    assert.equal(
+      await prisma.sessionSpeakingPermission.count({ where: { sessionId: session.id } }),
+      0
+    );
+    const next = await fixtureSession(courseId, 'Next controlled class');
+    await call('PATCH', `/api/sessions/${next.id}/start`, 'teacher');
+    assert.equal((await call('PUT', path, 'teacher', { ...body, version: 3 })).statusCode, 409);
+    assert.equal((await call('GET', path, 'teacher')).json().data.students[0].allowed, false);
+    await call('POST', '/api/sessions/end', 'teacher', { roomName: courseId });
+    assert.ok(mutations.every((id) => id === actors.student.id));
+  } finally {
+    RoomServiceClient.prototype.listParticipants = list;
+    RoomServiceClient.prototype.updateParticipant = update;
+    RoomServiceClient.prototype.mutePublishedTrack = mute;
+    restoreActors();
+  }
+});
+
+test('administration sees provider-confirmed teacher/student presence, durable rejoins, delayed exits and honest outage states', async () => {
+  const restoreActors = await isolatedControlActors();
+  const courseId = (
+    await createCourse({
+      title: 'Attendance detail',
+      description: 'Administration presence audit',
+      price: 0,
+    })
+  ).json().data.id;
+  await enroll(courseId, 'student');
+  const session = await fixtureSession(courseId, 'Attendance detail');
+  const path = `/api/admin/sessions/${session.id}/details`;
+  for (const role of ['student', 'parent', 'teacher', 'otherTeacher'])
+    assert.equal((await call('GET', path, role)).statusCode, 403);
+  assert.equal((await call('GET', path, 'admin')).json().data.teacher.hasJoined, false);
+  await call('PATCH', `/api/sessions/${session.id}/start`, 'teacher');
+  const original = RoomServiceClient.prototype.listParticipants;
+  const now = Math.floor(Date.now() / 1000) - 4;
+  let providerFailure = false;
+  let participants: any[] = [
+    { identity: actors.teacher.id, sid: 'PA_teacher_detail', joinedAt: BigInt(now), tracks: [] },
+    { identity: actors.student.id, sid: 'PA_student_detail', joinedAt: BigInt(now), tracks: [] },
+    { identity: actors.admin.id, sid: 'PA_hidden_detail', joinedAt: BigInt(now), tracks: [] },
+  ];
+  RoomServiceClient.prototype.listParticipants = async () => {
+    if (providerFailure) throw Error('provider offline');
+    return participants;
+  };
+  async function webhook(
+    kind: string,
+    identity: string,
+    sid: string,
+    createdAt = now,
+    joinedAt = now
+  ) {
+    const payload = JSON.stringify({
+      event: kind,
+      createdAt,
+      room: { name: `class-${session.id}` },
+      participant: { identity, sid, joinedAt },
+    });
+    const token = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET);
+    token.sha256 = createHash('sha256').update(payload).digest('base64');
+    return app.inject({
+      method: 'POST',
+      url: '/api/sessions/webhook',
+      payload,
+      headers: { 'content-type': 'application/webhook+json', authorization: await token.toJwt() },
+    });
+  }
+  try {
+    let detail = (await call('GET', path, 'admin')).json().data;
+    assert.equal(detail.teacher.present, true);
+    assert.equal(detail.teacher.hasJoined, true);
+    assert.equal(detail.summary.attended, 1);
+    assert.equal(detail.students[0].present, true);
+    assert.equal(
+      await prisma.classroomVisit.count({
+        where: { sessionId: session.id, userId: actors.admin.id },
+      }),
+      0
+    );
+    await call('GET', path, 'admin');
+    assert.equal(await prisma.classroomVisit.count({ where: { sessionId: session.id } }), 2);
+    participants = participants.filter((p) => p.identity !== actors.student.id);
+    detail = (await call('GET', path, 'admin')).json().data;
+    assert.equal(detail.students[0].present, false);
+    assert.equal(detail.students[0].visits[0].exitSource, 'OBSERVED');
+    assert.equal(
+      (await webhook('participant_left', actors.student.id, 'PA_student_detail', now + 1))
+        .statusCode,
+      200
+    );
+    participants.push({
+      identity: actors.student.id,
+      sid: 'PA_student_return',
+      joinedAt: BigInt(now + 2),
+      tracks: [],
+    });
+    detail = (await call('GET', path, 'admin')).json().data;
+    assert.equal(detail.students[0].entryCount, 2);
+    await webhook('participant_left', actors.student.id, 'PA_student_detail', now + 1);
+    detail = (await call('GET', path, 'admin')).json().data;
+    assert.equal(detail.students[0].present, true);
+    assert.equal(
+      detail.students[0].visits.find((v: any) => v.id === detail.students[0].visits[1].id)?.leftAt,
+      null
+    );
+    providerFailure = true;
+    detail = (await call('GET', path, 'admin')).json().data;
+    assert.equal(detail.livePresenceAvailable, false);
+    assert.equal(detail.summary.present, null);
+    assert.equal(detail.teacher.present, null);
+    assert.equal(detail.teacher.hasJoined, true);
+    providerFailure = false;
+    await call('POST', '/api/sessions/end', 'teacher', { roomName: courseId });
+    detail = (await call('GET', path, 'admin')).json().data;
+    assert.equal(detail.status, 'COMPLETED');
+    assert.ok(detail.endedAt);
+    assert.ok(detail.students[0].visits.every((v: any) => v.leftAt));
+    const student = await prisma.studentProfile.findUniqueOrThrow({
+      where: { userId: actors.student.id },
+    });
+    await prisma.enrollment.updateMany({ where: { courseId }, data: { status: 'CANCELLED' } });
+    detail = (await call('GET', path, 'admin')).json().data;
+    assert.equal(detail.students.length, 1);
+    assert.equal(detail.students[0].id, student.id);
+    assert.equal(await prisma.sessionAttendance.count({ where: { sessionId: session.id } }), 1);
+  } finally {
+    RoomServiceClient.prototype.listParticipants = original;
+    restoreActors();
   }
 });

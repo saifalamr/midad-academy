@@ -1,5 +1,9 @@
 'use client';
 
+import ClassroomMicrophones, {
+  ClassroomPresence,
+  useSpeakingPermission,
+} from '@/components/ClassroomMicrophones';
 import ClassClock from '@/components/ClassClock';
 import CameraVideo from '@/components/CameraVideo';
 import Link from 'next/link';
@@ -311,6 +315,7 @@ function ClassroomContent({
   const studentTracks = cameraTracks.filter((t) => getRole(t) === 'student');
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
   const room = useRoomContext();
+  const canSpeak = useSpeakingPermission(isTeacher, isObserver);
   const remoteParticipants = useRemoteParticipants();
   const participantCount = cameraTracks.filter((t) =>
     ['teacher', 'student'].includes(getRole(t))
@@ -876,6 +881,7 @@ function ClassroomContent({
         </div>
       </header>
 
+      <ClassroomPresence courseId={roomId} isObserver={isObserver} />
       <ClassClock courseId={roomId} editable={isTeacher} />
       {/* ── Video strip ── */}
       <div className="video-strip">
@@ -1439,6 +1445,7 @@ function ClassroomContent({
       <StartAudio className="classroom-start-audio" label="تشغيل صوت الحصة" />
       {/* ── Room controls ── */}
       <div className="room-controls" aria-label="أدوات المكالمة">
+        {isTeacher && <ClassroomMicrophones courseId={roomId} />}
         {isObserver && (
           <span className="observer-notice" dir="rtl">
             وضع المشاهدة · بدون كاميرا أو ميكروفون أو تفاعل
@@ -1449,6 +1456,8 @@ function ClassroomContent({
             <button
               className={`rc-btn ${!isMicrophoneEnabled ? 'rc-off' : ''}`}
               aria-pressed={isMicrophoneEnabled}
+              disabled={!canSpeak}
+              title={!canSpeak ? 'ارفع يدك وانتظر إذن المعلم لتشغيل المايك' : undefined}
               onClick={() => {
                 void localParticipant
                   .setMicrophoneEnabled(!isMicrophoneEnabled)
@@ -1458,7 +1467,13 @@ function ClassroomContent({
               }}
             >
               <CallIcon name="mic" off={!isMicrophoneEnabled} />
-              <span>{isMicrophoneEnabled ? 'كتم الصوت' : 'تشغيل الصوت'}</span>
+              <span>
+                {!canSpeak
+                  ? 'المايك مقفول من المعلم'
+                  : isMicrophoneEnabled
+                    ? 'كتم الصوت'
+                    : 'تشغيل الصوت'}
+              </span>
             </button>
 
             <button
@@ -1964,8 +1979,9 @@ export default function ClassroomPage() {
     [isObserver, choices?.videoEnabled, choices?.videoDeviceId]
   );
   const audioCapture = useMemo(
-    () => (!isObserver && choices?.audioEnabled ? { deviceId: choices.audioDeviceId } : false),
-    [isObserver, choices?.audioEnabled, choices?.audioDeviceId]
+    () =>
+      role === 'teacher' && choices?.audioEnabled ? { deviceId: choices.audioDeviceId } : false,
+    [role, choices?.audioEnabled, choices?.audioDeviceId]
   );
 
   if (exit)
@@ -2067,7 +2083,7 @@ export default function ClassroomPage() {
       <main className="midad classroom-lobby" dir="rtl">
         <section className="lobby-state">
           <Icon name="eye" size={36} />
-          <h1>مشاهدة حصة طفلك</h1>
+          <h1>{user.role === 'ADMIN' ? 'مراقبة الحصة' : 'مشاهدة حصة طفلك'}</h1>
           <p>
             يمكنك متابعة صوت الحصة والكاميرا والمحتوى والسبورة. دخولك للمشاهدة فقط، بدون كاميرا أو
             ميكروفون أو تفاعل.
@@ -2087,7 +2103,7 @@ export default function ClassroomPage() {
             دخول للمشاهدة
           </button>
           <button className="btn btn-outline" onClick={goDashboard}>
-            الرجوع لصفحة ولي الأمر
+            {user.role === 'ADMIN' ? 'الرجوع لإدارة الأكاديمية' : 'الرجوع لصفحة ولي الأمر'}
           </button>
         </section>
       </main>

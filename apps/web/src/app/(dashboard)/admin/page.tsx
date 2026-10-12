@@ -627,6 +627,12 @@ export default function AdminPage() {
                         )[s.status] || s.status}
                       </span>
                       <Link
+                        className="btn btn-gold btn-sm"
+                        href={`/admin/sessions/${s.id}/details`}
+                      >
+                        تفاصيل الحصة والحضور
+                      </Link>
+                      <Link
                         className="btn btn-outline btn-sm"
                         href={`/admin/sessions/${s.id}/materials`}
                       >
