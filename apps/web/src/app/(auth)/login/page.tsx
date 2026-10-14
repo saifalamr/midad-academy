@@ -1,5 +1,6 @@
 'use client';
 
+import { AuthIdentity, AuthBackdrop } from '@/components/AuthIdentity';
 import { PopupNotice } from '@/components/FeedbackProvider';
 import { useState } from 'react';
 import Link from 'next/link';
@@ -30,7 +31,7 @@ export default function LoginPage() {
       const json = await res.json();
 
       if (!res.ok) {
-        setError(json.error || 'Login failed');
+        setError(json.error || 'تعذر تسجيل الدخول');
         return;
       }
 
@@ -45,16 +46,16 @@ export default function LoginPage() {
       else if (role === 'parent') router.push('/parent');
       else router.push('/student');
     } catch {
-      setError('Could not connect to server');
+      setError('تعذر الاتصال بالخادم. حاول مرة أخرى.');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="midad auth">
+    <div className="midad auth" lang="ar">
       {/* ── Left side ───────────────────────────────────────── */}
-      <aside className="auth-side geo-navy">
+      <aside className="auth-side geo-navy" dir="rtl">
         <Link className="brand" href="/">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -65,13 +66,13 @@ export default function LoginPage() {
         </Link>
 
         <div className="auth-side-body">
-          <h2 className="auth-head">Welcome back to the academy.</h2>
-          <p className="ar auth-head-ar">أهلاً بعودتك إلى مداد</p>
+          <h2 className="auth-head">أهلاً بعودتك إلى مداد</h2>
+          <p className="ar auth-head-ar">نلتقي لنكتشف ونتعلّم</p>
           <p className="auth-side-p">
-            Pick up right where you left off — your classes, progress and badges are waiting.
+            حصصك، واجباتك وتقدّمك، كلها في مكان واحد.
           </p>
           <div className="card-glass auth-quote">
-            <p>Learn, practise and follow your progress — one lesson at a time.</p>
+            <p>كل حرف بداية، وكل درس خطوة جديدة.</p>
           </div>
         </div>
 
@@ -80,14 +81,16 @@ export default function LoginPage() {
 
       {/* ── Right side ──────────────────────────────────────── */}
       <div className="auth-main">
-        <div className="auth-card">
+        <AuthBackdrop />
+        <div className="auth-card" dir="rtl">
+          <AuthIdentity />
           <div className="auth-top-link">
-            New here? <Link href="/register">Create an account</Link>
+            جديد في مداد؟ <Link href="/register">إنشاء حساب ولي أمر</Link>
           </div>
 
-          <h1 className="auth-title">Log in</h1>
+          <h1 className="auth-title">تسجيل الدخول</h1>
           <p className="auth-sub">
-            Enter your details to continue. <span className="ar">تسجيل الدخول</span>
+            أدخل بياناتك لنكمل رحلة التعلّم.
           </p>
 
           {error && <PopupNotice className="auth-error">{error}</PopupNotice>}
@@ -95,7 +98,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit}>
             <div className="field">
               <label htmlFor="email">
-                Email or username <span className="ar muted">البريد أو اسم المستخدم</span>
+                البريد الإلكتروني أو اسم المستخدم
               </label>
               <input
                 id="email"
@@ -111,7 +114,7 @@ export default function LoginPage() {
 
             <div className="field">
               <label htmlFor="password">
-                Password <span className="ar muted">كلمة المرور</span>
+                كلمة المرور
               </label>
               <div className="input-wrap">
                 <input
@@ -127,7 +130,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   className="eye"
-                  aria-label="Toggle password"
+                  aria-label={showPw ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
                   onClick={() => setShowPw((v) => !v)}
                 >
                   {showPw ? (
@@ -153,10 +156,10 @@ export default function LoginPage() {
                   checked={remember}
                   onChange={(e) => setRemember(e.target.checked)}
                 />{' '}
-                Remember me
+                تذكّرني
               </label>
               <Link className="link-gold" href="/forgot-password">
-                Forgot password?
+                نسيت كلمة المرور؟
               </Link>
             </div>
 
@@ -166,7 +169,7 @@ export default function LoginPage() {
               className="btn btn-gold btn-block btn-lg"
               style={{ opacity: loading ? 0.65 : 1 }}
             >
-              {loading ? 'Signing in…' : 'Log in'}
+              {loading ? 'جارٍ تسجيل الدخول…' : 'تسجيل الدخول'}
             </button>
           </form>
         </div>

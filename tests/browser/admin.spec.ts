@@ -13,11 +13,11 @@ test('parent registration, admin child account, monthly course, enrollment and s
   await page.locator('#password').fill('TestingPassword2026!');
   await page.locator('#whatsappPhone').fill('+905001234567');
   await page.getByRole('checkbox').last().check();
-  await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  await page.getByRole('button', { name: 'إنشاء الحساب', exact: true }).click();
   await expect(page).toHaveURL(/login$/);
   await page.locator('#email').fill('admin@preview.midad.test');
   await page.locator('#password').fill('MidadPreview2026!');
-  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();
   await expect(page).toHaveURL(/admin$/);
   await expect(page.getByRole('heading', { name: 'إدارة الأكاديمية', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'الأسر والطلاب', exact: true }).click();
@@ -100,7 +100,7 @@ test('parent registration, admin child account, monthly course, enrollment and s
   await student.goto('/login');
   await student.locator('#email').fill('browser.child');
   await student.locator('#password').fill('TestingPassword2026!');
-  await student.getByRole('button', { name: 'Log in', exact: true }).click();
+  await student.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();
   await expect(student).toHaveURL(/student$/);
   await student.goto('/courses');
   await expect(student.getByText('Browser monthly course', { exact: true }).first()).toBeVisible();

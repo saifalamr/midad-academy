@@ -33,14 +33,14 @@ test('validation and login failures use dismissible popups; retry remains availa
   page,
 }) => {
   await page.goto('/login');
-  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();
   await expect(page.getByRole('alertdialog')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'راجع البيانات' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('alertdialog')).not.toBeVisible();
   await page.locator('#email').fill('missing@preview.midad.test');
   await page.locator('#password').fill('IncorrectPassword2026');
-  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();
   await expect(page.getByRole('alertdialog')).toContainText('Invalid credentials');
   await page.getByRole('button', { name: 'حسنًا' }).click();
   await expect(page.locator('#email')).toHaveValue('missing@preview.midad.test');
@@ -69,7 +69,7 @@ test('logout cancel and Escape preserve the account; confirmation clears both to
   await page.goto('/login');
   await page.locator('#email').fill('teacher@preview.midad.test');
   await page.locator('#password').fill('MidadPreview2026!');
-  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();
   await expect(page).toHaveURL(/\/teacher$/);
   const logout = page.getByRole('button', { name: /Log out/ });
   await logout.click();

@@ -4,7 +4,7 @@ test('mobile student login, enrollment, quiz and account linking code', async ({
   await page.goto('/login');
   await page.locator('#email').fill('student@preview.midad.test');
   await page.locator('#password').fill('MidadPreview2026!');
-  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();
   await expect(page).toHaveURL(/\/student$/);
   await expect(page.locator('main').getByText('Preview Student', { exact: true })).toBeVisible();
   await page.goto('/courses');
@@ -81,7 +81,7 @@ test('teacher creates a course and sees students; logout protects the dashboard'
   await page.goto('/login');
   await page.locator('#email').fill('teacher@preview.midad.test');
   await page.locator('#password').fill('MidadPreview2026!');
-  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();
   await expect(page).toHaveURL(/\/teacher$/);
   await expect(page.getByRole('link', { name: 'عرض المنهج' }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: /Create.*Class/ })).toHaveCount(0);
@@ -105,7 +105,7 @@ test('parent dashboard and report navigation work on mobile', async ({ page }) =
   await page.goto('/login');
   await page.locator('#email').fill('parent@preview.midad.test');
   await page.locator('#password').fill('MidadPreview2026!');
-  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();
   await expect(page).toHaveURL(/\/parent$/);
   await expect(page.getByRole('button', { name: '+ Add Child' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'تحميل سجل الحضور الأخير' })).toBeVisible();
@@ -178,7 +178,7 @@ test('parent browses courses without student checkout controls', async ({ page }
   await page.goto('/login');
   await page.locator('#email').fill('parent@preview.midad.test');
   await page.locator('#password').fill('MidadPreview2026!');
-  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();
   await expect(page).toHaveURL(/parent$/);
   await page.goto('/courses');
   await expect(page.getByRole('link', { name: 'طلب التسجيل عبر واتساب' }).first()).toBeVisible();
@@ -356,7 +356,7 @@ test('signed-in home stays a workspace across navigation, reloads and connection
   await page.goto('/login');
   await page.locator('#email').fill('teacher@preview.midad.test');
   await page.locator('#password').fill('MidadPreview2026!');
-  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();
   await expect(page).toHaveURL(/\/teacher$/);
   await page.getByRole('link', { name: 'الرئيسية', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'أهلاً، Preview Teacher' })).toBeVisible();
@@ -400,8 +400,8 @@ test('session-only login survives home reload and expires on a confirmed unautho
   await page.goto('/login');
   await page.locator('#email').fill('student@preview.midad.test');
   await page.locator('#password').fill('MidadPreview2026!');
-  await page.getByLabel('Remember me', { exact: true }).uncheck();
-  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByLabel('تذكّرني', { exact: true }).uncheck();
+  await page.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();
   await expect(page).toHaveURL(/\/student$/);
   await page.getByRole('link', { name: 'الرئيسية', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'أهلاً، Preview Student' })).toBeVisible();

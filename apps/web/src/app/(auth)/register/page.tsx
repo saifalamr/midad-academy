@@ -1,5 +1,6 @@
 'use client';
 
+import { AuthIdentity, AuthBackdrop } from '@/components/AuthIdentity';
 import { PopupNotice } from '@/components/FeedbackProvider';
 import { useState } from 'react';
 import Link from 'next/link';
@@ -38,22 +39,22 @@ export default function RegisterPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || data.message || 'Registration failed');
+        setError(data.error || data.message || 'تعذر إنشاء الحساب');
         return;
       }
 
       router.push('/login');
     } catch {
-      setError('Could not connect to server');
+      setError('تعذر الاتصال بالخادم. حاول مرة أخرى.');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="midad auth">
+    <div className="midad auth" lang="ar">
       {/* ── Left side ───────────────────────────────────────── */}
-      <aside className="auth-side geo-navy">
+      <aside className="auth-side geo-navy" dir="rtl">
         <Link className="brand" href="/">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -64,13 +65,13 @@ export default function RegisterPage() {
         </Link>
 
         <div className="auth-side-body">
-          <h2 className="auth-head">Begin the journey today.</h2>
-          <p className="ar auth-head-ar">ابدأ رحلة التعلّم اليوم</p>
+          <h2 className="auth-head">ابدأ رحلة طفلك مع مداد</h2>
+          <p className="ar auth-head-ar">العربية أقرب، والتعلّم أجمل</p>
           <ul className="auth-perks">
-            <li>Browse available courses before enrolling</li>
-            <li>Live lessons with your course teacher</li>
-            <li>Monthly courses managed by the academy</li>
-            <li>Parent dashboard for linked children</li>
+            <li>استعرض الدورات واختر ما يناسب طفلك</li>
+            <li>حصص مباشرة مع معلم طفلك</li>
+            <li>دورات شهرية تنظمها الأكاديمية</li>
+            <li>تابع حضور أبنائك وتقارير تقدّمهم</li>
           </ul>
         </div>
 
@@ -79,9 +80,11 @@ export default function RegisterPage() {
 
       {/* ── Right side ──────────────────────────────────────── */}
       <div className="auth-main">
-        <div className="auth-card">
+        <AuthBackdrop />
+        <div className="auth-card" dir="rtl">
+          <AuthIdentity />
           <div className="auth-top-link">
-            Already a member? <Link href="/login">Log in</Link>
+            عندك حساب؟ <Link href="/login">تسجيل الدخول</Link>
           </div>
 
           <h1 className="auth-title">إنشاء حساب ولي الأمر</h1>
@@ -94,14 +97,14 @@ export default function RegisterPage() {
           <form onSubmit={handleSubmit}>
             <div className="field">
               <label htmlFor="name">
-                Full name <span className="ar muted">الاسم الكامل</span>
+                الاسم الكامل
               </label>
               <input
                 id="name"
                 className="input"
                 type="text"
                 required
-                placeholder="e.g. Sara Al-Amin"
+                placeholder="مثال: سارة الأمين"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
@@ -109,7 +112,7 @@ export default function RegisterPage() {
 
             <div className="field">
               <label htmlFor="email">
-                Email address <span className="ar muted">البريد الإلكتروني</span>
+                البريد الإلكتروني
               </label>
               <input
                 id="email"
@@ -125,7 +128,7 @@ export default function RegisterPage() {
             <div className="grid-2">
               <div className="field">
                 <label htmlFor="password">
-                  Password <span className="ar muted">كلمة المرور</span>
+                  كلمة المرور
                 </label>
                 <input
                   id="password"
@@ -167,13 +170,13 @@ export default function RegisterPage() {
               من إعدادات الإشعارات.
             </label>
             <label className="check check-block">
-              <input type="checkbox" required />I agree to the{' '}
+              <input type="checkbox" required />أوافق على{' '}
               <Link href="/terms" className="link-gold">
-                Terms
+                الشروط
               </Link>{' '}
-              &amp;{' '}
+              و{' '}
               <Link href="/privacy" className="link-gold">
-                Privacy Policy
+                سياسة الخصوصية
               </Link>
             </label>
 
@@ -183,7 +186,7 @@ export default function RegisterPage() {
               className="btn btn-gold btn-block btn-lg"
               style={{ opacity: loading ? 0.65 : 1 }}
             >
-              {loading ? 'Creating account…' : 'Create account'}
+              {loading ? 'جارٍ إنشاء الحساب…' : 'إنشاء الحساب'}
             </button>
           </form>
         </div>
