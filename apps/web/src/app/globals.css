@@ -313,8 +313,8 @@
 /* ============================================================
    AUTH PAGES (login / register)
    ============================================================ */
-.midad .auth{display:grid;grid-template-columns:.92fr 1.08fr;min-height:100vh}
-.midad .auth-side{padding:40px 48px;display:flex;flex-direction:column;color:#fff;position:relative}
+.midad.auth{display:grid;grid-template-columns:minmax(240px,.72fr) minmax(0,1.28fr);min-height:100svh;padding-bottom:34px}
+.midad .auth-side{min-width:0;padding:28px 32px;display:flex;flex-direction:column;color:#fff;position:relative}
 .midad .brand-light .bn{gap:2px}
 .midad .brand-light .bn span{font-size:11px;letter-spacing:.18em}
 .midad .auth-side-body{margin:auto 0;max-width:420px}
@@ -360,8 +360,15 @@
 .midad .auth-error{background:#fde6df;border:1px solid #f5bdb6;border-radius:12px;
   padding:12px 16px;font-size:14px;color:#c93b31;margin-bottom:18px}
 
-@media(max-width:880px){
-  .midad .auth{grid-template-columns:1fr}
+@media(min-width:601px) and (max-width:1024px){
+  .midad .auth-side{padding:24px 20px}
+  .midad .auth-head{font-size:28px}
+  .midad .auth-head-ar{font-size:18px}
+  .midad .auth-side-p{font-size:14px}
+  .midad .auth-quote{padding:14px;margin-top:20px}
+}
+@media(max-width:600px){
+  .midad.auth{grid-template-columns:1fr}
   .midad .auth-side{display:none}
 }
 

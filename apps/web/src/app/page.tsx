@@ -72,7 +72,7 @@ export default function HomePage() {
             <Link href="/contact">تواصل معنا</Link>
             <Link href="/help">المساعدة</Link>
           </nav>
-          <small>By Yousef Al-Omari</small>
+          <small>made by DOPIXA</small>
         </footer>
       </div>
     </HomeExperience>

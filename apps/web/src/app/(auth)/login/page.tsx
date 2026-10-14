@@ -188,7 +188,7 @@ export default function LoginPage() {
           borderTop: '1px solid var(--line)',
         }}
       >
-        By Yousef Al-Omari
+        made by DOPIXA
       </div>
     </div>
   );
