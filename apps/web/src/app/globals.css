@@ -890,7 +890,8 @@ img[src*="midad-logo-transparent.png"]{clip-path:polygon(0 0,100% 0,100% 80%,70%
 .midad .auth-card .input{background:rgba(255,255,255,.7)}
 .midad .auth-card .input-wrap .input{padding-left:44px!important;padding-right:16px!important}
 .midad .auth-card .eye{right:auto;left:12px}
-.midad .auth-card .check-block{align-items:flex-start;flex-wrap:wrap;line-height:1.7}
+.midad .auth-card .check-block{display:block;line-height:1.7}
+.midad .auth-card .check-block input{display:inline-block;vertical-align:middle;margin-inline-end:8px}
 .midad .auth-card .check input{flex:none;margin-top:3px}
 .midad .auth-side .auth-head{font-family:'IBM Plex Sans Arabic',sans-serif;line-height:1.4}
 @media(max-width:600px){
