@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { buildSync } from 'esbuild';
 const script = buildSync({
   stdin: {
-    contents: `import React from 'react';import {createRoot} from 'react-dom/client';import AudioAnswer from './apps/web/src/components/AudioAnswer';const root=createRoot(document.getElementById('audio-root'));window.audioTest.unmount=()=>root.unmount();root.render(React.createElement(AudioAnswer,{sessionId:'fixture',questionId:'fixture',maxSeconds:30,disabled:false,onUploaded:()=>{},onBusy:value=>window.audioTest.busy=value}));`,
+    contents: `import React from 'react';import {FeedbackProvider} from './apps/web/src/components/FeedbackProvider';import {createRoot} from 'react-dom/client';import AudioAnswer from './apps/web/src/components/AudioAnswer';const root=createRoot(document.getElementById('audio-root'));window.audioTest.unmount=()=>root.unmount();root.render(React.createElement(FeedbackProvider,null,React.createElement(AudioAnswer,{sessionId:'fixture',questionId:'fixture',maxSeconds:30,disabled:false,onUploaded:()=>{},onBusy:value=>window.audioTest.busy=value})));`,
     resolveDir: process.cwd(),
     loader: 'tsx',
   },
@@ -12,7 +12,7 @@ const script = buildSync({
   jsx: 'automatic',
   format: 'iife',
   loader: { '.css': 'empty' },
-  alias: { '@': process.cwd() + '/apps/web/src' },
+  alias: { '@': process.cwd() + '/apps/web/src', 'next/navigation': process.cwd() + '/tests/browser/fixtures/navigation.ts' },
   define: {
     'process.env.NEXT_PUBLIC_API_URL': JSON.stringify('http://127.0.0.1:4000'),
     'process.env.NODE_ENV': JSON.stringify('production'),

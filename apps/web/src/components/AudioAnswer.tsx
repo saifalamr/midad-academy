@@ -1,4 +1,5 @@
 'use client';
+import { PopupNotice } from '@/components/FeedbackProvider';
 import { useEffect, useRef, useState } from 'react';
 import { API_URL } from '@/lib/config';
 const authorization = () => ({
@@ -49,7 +50,7 @@ export function AudioPlayback({ audioId }: { audioId: string }) {
           onError={() => setError('الرابط قد انتهى. اضغط تجديد رابط التسجيل.')}
         />
       )}
-      {error && <p role="alert">{error}</p>}
+      {error && <PopupNotice role="alert">{error}</PopupNotice>}
     </div>
   );
 }
@@ -308,7 +309,7 @@ export default function AudioAnswer({
           )}
         </>
       )}
-      {error && <p role="alert">{error}</p>}
+      {error && <PopupNotice role="alert">{error}</PopupNotice>}
     </div>
   );
 }

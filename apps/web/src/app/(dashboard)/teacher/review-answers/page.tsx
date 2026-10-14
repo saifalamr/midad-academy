@@ -1,5 +1,6 @@
 'use client';
 
+import { PopupNotice } from '@/components/FeedbackProvider';
 import Icon from '@/components/Icon';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -97,7 +98,7 @@ export default function ReviewAnswersPage() {
           </div>
         </div>
 
-        {error && <div role="alert" className="auth-error" style={{ marginBottom: 16 }}>{error}</div>}
+        {error && <PopupNotice role="alert" className="auth-error" style={{ marginBottom: 16 }}>{error}</PopupNotice>}
 
         {loading ? (
           <div className="card pad" style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14 }}>

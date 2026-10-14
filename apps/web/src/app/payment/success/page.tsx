@@ -1,4 +1,5 @@
 'use client';
+import { PopupNotice } from '@/components/FeedbackProvider';
 
 import Icon from '@/components/Icon';
 import { Suspense, useEffect, useState } from 'react';
@@ -13,7 +14,10 @@ type ConfirmResult = {
 };
 
 function authFetch(path: string, options: RequestInit = {}) {
-  const token = typeof window !== 'undefined' ? (localStorage.getItem('token') ?? sessionStorage.getItem('token')) : null;
+  const token =
+    typeof window !== 'undefined'
+      ? (localStorage.getItem('token') ?? sessionStorage.getItem('token'))
+      : null;
   return fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
@@ -40,7 +44,7 @@ function PaymentSuccessContent() {
       return;
     }
 
-    const token = (localStorage.getItem('token') ?? sessionStorage.getItem('token'));
+    const token = localStorage.getItem('token') ?? sessionStorage.getItem('token');
     if (!token) {
       router.push('/login');
       return;
@@ -59,7 +63,10 @@ function PaymentSuccessContent() {
         }
         if (json.data.requiresReview || json.data.enrollment?.status !== 'ACTIVE') {
           setStatus('review');
-          setError('تم تسجيل دفعتك، لكن التسجيل يحتاج مراجعة الأكاديمية. لا تدفع مرة أخرى؛ تواصل مع الدعم مع رقم الطلب: ' + sessionId);
+          setError(
+            'تم تسجيل دفعتك، لكن التسجيل يحتاج مراجعة الأكاديمية. لا تدفع مرة أخرى؛ تواصل مع الدعم مع رقم الطلب: ' +
+              sessionId
+          );
           return;
         }
         setResult(json.data);
@@ -84,12 +91,22 @@ function PaymentSuccessContent() {
 
         {status === 'done' && result && (
           <>
-            <div className="text-5xl mb-3"><Icon name="celebration" /></div>
+            <div className="text-5xl mb-3">
+              <Icon name="celebration" />
+            </div>
             <h1 className="text-lg font-bold text-gray-900 mb-1">Payment successful!</h1>
             <p className="text-sm text-gray-500 mb-6">
-              You&apos;re enrolled in <span className="font-medium text-gray-700">{result.course.title}</span>.
+              You&apos;re enrolled in{' '}
+              <span className="font-medium text-gray-700">{result.course.title}</span>.
               {result.course.price > 0 && (
-                <> We charged <span className="font-medium text-gray-700">{result.payment.amount.toFixed(2)} {result.payment.currency}</span>.</>
+                <>
+                  {' '}
+                  We charged{' '}
+                  <span className="font-medium text-gray-700">
+                    {result.payment.amount.toFixed(2)} {result.payment.currency}
+                  </span>
+                  .
+                </>
               )}
             </p>
             <button
@@ -103,9 +120,15 @@ function PaymentSuccessContent() {
 
         {(status === 'error' || status === 'review') && (
           <>
-            <div className="text-5xl mb-3"><Icon name="warning" /></div>
-            <h1 className="text-lg font-bold text-gray-900 mb-1">{status === 'review' ? 'تم تسجيل الدفع · التسجيل يحتاج مراجعة' : 'We could not confirm your payment'}</h1>
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-6">{error}</p>
+            <div className="text-5xl mb-3">
+              <Icon name="warning" />
+            </div>
+            <h1 className="text-lg font-bold text-gray-900 mb-1">
+              {status === 'review'
+                ? 'تم تسجيل الدفع · التسجيل يحتاج مراجعة'
+                : 'We could not confirm your payment'}
+            </h1>
+            <PopupNotice>{error}</PopupNotice>
             <button
               onClick={() => router.push('/courses')}
               className="w-full py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"

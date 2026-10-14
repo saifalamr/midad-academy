@@ -1,4 +1,5 @@
 'use client';
+import { PopupNotice } from '@/components/FeedbackProvider';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/components/AuthProvider';
@@ -167,12 +168,12 @@ export default function ParentDashboard() {
           جارٍ تحميل بيانات الأسرة…
         </section>
       ) : error ? (
-        <section className="card pad" role="alert">
+        <PopupNotice className="card pad" role="alert">
           <p>{error}</p>
           <button className="btn btn-outline" onClick={() => setReload((v) => v + 1)}>
             إعادة المحاولة
           </button>
-        </section>
+        </PopupNotice>
       ) : !child ? (
         <section className="card pad family-empty">
           <Icon name="family" size={42} />

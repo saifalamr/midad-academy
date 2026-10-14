@@ -12,11 +12,11 @@ test('student sees the next session, retries failed data and prepares devices be
   });
   await page.route('**/api/sessions/join', route => { joins++; return route.fulfill({ status: 409, json: {} }); });
   await page.goto('/student');
-  await expect(page.locator('.student-data-error')).toContainText('تعذر تحديث بعض بياناتك');
+  await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText('تعذر تحديث بعض بياناتك');
   await expect(page.getByText(course.title, { exact: true }).first()).toBeVisible();
   await page.getByRole('button', { name: 'إعادة المحاولة', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'تعلّم حرف الباء' })).toBeVisible();
-  await expect(page.locator('.student-data-error')).toHaveCount(0);
+  await expect(page.getByRole('alertdialog').getByRole('alert')).toHaveCount(0);
   for (const [width, height] of [[320, 700], [390, 844], [820, 1180], [1440, 900]]) {
     await page.setViewportSize({ width, height });
     await page.screenshot({ path: `test-results/student-journey-${width}.png`, fullPage: true });
@@ -39,7 +39,8 @@ test('student sees the next session, retries failed data and prepares devices be
   await expect(page.getByRole('heading', { name: 'جاهز للتعلّم؟' })).toBeVisible();
   expect(joins).toBe(0);
   await page.getByRole('button', { name: 'دخول الحصة', exact: true }).click();
-  await expect(page.locator('p[role=alert]')).toContainText('الحصة غير مباشرة');
+  await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText('الحصة غير مباشرة');
+  await page.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
   expect(joins).toBe(1);
 });
 
@@ -62,7 +63,8 @@ test('a delayed camera request can be cancelled by joining muted; its late strea
   await page.getByRole('button', { name: /تشغيل الكاميرا/ }).click();
   await expect(page.getByRole('button', { name: 'دخول الحصة', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'دخول الحصة', exact: true }).click();
-  await expect(page.locator('p[role=alert]')).toBeVisible();
+  await expect(page.getByRole('alertdialog').getByRole('alert')).toBeVisible();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
   await page.evaluate(() => (window as any).finishCamera());
   await expect.poll(() => page.evaluate(() => (window as any).lateCamera.getTracks().every((track: MediaStreamTrack) => track.readyState === 'ended'))).toBe(true);
 });

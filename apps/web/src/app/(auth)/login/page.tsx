@@ -1,5 +1,6 @@
 'use client';
 
+import { PopupNotice } from '@/components/FeedbackProvider';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -89,7 +90,7 @@ export default function LoginPage() {
             Enter your details to continue. <span className="ar">تسجيل الدخول</span>
           </p>
 
-          {error && <div className="auth-error">{error}</div>}
+          {error && <PopupNotice className="auth-error">{error}</PopupNotice>}
 
           <form onSubmit={handleSubmit}>
             <div className="field">

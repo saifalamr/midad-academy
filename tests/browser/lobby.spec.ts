@@ -43,7 +43,8 @@ test('lobby media controls work before joining and release preview devices', asy
   await expect(page.getByRole('button', { name: /إيقاف الكاميرا/ })).toHaveAttribute('aria-pressed', 'true');
   await page.route('**/api/sessions/create', route => route.fulfill({ status: 409, contentType: 'application/json', body: '{}' }));
   await page.getByRole('button', { name: 'دخول الحصة', exact: true }).click();
-  await expect(page.locator('p[role=alert]')).toContainText('الحصة غير مباشرة');
+  await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText('الحصة غير مباشرة');
+  await page.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
   expect(await page.evaluate(() => (window as unknown as { previewTracks: MediaStreamTrack[] }).previewTracks.every(t => t.readyState === 'ended'))).toBeTruthy();
   await context.close();
 });
@@ -52,10 +53,12 @@ test('denied media permissions show recovery and still allow joining muted', asy
   await page.addInitScript(() => { navigator.mediaDevices.getUserMedia = async () => { throw new DOMException('Denied', 'NotAllowedError'); }; });
   await page.goto('/classroom/preview-arabic');
   await page.getByRole('button', { name: /تشغيل الصوت/ }).click();
-  await expect(page.locator('p[role=alert]')).toContainText('الإذن مرفوض');
+  await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText('الإذن مرفوض');
+  await page.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
   await expect(page.getByRole('button', { name: /تشغيل الصوت/ })).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByRole('button', { name: 'دخول الحصة', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: /تشغيل الكاميرا/ }).click();
-  await expect(page.locator('p[role=alert]')).toContainText('الإذن مرفوض');
+  await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText('الإذن مرفوض');
+  await page.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
   await expect(page.getByRole('button', { name: /تشغيل الكاميرا/ })).toHaveAttribute('aria-pressed', 'false');
 });

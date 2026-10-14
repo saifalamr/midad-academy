@@ -1,5 +1,6 @@
 'use client';
 
+import { PopupNotice } from '@/components/FeedbackProvider';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -88,7 +89,7 @@ export default function RegisterPage() {
             بعد التسجيل والتواصل مع الأكاديمية، تضيف الإدارة أبناءك وتمنحهم حساباتهم الخاصة.
           </p>
 
-          {error && <div className="auth-error">{error}</div>}
+          {error && <PopupNotice className="auth-error">{error}</PopupNotice>}
 
           <form onSubmit={handleSubmit}>
             <div className="field">

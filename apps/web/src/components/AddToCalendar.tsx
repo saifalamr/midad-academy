@@ -1,4 +1,5 @@
 'use client';
+import { PopupNotice } from '@/components/FeedbackProvider';
 import { useState } from 'react';
 import { sessionCalendar, type CalendarSession } from '@/lib/calendar';
 
@@ -13,5 +14,5 @@ export default function AddToCalendar({ session }: { session: CalendarSession })
       setTimeout(() => URL.revokeObjectURL(url), 1000); setError('');
     } catch { setError('تعذر إضافة الموعد. تحقق من تاريخ الحصة.'); }
   }
-  return <div><button className="btn btn-sm btn-outline" type="button" onClick={download} aria-label={`إضافة ${session.title} للتقويم`}>إضافة للتقويم</button>{error && <small role="alert">{error}</small>}</div>;
+  return <div><button className="btn btn-sm btn-outline" type="button" onClick={download} aria-label={`إضافة ${session.title} للتقويم`}>إضافة للتقويم</button>{error && <PopupNotice role="alert">{error}</PopupNotice>}</div>;
 }

@@ -99,7 +99,7 @@ test('parent switches children, retries errors and sees scoped attendance and ex
     )
   );
   await page.goto('/parent');
-  await expect(page.locator('main').getByRole('alert')).toContainText('تعذر تحميل');
+  await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText('تعذر تحميل');
   await page.getByRole('button', { name: 'إعادة المحاولة', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'دورات أحمد' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'مشاهدة الحصة', exact: true })).toHaveAttribute('href', '/classroom/family-course');
@@ -218,6 +218,7 @@ test('parent live class links open a device-free observation lobby and use the p
   await expect(page.getByText('الحصة غير مباشرة الآن.', { exact: false })).toBeVisible();
   expect(observerCalls).toBe(1);
   expect(await page.evaluate(() => (window as any).captureRequests)).toBe(0);
+  await page.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
   await page.getByRole('button', { name: 'الرجوع للوحة التحكم' }).click();
   await expect(page).toHaveURL(/\/parent$/);
 });

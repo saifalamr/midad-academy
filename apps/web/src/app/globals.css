@@ -814,3 +814,58 @@ img[src*="midad-logo-transparent.png"]{clip-path:polygon(0 0,100% 0,100% 80%,70%
 .workspace-content .dash-hero>div:first-child{min-width:0;max-width:100%}
 @media(max-width:1000px){.midad .dh-level{flex-basis:auto;width:100%}}
 @media(max-width:700px){.workspace-topbar{position:relative;height:auto;min-height:60px;padding-block:8px;flex-wrap:wrap}.workspace-nav{position:relative;top:auto}.workspace-content .col-head{gap:12px;flex-wrap:wrap}.workspace-content .col-head h2{min-width:0;line-height:1.4}.workspace-content .lvl-row{gap:8px;flex-wrap:wrap}.workspace-content .lvl-note{line-height:1.6}}
+
+/* Compact public entry and consistent, accessible feedback. */
+.public-home{background:var(--paper)}
+.public-home .nav{position:sticky;top:0;z-index:45;background:#fff}
+.public-home .nav-inner{min-height:72px}
+.public-home .nav-links{gap:20px}
+.public-home .nav-cta .btn{min-height:44px}
+.welcome-section{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);align-items:center;gap:40px;padding-top:40px!important;padding-bottom:28px!important}
+.welcome-section h1{font-size:clamp(30px,4vw,48px);line-height:1.35;margin:10px 0 14px}
+.welcome-section>div>p{color:var(--ink-2);max-width:520px;font-size:16px;line-height:1.9;margin:0 0 20px}
+.welcome-actions{display:flex;flex-wrap:wrap;gap:10px}
+.welcome-actions .btn{min-height:46px;font-size:15px;padding:12px 20px;border-radius:12px}
+.welcome-courses{display:inline-flex;align-items:center;gap:8px;color:var(--navy)!important;margin-top:10px;min-height:44px;font-size:14px}
+.welcome-card{border:1px solid var(--line);background:#fff;border-radius:20px;padding:24px;box-shadow:var(--sh-sm)}
+.welcome-card>svg{color:var(--gold)}
+.welcome-card h2{font-size:21px;margin:12px 0;line-height:1.5}
+.welcome-card ol{padding-inline-start:22px;margin:0;display:grid;gap:8px;line-height:1.8;color:var(--ink-2)}
+.welcome-card p{font-size:13px;line-height:1.8;color:var(--ink-3);margin:16px 0 0;border-top:1px solid var(--line);padding-top:12px}
+.welcome-features{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.welcome-features article{display:flex;align-items:flex-start;gap:12px;padding:16px;border:1px solid var(--line);border-radius:14px;background:#fff}
+.welcome-features svg{color:var(--navy);flex-shrink:0;margin-top:4px}
+.welcome-features h2{font-size:16px;line-height:1.5;margin:0 0 4px}
+.welcome-features p{font-size:13px;color:var(--ink-3);line-height:1.7;margin:0}
+.public-home #monthly-courses{padding-top:30px;padding-bottom:32px;scroll-margin-top:88px}
+.public-home #monthly-courses .sec-h2{font-size:26px;margin:6px 0 10px;line-height:1.5}
+.public-home #monthly-courses .sec-sub{margin-bottom:18px;font-size:14px}
+.welcome-footer{display:flex;align-items:center;flex-wrap:wrap;justify-content:space-between;gap:14px;padding-top:18px!important;padding-bottom:18px!important;border-top:1px solid var(--line);font-size:14px;color:var(--ink-3)}
+.welcome-footer nav{display:flex;gap:20px}.welcome-footer a{min-height:44px;display:flex;align-items:center}
+.feedback-dialog{position:fixed;inset:0;margin:auto;width:min(440px,calc(100vw - 28px));max-height:calc(100dvh - 40px);padding:22px;border:1px solid var(--line);border-radius:18px;background:#fff;color:var(--ink);box-shadow:var(--sh-lg);overflow:auto}
+.feedback-dialog::backdrop{background:rgba(15,35,66,.48)}
+.feedback-heading{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.feedback-heading h2{font-size:20px;line-height:1.5;margin:0;flex:1}
+.feedback-symbol{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:var(--gold-soft);color:var(--navy);flex-shrink:0}
+.feedback-close{width:44px;height:44px;display:grid;place-items:center;border:0;border-radius:10px;background:var(--paper);color:var(--ink-2)}
+.feedback-body{font-size:15px;line-height:1.85;overflow-wrap:anywhere}
+.feedback-body p{margin:8px 0}.feedback-body button,.feedback-body a{margin-top:10px}
+.feedback-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px;margin-top:20px}
+.feedback-actions .btn{min-height:44px;padding:10px 18px;font-size:14px}
+.feedback-reopen{display:inline-flex;align-items:center;gap:7px;min-height:44px;margin:4px 0;padding:8px 12px;border:1px solid var(--gold-200);border-radius:10px;background:var(--gold-soft);color:var(--navy);font:inherit;font-size:13px}
+.feedback-dialog :focus-visible,.feedback-reopen:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+.midad .section{padding:40px 0}.midad .sec{padding-top:28px;padding-bottom:28px}
+.workspace-home{padding:24px}.workspace-welcome{padding-bottom:20px;margin-bottom:20px}.workspace-welcome p{margin-bottom:16px}
+.workspace-actions>a{padding:18px;gap:8px}.workspace-teacher-tools{padding-top:16px}
+.workspace-content .page-head{margin-bottom:18px}.workspace-content .pad{padding:16px}
+.midad .auth-main{padding:30px 28px}.midad .auth-title{font-size:32px}.midad .auth-sub{margin-bottom:20px}
+@media(max-width:700px){
+.public-home .nav-inner{min-height:64px}.public-home .nav-cta{display:flex!important;gap:6px}.public-home .nav-cta .btn{font-size:12px;padding:8px 10px}.public-home .nav-burger{display:none}.public-home .logo-full{height:40px}
+.welcome-section{grid-template-columns:1fr;gap:18px;padding-top:22px!important;padding-bottom:18px!important}.welcome-section h1{font-size:30px}.welcome-section>div>p{font-size:14px;margin-bottom:16px}.welcome-actions .btn{padding:10px 14px;font-size:14px}.welcome-card{padding:18px}
+.welcome-features{grid-template-columns:1fr;gap:8px}.welcome-features article{padding:12px}.public-home #monthly-courses{padding-top:24px}.public-home #monthly-courses .sec-h2{font-size:23px}
+.workspace-home{padding:20px 14px}.workspace-content .pad{padding:14px}.midad .auth-main{padding:24px 18px}.feedback-dialog{padding:18px}
+}
+@media(prefers-reduced-motion:reduce){.feedback-dialog{scroll-behavior:auto}}
+
+.public-home .catalog-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}.public-home .catalog-actions .btn{min-height:44px;font-size:14px}.public-home #monthly-courses article>p{font-size:14px;line-height:1.8;margin:8px 0}.public-home #monthly-courses .course-times{margin-top:12px}.public-home #monthly-courses article{padding:18px}
+@media(max-width:700px){.public-home .catalog-actions{flex-direction:column}.public-home .nav-inner{height:64px;padding:0 18px;gap:10px}.public-home #monthly-courses article{padding:16px}}

@@ -94,7 +94,8 @@ test('teacher saves and reloads private drafts, publishes a report once, and the
       route.fulfill({ status: 503, json: { error: 'تعذر الحفظ مؤقتًا' } })
     );
     await editor.getByRole('button', { name: 'حفظ مسودة' }).click();
-    await expect(editor.getByRole('alert')).toContainText('تعذر الحفظ');
+    await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText('تعذر الحفظ');
+  await page.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
     await expect(editor.getByRole('textbox')).toHaveValue(note);
     await page.unroute(path);
     await editor.getByRole('button', { name: 'حفظ مسودة' }).click();

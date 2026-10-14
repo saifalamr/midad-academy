@@ -1,4 +1,5 @@
 'use client';
+import { PopupNotice } from '@/components/FeedbackProvider';
 import { AudioPlayback } from './AudioAnswer';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -62,12 +63,12 @@ export default function HomeworkList() {
       </header>
       {loading && <p role="status">جارٍ تحميل الواجبات…</p>}
       {error && (
-        <div role="alert" className="homework-error">
+        <PopupNotice role="alert" className="homework-error">
           {error}
           <button className="btn btn-outline btn-sm" onClick={() => setRetry((n) => n + 1)}>
             إعادة المحاولة
           </button>
-        </div>
+        </PopupNotice>
       )}
       {!loading && !error && !items.length && (
         <section className="card pad">

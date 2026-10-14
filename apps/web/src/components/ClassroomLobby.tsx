@@ -1,4 +1,5 @@
 'use client';
+import { PopupNotice } from '@/components/FeedbackProvider';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import type { LocalUserChoices } from '@livekit/components-react';
@@ -63,7 +64,7 @@ export default function ClassroomLobby({ name, lesson, onJoin, onBack }: { name:
           <button disabled={busy !== null} aria-pressed={enabled.video} onClick={() => void change('video', !enabled.video)}><Icon name="video" /><span>{busy === 'video' ? 'جارٍ التشغيل…' : enabled.video ? 'إيقاف الكاميرا' : 'تشغيل الكاميرا'}<small>{enabled.video ? 'الكاميرا مفتوحة' : 'الكاميرا مغلقة'}</small></span><i className={enabled.video ? 'device-on' : ''} /></button>
         </div>
         {devices.length > 0 && <div className="lobby-device-selects">{(['audio', 'video'] as const).map(kind => <label key={kind}>{kind === 'audio' ? 'الميكروفون' : 'الكاميرا'}<select disabled={busy !== null} value={selected[kind]} onChange={e => { const id = e.target.value; setSelected(prev => ({ ...prev, [kind]: id })); if (enabled[kind]) void change(kind, true, id); }}>{devices.filter(d => d.kind === `${kind}input`).map((d, index) => <option key={d.deviceId} value={d.deviceId}>{d.label || `جهاز ${index + 1}`}</option>)}</select></label>)}</div>}
-        {error && <p className="lobby-device-error" role="alert"><Icon name="warning" />{error}</p>}
+        {error && <PopupNotice className="lobby-device-error" role="alert"><Icon name="warning" />{error}</PopupNotice>}
       </div>
       <div className="lobby-intro"><span className="lobby-eyebrow">قبل دخول الحصة</span><h1 id="lobby-title">جاهز للتعلّم؟</h1><p>راجع صوتك وصورتك، ثم ادخل الحصة. تستطيع تغييرهما في أي وقت أثناء الدرس.</p><div className="lobby-lesson">{lesson && <><h2>{lesson.title}</h2><p>{lesson.course.title}{lesson.teacherName ? ` · ${lesson.teacherName}` : ''}</p><span><Icon name="calendar" />{new Date(lesson.scheduledAt).toLocaleString('ar', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span></>}</div><div className="lobby-identity"><span className="avatar">{name.slice(0, 1)}</span><div><small>تدخل باستخدام حسابك</small><strong>{name}</strong></div></div><button className="btn btn-gold lobby-join" onClick={() => { revisions.current.audio++; revisions.current.video++; Object.values(streams.current).forEach(stream => stream?.getTracks().forEach(track => track.stop())); onJoin({ username: name, audioEnabled: enabled.audio, videoEnabled: enabled.video, audioDeviceId: selected.audio || 'default', videoDeviceId: selected.video || 'default' }); }}>دخول الحصة <Icon name="left" /></button><p className="lobby-join-summary">{enabled.audio ? 'المايك مفتوح' : 'المايك مغلق'} · {enabled.video ? 'الكاميرا مفتوحة' : 'الكاميرا مغلقة'}</p><div className="lobby-tip"><Icon name="check" /><span>لن يسمعك أو يراك أحد حتى تدخل الحصة.</span></div></div>
     </section>

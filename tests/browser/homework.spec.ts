@@ -117,7 +117,8 @@ test('admin prepares homework, pupil recovers a draft and retries one submission
     });
     await pupil.reload();
     await solver.getByRole('button', { name: 'بدء التسجيل', exact: true }).click();
-    await expect(solver.getByRole('alert')).toContainText('صلاحية');
+    await expect(pupil.getByRole('alertdialog').getByRole('alert')).toContainText('صلاحية');
+  await pupil.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
     await solver
       .getByLabel('رفع ملف صوتي')
       .setInputFiles({
@@ -156,7 +157,8 @@ test('admin prepares homework, pupil recovers a draft and retries one submission
       await route.abort('connectionfailed');
     });
     await solver.getByRole('button', { name: 'تسليم الواجب', exact: true }).click();
-    await expect(solver.getByRole('alert')).toBeVisible();
+    await expect(pupil.getByRole('alertdialog').getByRole('alert')).toBeVisible();
+  await pupil.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
     await expect(solver.getByRole('radio', { name: 'ألف', exact: true })).toBeChecked();
     await pupil.unroute(submitPath);
     await solver.getByRole('button', { name: 'تسليم الواجب', exact: true }).click();

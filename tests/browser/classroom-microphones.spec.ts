@@ -3,7 +3,7 @@ import { buildSync } from 'esbuild';
 import { readFileSync } from 'node:fs';
 const script = buildSync({
   stdin: {
-    contents: `import React from 'react';import {createRoot} from 'react-dom/client';import {Room,RoomEvent} from 'livekit-client';import {ParticipantPermission} from '@livekit/protocol';import {RoomContext} from '@livekit/components-react';import Controls,{useSpeakingPermission} from './apps/web/src/components/ClassroomMicrophones';const room=new Room();Object.defineProperty(room,'name',{value:'class-fixture'});let enabled=false,stops=0;Object.defineProperty(room.localParticipant,'isMicrophoneEnabled',{get:()=>enabled});room.localParticipant.setMicrophoneEnabled=async value=>{enabled=value;if(!value)stops++;};function Guard(){const allowed=useSpeakingPermission(false,false);return <button id='student-microphone' disabled={!allowed}>مايك الطالب</button>;}window.controlTest={grant:()=>room.localParticipant.setPermissions(new ParticipantPermission({canPublish:true,canSubscribe:true,canPublishData:true,canPublishSources:[1,2,3,4]})),revoke:()=>{enabled=true;room.localParticipant.setPermissions(new ParticipantPermission({canPublish:true,canSubscribe:true,canPublishData:true,canPublishSources:[1,3]}));},spoof:()=>room.emit(RoomEvent.DataReceived,new TextEncoder().encode(JSON.stringify({type:'microphonePermission',allowed:true}))),state:()=>({enabled,stops})};createRoot(document.getElementById('controls-root')).render(<RoomContext.Provider value={room}><Guard/><Controls courseId='fixture'/></RoomContext.Provider>);`,
+    contents: `import React from 'react';import {FeedbackProvider} from './apps/web/src/components/FeedbackProvider';import {createRoot} from 'react-dom/client';import {Room,RoomEvent} from 'livekit-client';import {ParticipantPermission} from '@livekit/protocol';import {RoomContext} from '@livekit/components-react';import Controls,{useSpeakingPermission} from './apps/web/src/components/ClassroomMicrophones';const room=new Room();Object.defineProperty(room,'name',{value:'class-fixture'});let enabled=false,stops=0;Object.defineProperty(room.localParticipant,'isMicrophoneEnabled',{get:()=>enabled});room.localParticipant.setMicrophoneEnabled=async value=>{enabled=value;if(!value)stops++;};function Guard(){const allowed=useSpeakingPermission(false,false);return <button id='student-microphone' disabled={!allowed}>مايك الطالب</button>;}window.controlTest={grant:()=>room.localParticipant.setPermissions(new ParticipantPermission({canPublish:true,canSubscribe:true,canPublishData:true,canPublishSources:[1,2,3,4]})),revoke:()=>{enabled=true;room.localParticipant.setPermissions(new ParticipantPermission({canPublish:true,canSubscribe:true,canPublishData:true,canPublishSources:[1,3]}));},spoof:()=>room.emit(RoomEvent.DataReceived,new TextEncoder().encode(JSON.stringify({type:'microphonePermission',allowed:true}))),state:()=>({enabled,stops})};createRoot(document.getElementById('controls-root')).render(<FeedbackProvider><RoomContext.Provider value={room}><Guard/><Controls courseId='fixture'/></RoomContext.Provider></FeedbackProvider>);`,
     resolveDir: process.cwd(),
     loader: 'tsx',
   },
@@ -13,7 +13,7 @@ const script = buildSync({
   jsx: 'automatic',
   format: 'iife',
   loader: { '.css': 'empty' },
-  alias: { '@': process.cwd() + '/apps/web/src' },
+  alias: { '@': process.cwd() + '/apps/web/src', 'next/navigation': process.cwd() + '/tests/browser/fixtures/navigation.ts' },
   define: {
     'process.env.NEXT_PUBLIC_API_URL': JSON.stringify('http://127.0.0.1:4000'),
     'process.env.NODE_ENV': JSON.stringify('production'),
@@ -87,7 +87,8 @@ test('teacher controls are clear across screens and only authenticated SDK permi
   await expect.poll(() => page.evaluate(() => (window as any).controlTest.state().stops)).toBe(1);
   fail = true;
   await dialog.getByRole('button', { name: 'السماح بالكلام لـ الطالب التجريبي' }).click();
-  await expect(dialog.getByRole('alert')).toContainText('تعذر تأكيد');
+  await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText('تعذر تأكيد');
+  await page.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
   await expect(dialog).toContainText('بانتظار تأكيد تطبيق الإذن');
   for (const width of [320, 820, 1440]) {
     await page.setViewportSize({ width, height: 900 });

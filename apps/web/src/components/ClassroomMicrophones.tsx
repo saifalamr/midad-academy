@@ -1,4 +1,5 @@
 'use client';
+import { PopupNotice } from '@/components/FeedbackProvider';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocalParticipant, useRoomContext } from '@livekit/components-react';
 import { ParticipantEvent, RoomEvent, Track } from 'livekit-client';
@@ -228,14 +229,14 @@ export default function ClassroomMicrophones({ courseId }: { courseId: string })
               قفل مايكات الجميع
             </button>
             {data && !data.providerAvailable && (
-              <p role="alert" className="microphone-error">
+              <PopupNotice role="alert" className="microphone-error">
                 تعذر الاتصال بخدمة المكالمة. نحدّث الحالة تلقائيًا؛ لا يمكن تأكيد الكتم الآن.
-              </p>
+              </PopupNotice>
             )}
             {error && (
-              <p role="alert" className="microphone-error">
+              <PopupNotice role="alert" className="microphone-error">
                 {error}
-              </p>
+              </PopupNotice>
             )}
             {!data && !error && <p role="status">جارٍ تحميل الطلاب…</p>}
             {data && !data.students.length && <p>لا يوجد طلاب مسجلون في هذه الدورة.</p>}

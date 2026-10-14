@@ -1,4 +1,5 @@
 'use client';
+import { PopupNotice } from '@/components/FeedbackProvider';
 import '@/components/course-times.css';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -85,9 +86,9 @@ export default function CoursesPage() {
         ))}
       </div>
       {error && (
-        <p className="auth-error" role="alert">
+        <PopupNotice className="auth-error" role="alert">
           {error}
-        </p>
+        </PopupNotice>
       )}
       {loading ? (
         <p role="status">جارٍ تحميل الدورات…</p>

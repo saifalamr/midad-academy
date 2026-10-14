@@ -1,5 +1,6 @@
 'use client';
 
+import { PopupNotice } from '@/components/FeedbackProvider';
 import Icon from '@/components/Icon';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -167,7 +168,7 @@ export default function CourseLessonsPage() {
           </div>
         </div>
 
-        {loadError && <p role="alert">{loadError}</p>}
+        {loadError && <PopupNotice role="alert">{loadError}</PopupNotice>}
         {loading ? (
           <div className="card pad" style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14 }}>
             Loading lessons…
@@ -194,7 +195,7 @@ export default function CourseLessonsPage() {
 
             <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
               {quizLoading && <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>Loading quiz…</p>}
-              {quizError && <div className="auth-error" role="alert">{quizError}</div>}
+              {quizError && <PopupNotice className="auth-error" role="alert">{quizError}</PopupNotice>}
 
               {activeQuiz && !result && (
                 activeQuiz.questions.map((q, i) => (

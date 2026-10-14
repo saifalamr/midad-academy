@@ -1,4 +1,5 @@
 'use client';
+import { PopupNotice } from '@/components/FeedbackProvider';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Icon from '@/components/Icon';
@@ -285,9 +286,9 @@ export default function AdminPage() {
         ))}
       </nav>
       {error && (
-        <div className="auth-error" role="alert">
+        <PopupNotice className="auth-error" role="alert">
           {error}
-        </div>
+        </PopupNotice>
       )}
       {message && (
         <p className="admin-success" role="status">

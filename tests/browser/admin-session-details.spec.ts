@@ -120,7 +120,7 @@ test('administration opens class details from the course and sees historical tea
       r.fulfill({ status: 503, json: { error: 'تعذر قراءة السجل مؤقتًا' } })
     );
     await page.reload();
-    await expect(page.getByRole('main').getByRole('alert')).toContainText('تعذر قراءة');
+    await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText('تعذر قراءة');
     await page.unroute(route);
     await page.getByRole('button', { name: 'إعادة المحاولة' }).click();
     await expect(instructor).toContainText('سُجّل دخوله');

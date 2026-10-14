@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { API_URL } from '@/lib/config';
 import { courseInquiryUrl, sessionDate } from '@/lib/academy-contact';
 import Icon from './Icon';
+import { PopupNotice } from './FeedbackProvider';
 type Course = {
   id: string;
   title: string;
@@ -21,7 +22,9 @@ type Course = {
 export default function MonthlyCatalog() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [state, setState] = useState('loading');
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
+    setState('loading');
     let active = true;
     fetch(`${API_URL}/api/courses/catalog`)
       .then(async (r) => {
@@ -40,16 +43,21 @@ export default function MonthlyCatalog() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [attempt]);
   return (
-    <section className="wrap sec" id="monthly-courses">
+    <section className="wrap sec" id="monthly-courses" dir="rtl">
       <span className="eyebrow">الدورات الشهرية</span>
       <h2 className="sec-h2">اختر رحلة طفلك القادمة</h2>
       <p className="sec-sub">يتواصل ولي الأمر مع الأكاديمية، وتتولى الإدارة تسجيل الأبناء.</p>
       {state === 'loading' ? (
         <p role="status">جارٍ عرض الدورات…</p>
       ) : state === 'error' ? (
-        <p role="status">تعذر تحميل الدورات الآن. حاول مجددًا لاحقًا.</p>
+        <PopupNotice>
+          تعذر تحميل الدورات الآن.
+          <button className="btn btn-outline" onClick={() => setAttempt((a) => a + 1)}>
+            إعادة المحاولة
+          </button>
+        </PopupNotice>
       ) : !courses.length ? (
         <p>سيتم الإعلان عن الدورات الشهرية هنا قريبًا.</p>
       ) : (
@@ -65,7 +73,7 @@ export default function MonthlyCatalog() {
               <span className="tag">
                 {c.month} · الأعمار {c.ageGroup}
               </span>
-              <h3 style={{ fontSize: 24, margin: '16px 0' }}>{c.title}</h3>
+              <h3 style={{ fontSize: 21, margin: '10px 0' }}>{c.title}</h3>
               <p>{c.description}</p>
               <p>
                 {c.teacherName} · {c.availableSeats} مقاعد متاحة
@@ -93,17 +101,19 @@ export default function MonthlyCatalog() {
                 )}
                 <small>توقيت {c.timeZone}</small>
               </div>
-              <a
-                className="btn btn-gold"
-                href={courseInquiryUrl(c)}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {c.availableSeats > 0 ? 'طلب التسجيل عبر واتساب' : 'استفسر عن قائمة الانتظار'}
-              </a>
-              <Link className="btn btn-outline" style={{ marginTop: 12 }} href="/register">
-                <Icon name="family" /> إنشاء حساب ولي الأمر
-              </Link>
+              <div className="catalog-actions">
+                <a
+                  className="btn btn-gold"
+                  href={courseInquiryUrl(c)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {c.availableSeats > 0 ? 'طلب التسجيل عبر واتساب' : 'استفسر عن قائمة الانتظار'}
+                </a>
+                <Link className="btn btn-outline" href="/register">
+                  <Icon name="family" /> إنشاء حساب ولي الأمر
+                </Link>
+              </div>
             </article>
           ))}
         </div>

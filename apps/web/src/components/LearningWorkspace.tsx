@@ -1,5 +1,6 @@
 'use client';
 
+import { PopupNotice } from '@/components/FeedbackProvider';
 import Icon from '@/components/Icon';
 import { useEffect, useState } from 'react';
 import { API_URL } from '@/lib/config';
@@ -79,7 +80,7 @@ export default function LearningWorkspace({ courseId, lessons, onQuiz, quizLoadi
       <label>ابحث عن درس<input className="learning-input" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="اسم الدرس أو وصفه" /></label>
       {student && <label>عرض الدروس<select className="learning-input" value={filter} onChange={event => setFilter(event.target.value)}><option value="all">كل الدروس</option><option value="todo">لم تُنجز بعد</option><option value="done">المكتملة</option></select></label>}
     </div>
-    {error && <p role="alert" className="auth-error">{error} {!ready && <button className="btn btn-sm btn-outline" onClick={() => window.location.reload()}>إعادة المحاولة</button>}</p>}
+    {error && <PopupNotice role="alert" className="auth-error">{error} {!ready && <button className="btn btn-sm btn-outline" onClick={() => window.location.reload()}>إعادة المحاولة</button>}</PopupNotice>}
     <p role="status" className="learning-save-status">{message}</p>
     {!shown.length ? <div className="card pad">لا توجد دروس تطابق البحث أو الفلتر.</div> : shown.map(lesson => {
       const done = !!states[lesson.id]?.completedAt;

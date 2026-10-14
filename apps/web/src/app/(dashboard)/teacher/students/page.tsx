@@ -1,4 +1,5 @@
 'use client';
+import { PopupNotice } from '@/components/FeedbackProvider';
 import Icon from '@/components/Icon';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -26,7 +27,7 @@ export default function TeacherStudents() {
     <Link href="/teacher" className="link-gold"><Icon name="left" /> Teacher dashboard</Link>
     <h1 className="sec-h2">Your students · طلابك</h1>
     <p className="muted">تابع إنجاز المواد لكل طالب. الإنجاز يحدده الطالب؛ درجات الاختبارات والحضور مستقلان.</p>
-    {error && <p role="alert" className="auth-error">{error} <button className="btn btn-outline btn-sm" onClick={() => window.location.reload()}>إعادة المحاولة</button></p>}
+    {error && <PopupNotice role="alert" className="auth-error">{error} <button className="btn btn-outline btn-sm" onClick={() => window.location.reload()}>إعادة المحاولة</button></PopupNotice>}
     <div className="learning-toolbar">
       <label>البحث عن طالب<input className="learning-input" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="الاسم أو البريد" /></label>
       <label>الدورة<select className="learning-input" value={course} onChange={event => setCourse(event.target.value)}><option value="">كل الدورات</option>{courses.map(([id, title]) => <option key={id} value={id}>{title}</option>)}</select></label>

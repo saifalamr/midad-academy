@@ -1,4 +1,5 @@
 'use client';
+import { PopupNotice } from '@/components/FeedbackProvider';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { API_URL } from '@/lib/config';
@@ -148,12 +149,12 @@ export default function AdminSessionDetails({ sessionId }: { sessionId: string }
       </header>
       {!data && !error && <p role="status">جارٍ تحميل بيانات الحصة…</p>}
       {error && (
-        <p role="alert" className="session-detail-error">
+        <PopupNotice role="alert" className="session-detail-error">
           {error}{' '}
           <button className="btn btn-outline" onClick={() => setRetry((n) => n + 1)}>
             إعادة المحاولة
           </button>
-        </p>
+        </PopupNotice>
       )}
       {data && (
         <>
@@ -195,10 +196,10 @@ export default function AdminSessionDetails({ sessionId }: { sessionId: string }
             </div>
           </section>
           {data.status === 'LIVE' && !data.livePresenceAvailable && (
-            <p role="alert" className="session-detail-error">
+            <PopupNotice role="alert" className="session-detail-error">
               تعذر التأكد من المتصلين الآن. نعرض سجل الدخول المحفوظ؛ هذا لا يعني أن المعلم أو الطلاب
               غائبون.
-            </p>
+            </PopupNotice>
           )}
           <section className="session-detail-card" aria-label="حضور المعلم">
             <h2>المعلم · {data.teacher.name}</h2>

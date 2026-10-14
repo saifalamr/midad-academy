@@ -1,4 +1,5 @@
 'use client';
+import { PopupNotice } from '@/components/FeedbackProvider';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { API_URL } from '@/lib/config';
@@ -138,7 +139,7 @@ export default function SessionPlan({
       </header>
       {loading && <p role="status">جارٍ تحميل خطة الحصة…</p>}
       {error && (
-        <div className="plan-error" role="alert">
+        <PopupNotice className="plan-error" role="alert">
           {error}
           <button
             className="btn btn-outline btn-sm"
@@ -152,7 +153,7 @@ export default function SessionPlan({
           >
             إعادة تحميل الخطة
           </button>
-        </div>
+        </PopupNotice>
       )}
       {message && (
         <p role="status" className="plan-success">

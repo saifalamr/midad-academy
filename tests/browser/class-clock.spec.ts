@@ -3,7 +3,7 @@ import { buildSync } from 'esbuild';
 import { readFileSync } from 'node:fs';
 const script = buildSync({
   stdin: {
-    contents: `import React from 'react'; import {createRoot} from 'react-dom/client'; import ClassClock from './apps/web/src/components/ClassClock'; const root=createRoot(document.getElementById('clock-root')); let key=0; window.clockTest={remount:()=>root.render(React.createElement(ClassClock,{key:++key,courseId:'clock-fixture',editable:true}))}; window.clockTest.remount();`,
+    contents: `import React from 'react';import {FeedbackProvider} from './apps/web/src/components/FeedbackProvider'; import {createRoot} from 'react-dom/client'; import ClassClock from './apps/web/src/components/ClassClock'; const root=createRoot(document.getElementById('clock-root')); let key=0; window.clockTest={remount:()=>root.render(React.createElement(FeedbackProvider,null,React.createElement(ClassClock,{key:++key,courseId:'clock-fixture',editable:true})))}; window.clockTest.remount();`,
     resolveDir: process.cwd(),
     loader: 'tsx',
   },
@@ -13,7 +13,7 @@ const script = buildSync({
   jsx: 'automatic',
   format: 'iife',
   loader: { '.css': 'empty' },
-  alias: { '@': process.cwd() + '/apps/web/src' },
+  alias: { '@': process.cwd() + '/apps/web/src', 'next/navigation': process.cwd() + '/tests/browser/fixtures/navigation.ts' },
   define: {
     'process.env.NEXT_PUBLIC_API_URL': JSON.stringify('http://127.0.0.1:4000'),
     'process.env.NODE_ENV': JSON.stringify('production'),

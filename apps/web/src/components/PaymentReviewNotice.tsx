@@ -1,4 +1,5 @@
 'use client';
+import { PopupNotice } from '@/components/FeedbackProvider';
 import { useEffect, useState } from 'react';
 import { API_URL } from '@/lib/config';
 type Review = { id: string; amount: number; currency: string; providerPaymentId: string; course: { title: string }; user: { name: string; email: string } };
@@ -12,7 +13,7 @@ export default function PaymentReviewNotice() {
       .catch(err => { if (!controller.signal.aborted) setError(err.message); });
     return () => controller.abort();
   }, []);
-  if (error) return <p role="alert" className="auth-error">{error}</p>;
+  if (error) return <PopupNotice role="alert" className="auth-error">{error}</PopupNotice>;
   if (!reviews.length) return null;
   return <aside className="card pad" style={{ marginBottom: 20, borderColor: '#d97706' }} dir="rtl" aria-label="مدفوعات تحتاج مراجعة">
     <h2 style={{ fontSize: 20 }}>مدفوعات تحتاج مراجعتك · {reviews.length}</h2>

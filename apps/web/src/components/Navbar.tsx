@@ -16,9 +16,8 @@ const DASHBOARD_PATH: Record<CurrentUser['role'], string> = {
 };
 
 const NAV_LINKS = [
-  { href: '/', label: 'Home' },
-  { href: '/courses', label: 'Courses' },
-  { href: '/#pricing-anchor', label: 'Pricing' },
+  { href: '/', label: 'الرئيسية' },
+  { href: '/#monthly-courses', label: 'الدورات الشهرية' },
 ];
 
 export default function Navbar() {
@@ -38,8 +37,8 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, []);
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    if (!(await logout())) return;
     setMenuOpen(false);
     setMobileOpen(false);
     router.push('/');
@@ -61,9 +60,11 @@ export default function Navbar() {
               {link.label}
             </Link>
           ))}
-          <Link className={pathname === dashboardHref ? 'on' : ''} href={dashboardHref}>
-            Dashboard
-          </Link>
+          {user && (
+            <Link className={pathname === dashboardHref ? 'on' : ''} href={dashboardHref}>
+              حسابي
+            </Link>
+          )}
         </nav>
 
         <div className="nav-cta">
@@ -91,7 +92,7 @@ export default function Navbar() {
                     <Icon name="dashboard" /> My Dashboard
                   </Link>
                   <button className="logout" onClick={handleLogout}>
-                    <Icon name="logout" /> Log out
+                    <Icon name="logout" /> تسجيل الخروج
                   </button>
                 </div>
               )}
@@ -101,10 +102,10 @@ export default function Navbar() {
           ) : (
             <>
               <Link className="btn btn-sm btn-outline" href="/login">
-                Log in
+                تسجيل الدخول
               </Link>
               <Link className="btn btn-sm btn-gold" href="/register">
-                Get Started
+                إنشاء حساب
               </Link>
             </>
           )}
@@ -137,12 +138,12 @@ export default function Navbar() {
           </Link>
         ))}
         <Link href={dashboardHref} onClick={() => setMobileOpen(false)}>
-          Dashboard
+          حسابي
         </Link>
 
         {user ? (
           <button className="logout" onClick={handleLogout}>
-            <Icon name="logout" /> Log out ({user.name})
+            <Icon name="logout" /> تسجيل الخروج ({user.name})
           </button>
         ) : status !== 'ready' ? (
           <span role="status">جارٍ تحميل الحساب…</span>
@@ -153,14 +154,14 @@ export default function Navbar() {
               href="/login"
               onClick={() => setMobileOpen(false)}
             >
-              Log in
+              تسجيل الدخول
             </Link>
             <Link
               className="btn btn-sm btn-gold"
               href="/register"
               onClick={() => setMobileOpen(false)}
             >
-              Get Started
+              إنشاء حساب
             </Link>
           </div>
         )}

@@ -1,4 +1,5 @@
 'use client';
+import { PopupNotice } from '@/components/FeedbackProvider';
 import AudioAnswer, { AudioPlayback } from './AudioAnswer';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -57,12 +58,12 @@ export default function HomeworkWorkspace({ sessionId }: { sessionId: string }) 
       </header>
       {loading && <p role="status">جارٍ تحميل الواجب…</p>}
       {error && (
-        <div className="homework-error" role="alert">
+        <PopupNotice className="homework-error" role="alert">
           {error}
           <button className="btn btn-outline btn-sm" onClick={() => setRetry((v) => v + 1)}>
             إعادة المحاولة
           </button>
-        </div>
+        </PopupNotice>
       )}
       {data &&
         (user?.role === 'ADMIN' ? (
@@ -147,9 +148,9 @@ function HomeworkEditor({ data, sessionId }: { data: HomeworkData; sessionId: st
           : 'جهز الواجب قبل بداية الحصة. كل سؤال له درجة، والواجب يُسلم مرة واحدة.'}
       </p>
       {error && (
-        <p className="homework-error" role="alert">
+        <PopupNotice className="homework-error" role="alert">
           {error}
-        </p>
+        </PopupNotice>
       )}
       {message && (
         <p role="status" className="homework-success">
@@ -425,9 +426,9 @@ function HomeworkSolver({
         <p className="card pad">ملاحظة المعلم: {submission.feedback}</p>
       )}
       {error && (
-        <p role="alert" className="homework-error">
+        <PopupNotice role="alert" className="homework-error">
           {error}
-        </p>
+        </PopupNotice>
       )}
       <form onSubmit={submit}>
         <fieldset disabled={busy || !restored} className="homework-fields">
@@ -569,9 +570,9 @@ function GradeEditor({
         {new Date(initial.submittedAt).toLocaleString('ar')}
       </p>
       {error && (
-        <p role="alert" className="homework-error">
+        <PopupNotice role="alert" className="homework-error">
           {error}
-        </p>
+        </PopupNotice>
       )}
       {message && (
         <p role="status" className="homework-success">

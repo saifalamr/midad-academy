@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { PopupNotice } from './FeedbackProvider';
 import Icon from './Icon';
 import WorkspaceShell from './WorkspaceShell';
 import { dashboardPath, useAuth } from './AuthProvider';
@@ -14,11 +15,13 @@ export default function HomeExperience({ children }: { children: React.ReactNode
   if (!user && status === 'error')
     return (
       <main className="midad connection-state">
-        <h1>تعذر تحميل حسابك</h1>
-        <p>أعد المحاولة للمتابعة، لا تحتاج إلى تسجيل الدخول مجددًا.</p>
-        <button className="btn btn-gold" onClick={() => void refresh()}>
-          إعادة المحاولة
-        </button>
+        <PopupNotice title="تعذر تحميل الحساب">
+          <h1>تعذر تحميل حسابك</h1>
+          <p>أعد المحاولة للمتابعة، لا تحتاج إلى تسجيل الدخول مجددًا.</p>
+          <button className="btn btn-gold" onClick={() => void refresh()}>
+            إعادة المحاولة
+          </button>
+        </PopupNotice>
       </main>
     );
   if (!user) return <>{children}</>;

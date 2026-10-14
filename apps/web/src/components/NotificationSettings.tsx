@@ -1,4 +1,5 @@
 'use client';
+import { PopupNotice } from '@/components/FeedbackProvider';
 import { useEffect, useState } from 'react';
 import { useAuth } from './AuthProvider';
 import { API_URL } from '@/lib/config';
@@ -91,9 +92,9 @@ export default function NotificationSettings() {
         <h1>{admin ? 'سجل رسائل واتساب' : 'رسائل واتساب'}</h1>
       </header>
       {error && (
-        <p role="alert" className="homework-error">
+        <PopupNotice role="alert" className="homework-error">
           {error} <button onClick={() => setRevision((n) => n + 1)}>إعادة المحاولة</button>
-        </p>
+        </PopupNotice>
       )}
       {!data && !error && <p role="status">جارٍ التحميل…</p>}
       {data &&

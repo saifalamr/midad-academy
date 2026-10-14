@@ -1,5 +1,6 @@
 'use client';
 
+import { PopupNotice, showPopup } from '@/components/FeedbackProvider';
 import ClassroomMicrophones, {
   ClassroomPresence,
   useSpeakingPermission,
@@ -226,9 +227,9 @@ function PdfViewer({
       }}
     >
       {error && (
-        <p role="alert" style={{ color: '#f87171' }}>
+        <PopupNotice role="alert" style={{ color: '#f87171' }}>
           {error}
-        </p>
+        </PopupNotice>
       )}
       {loading && <p style={{ color: '#8ea0bb', fontSize: 13 }}>جارٍ تحميل الصفحة {page}…</p>}
       <canvas
@@ -866,7 +867,7 @@ function ClassroomContent({
                   body: JSON.stringify({ roomName: roomId }),
                 });
                 if (!res.ok) {
-                  window.alert('تعذر إنهاء الحصة. أعد المحاولة.');
+                  showPopup('تعذر إنهاء الحصة. أعد المحاولة.');
                   return;
                 }
                 onEnd();
@@ -1438,9 +1439,9 @@ function ClassroomContent({
         </div>
       )}
       {classError && (
-        <div role="alert" style={{ color: '#f87171', textAlign: 'center' }}>
+        <PopupNotice role="alert" style={{ color: '#f87171', textAlign: 'center' }}>
           {classError} <button onClick={() => setClassError('')}>إغلاق</button>
-        </div>
+        </PopupNotice>
       )}
       <StartAudio className="classroom-start-audio" label="تشغيل صوت الحصة" />
       {/* ── Room controls ── */}
@@ -1614,7 +1615,7 @@ function ClassroomContent({
                   {contentLoading ? (
                     <p role="status">جارٍ تحميل مواد الدورة…</p>
                   ) : (shareTab === 'plan' ? planLoadError : contentLoadError) ? (
-                    <div role="alert">
+                    <PopupNotice role="alert">
                       <p>{shareTab === 'plan' ? planLoadError : contentLoadError}</p>
                       <button
                         className="btn btn-outline btn-sm"
@@ -1622,7 +1623,7 @@ function ClassroomContent({
                       >
                         إعادة تحميل المواد
                       </button>
-                    </div>
+                    </PopupNotice>
                   ) : (shareTab === 'plan' ? sessionContent : courseContent).length === 0 ? (
                     <p style={{ fontSize: 13, color: 'var(--ink-3)' }}>
                       {shareTab === 'plan'
@@ -1764,9 +1765,9 @@ function ClassroomContent({
 
               {sharing && <p role="status">جارٍ مشاركة المحتوى مع الطلاب…</p>}
               {shareError && (
-                <div role="alert" className="auth-error">
+                <PopupNotice role="alert" className="auth-error">
                   {shareError}
-                </div>
+                </PopupNotice>
               )}
             </div>
 
@@ -2058,9 +2059,9 @@ export default function ClassroomPage() {
         style={{ alignItems: 'center', justifyContent: 'center' }}
       >
         <div className="lobby-state">
-          <p role="alert" dir="rtl" style={{ color: '#a83232', fontWeight: 600, marginBottom: 12 }}>
+          <PopupNotice role="alert" dir="rtl" style={{ color: '#a83232', fontWeight: 600, marginBottom: 12 }}>
             {error}
-          </p>
+          </PopupNotice>
           <button className="btn btn-gold btn-sm" onClick={retryJoin}>
             إعادة دخول الحصة
           </button>

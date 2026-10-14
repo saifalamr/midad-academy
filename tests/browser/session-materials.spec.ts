@@ -85,7 +85,8 @@ test('admin orders class materials, retries safely, teacher reads frozen curricu
         : route.continue()
     );
     await page.getByRole('button', { name: 'حفظ مواد الحصة', exact: true }).click();
-    await expect(page.locator('.session-plan').getByRole('alert')).toContainText('تعذر الحفظ');
+    await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText('تعذر الحفظ');
+  await page.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
     await expect(plan.locator('li')).toHaveCount(2);
     await page.unroute(path);
     await page.getByRole('button', { name: 'حفظ مواد الحصة', exact: true }).click();

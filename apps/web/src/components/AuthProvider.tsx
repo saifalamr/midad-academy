@@ -1,5 +1,6 @@
 'use client';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useFeedback } from './FeedbackProvider';
 import { API_URL } from '@/lib/config';
 export type Account = {
   id: string;
@@ -11,10 +12,11 @@ type Auth = {
   user: Account | null;
   status: 'loading' | 'ready' | 'error';
   refresh: () => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<boolean>;
 };
 const Context = createContext<Auth | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { confirm } = useFeedback();
   const [user, setUser] = useState<Account | null>(null);
   const [status, setStatus] = useState<Auth['status']>('loading');
   const sequence = useRef(0);
@@ -49,14 +51,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (revision === sequence.current) setStatus('error');
     }
   }, []);
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    if (!(await confirm('هل تريد تسجيل الخروج من حسابك؟'))) return false;
     ++sequence.current;
     localStorage.removeItem('token');
     sessionStorage.removeItem('token');
     setUser(null);
     setStatus('ready');
     window.dispatchEvent(new Event('midad-auth'));
-  }, []);
+    return true;
+  }, [confirm]);
   useEffect(() => {
     const requests = sequence;
     void refresh();

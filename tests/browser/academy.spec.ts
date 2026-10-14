@@ -46,9 +46,10 @@ test('mobile student login, enrollment, quiz and account linking code', async ({
     })
   );
   await page.getByRole('button', { name: 'حفظ الملاحظة', exact: true }).click();
-  await expect(page.getByRole('alert').filter({ hasText: 'تعذر الحفظ' })).toContainText(
+  await expect(page.getByRole('alertdialog').getByRole('alert').filter({ hasText: 'تعذر الحفظ' })).toContainText(
     'تعذر الحفظ'
   );
+  await page.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
   await expect(page.getByLabel('ملاحظتك الخاصة لهذا الدرس')).toHaveValue(
     'ملاحظة تبقى هنا عند تعذر الحفظ'
   );
@@ -95,6 +96,7 @@ test('teacher creates a course and sees students; logout protects the dashboard'
     page.getByRole('cell', { name: 'Preview Student', exact: true }).first()
   ).toBeVisible();
   await page.getByRole('button', { name: /Log out/ }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'تسجيل الخروج', exact: true }).click();
   await page.goto('/teacher');
   await expect(page).toHaveURL(/\/login$/);
 });
@@ -203,11 +205,13 @@ test('a student can retry joining after a connection failure without leaving the
   });
   await page.goto('/classroom/preview-arabic');
   await page.getByRole('button', { name: 'دخول الحصة', exact: true }).click();
-  await expect(page.locator('p[role="alert"]')).toContainText('الحصة غير مباشرة الآن');
+  await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText('الحصة غير مباشرة الآن');
+  await page.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
   expect(attempts).toBe(1);
   await page.getByRole('button', { name: 'إعادة دخول الحصة', exact: true }).click();
   await expect.poll(() => attempts).toBe(2);
-  await expect(page.locator('p[role="alert"]')).toBeVisible();
+  await expect(page.getByRole('alertdialog').getByRole('alert')).toBeVisible();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
   await expect(page).toHaveURL(/classroom\/preview-arabic/);
   await page.getByRole('button', { name: 'الرجوع للوحة التحكم', exact: true }).click();
   await expect(page).toHaveURL(/student/);
@@ -275,8 +279,9 @@ test('mobile quiz delivery retries one saved attempt, teacher feedback and final
     .click();
   await studentPage.getByRole('button', { name: 'Submit Quiz', exact: true }).click();
   await expect(
-    studentPage.getByRole('alert').filter({ hasText: 'أجب عن جميع الأسئلة' })
+    studentPage.getByRole('alertdialog').getByRole('alert').filter({ hasText: 'أجب عن جميع الأسئلة' })
   ).toBeVisible();
+  await studentPage.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
   await studentPage.getByLabel('إجابتك: اكتب جملة عربية', { exact: true }).fill('مرحباً يا معلم');
   let delivered = false;
   const keys: string[] = [];
@@ -291,8 +296,9 @@ test('mobile quiz delivery retries one saved attempt, teacher feedback and final
   });
   await studentPage.getByRole('button', { name: 'Submit Quiz', exact: true }).click();
   await expect(
-    studentPage.getByRole('alert').filter({ hasText: 'تعذر تأكيد التسليم' })
+    studentPage.getByRole('alertdialog').getByRole('alert').filter({ hasText: 'تعذر تأكيد التسليم' })
   ).toBeVisible();
+  await studentPage.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
   await studentPage.getByRole('button', { name: 'Submit Quiz', exact: true }).click();
   await expect(studentPage.getByText('Pending Review', { exact: true })).toBeVisible();
   expect(keys.length).toBe(2);
@@ -323,7 +329,8 @@ test('mobile quiz delivery retries one saved attempt, teacher feedback and final
   await expect(answerCard.getByRole('spinbutton')).toHaveValue('2'); // Feedback alone preserves the default grade.
   await answerCard.getByRole('spinbutton').fill('1.5');
   await answerCard.getByRole('button', { name: 'Mark as Graded', exact: true }).click();
-  await expect(teacherPage.getByRole('alert').filter({ hasText: 'must be between' })).toBeVisible();
+  await expect(teacherPage.getByRole('alertdialog').getByRole('alert').filter({ hasText: 'must be between' })).toBeVisible();
+  await teacherPage.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
   await answerCard.getByRole('spinbutton').fill('2');
   await answerCard.getByRole('button', { name: 'Mark as Graded', exact: true }).click();
   await expect(answerCard).toHaveCount(0);
@@ -353,7 +360,7 @@ test('signed-in home stays a workspace across navigation, reloads and connection
   await expect(page).toHaveURL(/\/teacher$/);
   await page.getByRole('link', { name: 'الرئيسية', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'أهلاً، Preview Teacher' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Create an account', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'إنشاء حساب ولي أمر', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'فتح صفوفي وحصصي', exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { name: 'أهلاً، Preview Teacher' })).toBeVisible();
@@ -374,15 +381,16 @@ test('signed-in home stays a workspace across navigation, reloads and connection
   await page.reload();
   await expect(page.getByRole('heading', { name: 'تعذر تحميل حسابك' })).toBeVisible();
   expect(await page.evaluate(() => !!localStorage.getItem('token'))).toBeTruthy();
-  await expect(page.getByRole('link', { name: 'Create an account', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'إنشاء حساب ولي أمر', exact: true })).toHaveCount(0);
   await page.unroute('**/api/auth/me');
   await page.getByRole('button', { name: 'إعادة المحاولة', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'أهلاً، Preview Teacher' })).toBeVisible();
   await page.getByRole('button', { name: 'Log out · خروج', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'تسجيل الخروج', exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
   await page.goto('/');
   await expect(
-    page.getByRole('link', { name: 'Create an account', exact: true }).first()
+    page.getByRole('link', { name: 'إنشاء حساب ولي أمر', exact: true }).first()
   ).toBeVisible();
 });
 
@@ -406,7 +414,6 @@ test('session-only login survives home reload and expires on a confirmed unautho
     route.fulfill({ status: 401, contentType: 'application/json', body: '{}' })
   );
   await page.reload();
-  await page.getByRole('button', { name: 'Toggle menu' }).click();
-  await expect(page.getByRole('link', { name: 'Log in', exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: 'تسجيل الدخول', exact: true }).first()).toBeVisible();
   expect(await page.evaluate(() => sessionStorage.getItem('token'))).toBeNull();
 });

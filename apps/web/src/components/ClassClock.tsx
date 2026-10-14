@@ -1,4 +1,5 @@
 'use client';
+import { PopupNotice } from '@/components/FeedbackProvider';
 import { useEffect, useState } from 'react';
 import { API_URL } from '@/lib/config';
 import { classPhases, phaseAt } from '@/lib/class-clock';
@@ -136,12 +137,12 @@ export default function ClassClock({
         </ol>
       )}
       {error && (
-        <p role="alert">
+        <PopupNotice role="alert">
           {error}{' '}
           <button type="button" onClick={() => setRetry((v) => v + 1)}>
             إعادة التحديث
           </button>
-        </p>
+        </PopupNotice>
       )}
       {editable && editing && clock && (
         <form

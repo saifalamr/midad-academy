@@ -1,4 +1,5 @@
 'use client';
+import { PopupNotice } from '@/components/FeedbackProvider';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { API_URL } from '@/lib/config';
@@ -244,9 +245,9 @@ function ReportEditor({
         </p>
       )}
       {error && (
-        <p role="alert" className="auth-error">
+        <PopupNotice role="alert" className="auth-error">
           {error}
-        </p>
+        </PopupNotice>
       )}
     </article>
   );
@@ -330,12 +331,12 @@ export default function SessionReports() {
       {loading ? (
         <p role="status">جارٍ تحميل الحصص…</p>
       ) : error ? (
-        <section className="card pad" role="alert">
+        <PopupNotice className="card pad" role="alert">
           <p>{error}</p>
           <button className="btn btn-outline" onClick={() => setReload((v) => v + 1)}>
             إعادة المحاولة
           </button>
-        </section>
+        </PopupNotice>
       ) : !sessions.length ? (
         <section className="card pad">
           <h2>لا توجد حصص مكتملة بعد</h2>
@@ -360,12 +361,12 @@ export default function SessionReports() {
           {detailLoading ? (
             <p role="status">جارٍ تحميل طلاب الحصة…</p>
           ) : detailError ? (
-            <section className="card pad" role="alert">
+            <PopupNotice className="card pad" role="alert">
               <p>{detailError}</p>
               <button className="btn btn-outline" onClick={() => setDetailReload((v) => v + 1)}>
                 إعادة تحميل الطلاب
               </button>
-            </section>
+            </PopupNotice>
           ) : (
             detail && (
               <>

@@ -84,8 +84,8 @@ export default function WorkspaceShell({ children }: { children: React.ReactNode
           <button
             className="workspace-logout"
             aria-label="Log out · خروج"
-            onClick={() => {
-              logout();
+            onClick={async () => {
+              if (!(await logout())) return;
               router.replace('/login');
             }}
           >

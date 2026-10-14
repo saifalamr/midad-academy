@@ -1,5 +1,6 @@
 'use client';
 
+import { PopupNotice } from '@/components/FeedbackProvider';
 import Icon from '@/components/Icon';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -381,7 +382,7 @@ export default function StudentDashboard() {
         )}
 
         {error && (
-          <div className="auth-error student-data-error" role="alert" dir="rtl">
+          <PopupNotice className="auth-error student-data-error" role="alert" dir="rtl">
             <span>{error}</span>
             <button
               className="btn btn-outline btn-sm"
@@ -390,7 +391,7 @@ export default function StudentDashboard() {
             >
               {loading ? 'جارٍ التحديث…' : 'إعادة المحاولة'}
             </button>
-          </div>
+          </PopupNotice>
         )}
 
         <div className="dash-grid">

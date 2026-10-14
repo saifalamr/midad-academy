@@ -1,5 +1,6 @@
 'use client';
 
+import { PopupNotice } from '@/components/FeedbackProvider';
 import Icon from '@/components/Icon';
 import { useAuth, dashboardPath } from '@/components/AuthProvider';
 import { useEffect, useRef, useState } from 'react';
@@ -537,9 +538,9 @@ export default function CourseContentPage() {
         </div>
 
         {uploadError && (
-          <div className="auth-error" style={{ marginBottom: 16 }}>
+          <PopupNotice className="auth-error" style={{ marginBottom: 16 }}>
             {uploadError}
-          </div>
+          </PopupNotice>
         )}
 
         {loading ? (
@@ -730,7 +731,7 @@ export default function CourseContentPage() {
                 />
               </div>
 
-              {formError && <div className="auth-error">{formError}</div>}
+              {formError && <PopupNotice className="auth-error">{formError}</PopupNotice>}
             </form>
 
             <div className="modal-foot">
@@ -996,9 +997,9 @@ export default function CourseContentPage() {
                 </button>
 
                 {quizError && (
-                  <div className="auth-error" style={{ marginTop: 16 }}>
+                  <PopupNotice className="auth-error" style={{ marginTop: 16 }}>
                     {quizError}
-                  </div>
+                  </PopupNotice>
                 )}
               </div>
             )}

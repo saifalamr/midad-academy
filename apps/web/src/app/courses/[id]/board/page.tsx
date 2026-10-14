@@ -1,4 +1,5 @@
 'use client';
+import { PopupNotice } from '@/components/FeedbackProvider';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -34,7 +35,7 @@ export default function CourseBoard() {
       <h1 style={{ fontSize: 24 }}>سبورة الدورة</h1><Link className="btn btn-ghost" href={`/courses/${id}/lessons`}>العودة للدروس</Link>
     </div>
     <p>الرسم محفوظ ومتزامن بين المشاركين. يمكنك استخدام السبورة خارج وقت المكالمة.</p>
-    {error ? <p role="alert">{error} <button className="btn btn-sm btn-outline" onClick={() => window.location.reload()}>إعادة المحاولة</button></p> : !access ? <p>جاري التحقق من الصلاحية…</p> : <>
+    {error ? <PopupNotice role="alert">{error} <button className="btn btn-sm btn-outline" onClick={() => window.location.reload()}>إعادة المحاولة</button></PopupNotice> : !access ? <p>جاري التحقق من الصلاحية…</p> : <>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '16px 0' }}>
         {tools.map(item => <button key={item.id} disabled={!access.canDraw} className={`btn ${tool === item.id ? 'btn-gold' : 'btn-ghost'}`} onClick={() => setTool(item.id)}>{item.name}</button>)}
         {tool === 'eraser' && <>
