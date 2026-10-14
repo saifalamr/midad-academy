@@ -26,7 +26,7 @@ export function AuthBackdrop() {
         <circle cx="730" cy="930" r="48" /><circle cx="730" cy="930" r="60" />
         <path d="M350 80l8-8 8 8-8 8zM65 800l8-8 8 8-8 8zM710 310l6-6 6 6-6 6z" />
       </g>
-      <g fill="currentColor" fontFamily="serif" fontSize="64">
+      <g fill="currentColor" fontFamily="inherit" fontSize="64">
         <text x="55" y="330" transform="rotate(-14 55 330)">أ</text>
         <text x="710" y="440" transform="rotate(12 710 440)">ب</text>
         <text x="260" y="930" transform="rotate(-8 260 930)">ض</text>
