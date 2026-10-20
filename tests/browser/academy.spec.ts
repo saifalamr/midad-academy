@@ -181,7 +181,7 @@ test('parent browses courses without student checkout controls', async ({ page }
   await page.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();
   await expect(page).toHaveURL(/parent$/);
   await page.goto('/courses');
-  await expect(page.getByRole('link', { name: 'طلب التسجيل عبر واتساب' }).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: 'سجّل طفلك' }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: /Enroll/ })).toHaveCount(0);
 });
 

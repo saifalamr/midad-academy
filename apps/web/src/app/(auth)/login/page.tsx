@@ -43,7 +43,11 @@ export default function LoginPage() {
       const role: string = json.data.user?.role?.toLowerCase() ?? '';
       if (role === 'admin') router.push('/admin');
       else if (role === 'teacher') router.push('/teacher');
-      else if (role === 'parent') router.push('/parent');
+      else if (role === 'parent') {
+        const pending = sessionStorage.getItem('midad-return-to');
+        sessionStorage.removeItem('midad-return-to');
+        router.push(pending && /^\/academy(?:\?|$)/.test(pending) ? pending : '/parent');
+      }
       else router.push('/student');
     } catch {
       setError('تعذر الاتصال بالخادم. حاول مرة أخرى.');

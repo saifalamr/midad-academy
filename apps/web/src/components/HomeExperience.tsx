@@ -67,12 +67,12 @@ export default function HomeExperience({ children }: { children: React.ReactNode
               عرض الدورات <Icon name="right" />
             </span>
           </Link>
-          <Link className="card" href="/account">
+          <Link className="card" href="/academy">
             <Icon name="family" size={28} />
-            <h2>حسابي</h2>
-            <p>بياناتك الشخصية وإعدادات الحساب</p>
+            <h2>التسجيل والمتابعة</h2>
+            <p>طلبات التسجيل والإشعارات ومتابعة التعلم</p>
             <span>
-              إدارة الحساب <Icon name="right" />
+              فتح المتابعة <Icon name="right" />
             </span>
           </Link>
         </section>

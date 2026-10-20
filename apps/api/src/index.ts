@@ -27,6 +27,7 @@ import { rateLimitKey } from './lib/rate-limit';
 import { notificationRoutes } from './routes/notifications';
 import { homeworkAudioRoutes } from './routes/homework-audio';
 import { homeworkRoutes } from './routes/homework';
+import { academyRoutes } from './routes/academy';
 import { adminRoutes } from './routes/admin';
 import { bootstrapAdmin } from './lib/bootstrap-admin';
 import { prepareReview } from './lib/prepare-review';
@@ -116,7 +117,16 @@ export async function buildApp() {
     });
   });
 
+  // Legacy administration actions are logged without request bodies or credentials.
+  app.addHook('onResponse', async (request, reply) => {
+    if (request.user?.role !== 'ADMIN' || !request.url.startsWith('/api/admin/') || ['GET', 'HEAD', 'OPTIONS'].includes(request.method) || reply.statusCode >= 400) return;
+    try {
+      await prisma.auditEvent.create({ data: { actorId: request.user.id, action: `${request.method} ${request.routeOptions.url}`, targetId: request.url.split('?')[0], details: {} } });
+    } catch { app.log.error('Could not persist legacy administration audit event'); }
+  });
+
   // ── Routes ───────────────────────────────────────────────────────────────
+  await app.register(academyRoutes, { prefix: '/api/academy' });
   await app.register(healthRoutes, { prefix: '/api' });
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(accountRoutes, { prefix: '/api/account' });

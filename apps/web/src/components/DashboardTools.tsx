@@ -13,9 +13,12 @@ export default function DashboardTools({ children }: { children: React.ReactNode
     ['teacher', 'student', 'parent', 'admin'].includes(area) &&
     user.role.toLowerCase() !== area;
   useEffect(() => {
-    if (status === 'ready' && !user) router.replace('/login');
+    if (status === 'ready' && !user) {
+      if (path === '/academy') sessionStorage.setItem('midad-return-to', location.pathname + location.search);
+      router.replace('/login');
+    }
     else if (wrongRole && user) router.replace(dashboardPath(user.role));
-  }, [user, status, wrongRole, router]);
+  }, [user, status, wrongRole, router, path]);
   if (status === 'error' && !user)
     return (
       <main className="midad wrap connection-state">

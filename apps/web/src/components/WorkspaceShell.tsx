@@ -22,6 +22,7 @@ export default function WorkspaceShell({ children }: { children: React.ReactNode
             : 'صفوفي وحصصي',
       icon: 'calendar',
     },
+    { href: '/academy', label: user.role === 'ADMIN' ? 'الطلبات والمتابعة' : 'التسجيل والمتابعة', icon: 'family' },
     { href: '/courses', label: 'الدورات', icon: 'book' },
     ...(user.role !== 'ADMIN'
       ? [

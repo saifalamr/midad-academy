@@ -48,7 +48,7 @@ export default function MonthlyCatalog() {
     <section className="wrap sec" id="monthly-courses" dir="rtl">
       <span className="eyebrow">الدورات الشهرية</span>
       <h2 className="sec-h2">اختر رحلة طفلك القادمة</h2>
-      <p className="sec-sub">يتواصل ولي الأمر مع الأكاديمية، وتتولى الإدارة تسجيل الأبناء.</p>
+      <p className="sec-sub">اختر الدورة وأرسل طلبًا لطفلك داخل حسابك. تؤكد الإدارة التسجيل بعد المراجعة.</p>
       {state === 'loading' ? (
         <p role="status">جارٍ عرض الدورات…</p>
       ) : state === 'error' ? (
@@ -102,14 +102,10 @@ export default function MonthlyCatalog() {
                 <small>توقيت {c.timeZone}</small>
               </div>
               <div className="catalog-actions">
-                <a
-                  className="btn btn-gold"
-                  href={courseInquiryUrl(c)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {c.availableSeats > 0 ? 'طلب التسجيل عبر واتساب' : 'استفسر عن قائمة الانتظار'}
-                </a>
+                <Link className="btn btn-gold" href={`/academy?course=${encodeURIComponent(c.id)}`}>
+                  {c.availableSeats > 0 ? 'سجّل طفلك' : 'مكتملة — الانضمام لقائمة الانتظار'}
+                </Link>
+                <a className="btn btn-outline" href={courseInquiryUrl(c)} target="_blank" rel="noopener noreferrer">استفسار عبر واتساب</a>
                 <Link className="btn btn-outline" href="/register">
                   <Icon name="family" /> إنشاء حساب ولي الأمر
                 </Link>

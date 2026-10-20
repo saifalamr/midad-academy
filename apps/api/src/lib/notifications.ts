@@ -159,7 +159,7 @@ export async function dispatchNotifications(now = new Date()) {
     const item = await prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<
         { id: string }[]
-      >`SELECT id FROM "WhatsAppNotification" WHERE status = 'PENDING' AND "availableAt" <= ${now} ORDER BY "availableAt" LIMIT 1 FOR UPDATE SKIP LOCKED`;
+      >`SELECT id FROM "WhatsAppNotification" WHERE status = 'PENDING' AND "availableAt" <= (${now.toISOString()}::timestamptz AT TIME ZONE 'UTC') ORDER BY "availableAt" LIMIT 1 FOR UPDATE SKIP LOCKED`;
       if (!rows[0]) return null;
       return tx.whatsAppNotification.update({
         where: { id: rows[0].id },

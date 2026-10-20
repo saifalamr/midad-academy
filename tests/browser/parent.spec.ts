@@ -167,7 +167,7 @@ test('course enquiry opens academy WhatsApp with exact course, month and timezon
     })
   );
   await page.goto('/courses');
-  const link = page.getByRole('link', { name: 'طلب التسجيل عبر واتساب' });
+  const link = page.getByRole('link', { name: 'استفسار عبر واتساب' }).first();
   const href = await link.getAttribute('href');
   const url = new URL(href!);
   expect(url.hostname).toBe('wa.me');
@@ -176,14 +176,14 @@ test('course enquiry opens academy WhatsApp with exact course, month and timezon
   expect(url.searchParams.get('text')).toContain('2099-01');
   expect(url.searchParams.get('text')).toContain('Africa/Cairo');
   await expect(page.getByText('المواعيد القادمة', { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole('link', { name: 'استفسر عن قائمة الانتظار' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'مكتملة — الانضمام لقائمة الانتظار' })).toBeVisible();
   const publicContext = await browser.newContext();
   const publicPage = await publicContext.newPage();
   await publicPage.route('**/api/courses/catalog', (route) =>
     route.fulfill({ json: { data: [course] } })
   );
   await publicPage.goto('http://127.0.0.1:3000/');
-  await expect(publicPage.getByRole('link', { name: 'طلب التسجيل عبر واتساب' })).toHaveAttribute(
+  await expect(publicPage.getByRole('link', { name: 'استفسار عبر واتساب' })).toHaveAttribute(
     'href',
     href!
   );

@@ -2636,7 +2636,7 @@ test('WhatsApp consent, durable deduplication, reminders and ambiguous failures 
       return new Response(JSON.stringify({ messages: [{ id: 'provider-1' }] }), { status: 200 });
     }) as any;
     await dispatchNotifications();
-    assert.equal(requests, 1);
+    assert.equal(requests, 1, JSON.stringify(await prisma.whatsAppNotification.findMany({where:{referenceId:session.id},select:{status:true,lastError:true,availableAt:true,attempts:true}})));
     await dispatchNotifications();
     assert.equal(requests, 1);
     assert.equal(
@@ -2972,4 +2972,160 @@ test('administration sees provider-confirmed teacher/student presence, durable r
     RoomServiceClient.prototype.listParticipants = original;
     restoreActors();
   }
+});
+
+async function operationsFixture(capacity = 1, price = 0) {
+  const suffix = randomUUID().slice(0, 8);
+  const keys: Record<string, string> = {};
+  const users: Record<string, any> = {};
+  for (const [name, role] of [['admin','ADMIN'],['parent','PARENT'],['stranger','PARENT'],['teacher','TEACHER']] as const) {
+    const key = `ops-${name}-${suffix}`;
+    const user = await prisma.user.create({ data: { name: `عمليات ${name}`, email: `${key}@midad.test`, role, passwordHash: 'not-a-login-hash', ...(role === 'PARENT' ? { parentProfile: { create: {} } } : role === 'TEACHER' ? { teacherProfile: { create: { bio: '', qualifications: [], hourlyRate: 0 } } } : {}) }, include: { parentProfile: true, teacherProfile: true } });
+    keys[name] = key; users[name] = user;
+    actors[key] = { id: user.id, email: user.email, token: app.jwt.sign({ id: user.id, email: user.email, role, version: 0 }) };
+  }
+  const course = await prisma.course.create({ data: { title: `دورة العمليات ${suffix}`, description: 'دورة لاختبار رحلة الأسرة كاملة', teacherId: users.teacher.teacherProfile.id, ageGroup: '8–10', level: 'beginner', price, maxStudents: capacity, month: new Date().toISOString().slice(0,7), timeZone: 'Europe/Istanbul' } });
+  const childRes = await call('POST', '/api/academy/children', keys.parent, { name: 'طفل العمليات', age: 9 });
+  assert.equal(childRes.statusCode, 201, childRes.body);
+  return { keys, users, course, childId: childRes.json().data.id };
+}
+
+test('family intake is owned, idempotent, capacity-safe and preserves manual payment evidence', async () => {
+  const { keys, course, childId } = await operationsFixture(1, 50);
+  assert.equal((await call('POST','/api/academy/applications',keys.stranger,{studentId:childId,courseId:course.id})).statusCode,404);
+  const apply = () => call('POST','/api/academy/applications',keys.parent,{studentId:childId,courseId:course.id,needsAssessment:true,levelNotes:'يعرف بعض الحروف',preferredTime:'المساء'});
+  const [one,two] = await Promise.all([apply(),apply()]);
+  assert.equal(one.statusCode,201,one.body);assert.equal(two.json().data.id,one.json().data.id);
+  const a=one.json().data;
+  assert.equal((await call('PATCH',`/api/academy/applications/${a.id}`,keys.parent,{version:a.version,action:'APPROVE'})).statusCode,403);
+  assert.equal((await call('PATCH',`/api/academy/applications/${a.id}`,keys.admin,{version:a.version,action:'APPROVE'})).statusCode,400);
+  const other=(await call('POST','/api/academy/children',keys.parent,{name:'طفل ثان',age:8})).json().data.id;
+  const b=(await call('POST','/api/academy/applications',keys.parent,{studentId:other,courseId:course.id})).json().data;
+  const results = await Promise.all([a,b].map(x=>call('PATCH',`/api/academy/applications/${x.id}`,keys.admin,{version:x.version,action:'APPROVE',paymentStatus:'PAID',paymentReference:'وصل نقدي 123'})));
+  assert.deepEqual(results.map(r=>r.statusCode).sort(),[200,409]);
+  assert.equal(await prisma.enrollment.count({where:{courseId:course.id,status:'ACTIVE'}}),1);
+  const approved=results.find(r=>r.statusCode===200)!.json().data;
+  assert.equal(approved.paymentStatus,'PAID');assert.equal(approved.paymentReference,'وصل نقدي 123');
+  assert.equal((await call('PATCH',`/api/academy/applications/${approved.id}`,keys.admin,{version:1,action:'APPROVE'})).statusCode,409);
+  const c=(await call('POST','/api/academy/children',keys.stranger,{name:'طفل الانتظار',age:9})).json().data.id;
+  const waiting=await call('POST','/api/academy/applications',keys.stranger,{studentId:c,courseId:course.id});
+  assert.equal(waiting.json().data.status,'WAITLIST');
+  const strangerList=(await call('GET','/api/academy/applications',keys.stranger)).json().data;
+  assert.equal(strangerList.length,1);assert.equal(strangerList[0].student.id,c);
+  const refund=await call('PATCH',`/api/academy/applications/${approved.id}`,keys.admin,{version:approved.version,action:'PAYMENT',paymentStatus:'REFUNDED',paymentReference:'تحويل استرجاع 456'});
+  assert.equal(refund.statusCode,200,refund.body);
+  assert.equal((await call('GET','/api/academy/audit',keys.parent)).statusCode,403);
+  const log=(await call('GET','/api/academy/audit',keys.admin)).json().data;
+  assert.ok(log.some((x:any)=>x.action==='APPLICATION_PAYMENT'&&x.details.reference==='تحويل استرجاع 456'));
+});
+
+test('parent child password recovery revokes old sessions without granting access to another family', async () => {
+  const {keys,childId}=await operationsFixture();
+  const oldChild=await prisma.studentProfile.findUniqueOrThrow({where:{id:childId},include:{user:true}});
+  const oldToken=app.jwt.sign({id:oldChild.user.id,email:oldChild.user.email,role:'STUDENT',version:0});
+  assert.equal((await call('POST',`/api/academy/children/${childId}/password`,keys.stranger,{password:'TestingNewPassword2026!'})).statusCode,404);
+  assert.equal((await call('POST',`/api/academy/children/${childId}/password`,keys.parent,{password:'short'})).statusCode,400);
+  const reset=await call('POST',`/api/academy/children/${childId}/password`,keys.parent,{password:'TestingNewPassword2026!'});
+  assert.equal(reset.statusCode,200,reset.body);
+  assert.equal((await app.inject({method:'GET',url:'/api/auth/me',headers:{authorization:`Bearer ${oldToken}`}})).statusCode,401);
+  const login=await call('POST','/api/auth/login',undefined,{email:oldChild.user.username,password:'TestingNewPassword2026!'});
+  assert.equal(login.statusCode,200,login.body);
+  const log=(await call('GET','/api/academy/audit',keys.admin)).body;
+  assert.ok(!log.includes('TestingNewPassword'));assert.ok(!log.includes('passwordHash'));
+});
+
+test('rescheduling is conflict-safe, durable, acknowledged per user and links one live makeup', async () => {
+  const {keys,users,course,childId}=await operationsFixture();
+  await prisma.enrollment.create({data:{courseId:course.id,studentId:childId,enrolledAt:new Date(Date.now()-86400000)}});
+  const scheduledAt=new Date(Date.now()+2*86400000);
+  const session=await prisma.classSession.create({data:{courseId:course.id,teacherId:users.teacher.teacherProfile.id,title:'حصة اختبار',scheduledAt,durationMinutes:45}});
+  assert.equal((await call('GET',`/api/academy/sessions/${session.id}`,keys.stranger)).statusCode,404);
+  const conflict=await prisma.classSession.create({data:{courseId:course.id,teacherId:users.teacher.teacherProfile.id,title:'موعد محجوز',scheduledAt:new Date(scheduledAt.getTime()+3600000)}});
+  const bad=await call('PATCH',`/api/academy/sessions/${session.id}/schedule`,keys.admin,{action:'RESCHEDULE',updatedAt:session.updatedAt.toISOString(),reason:'تغيير الموعد',scheduledAt:conflict.scheduledAt.toISOString()});
+  assert.equal(bad.statusCode,409,bad.body);
+  assert.equal(await prisma.academyNotice.count({where:{href:`/sessions/${session.id}`}}),0);
+  const change=await call('PATCH',`/api/academy/sessions/${session.id}/schedule`,keys.admin,{action:'RESCHEDULE',updatedAt:session.updatedAt.toISOString(),reason:'موعد يناسب الأسرة',scheduledAt:new Date(scheduledAt.getTime()+7200000).toISOString()});
+  assert.equal(change.statusCode,200,change.body);
+  const notices=(await call('GET','/api/academy/notices',keys.parent)).json().data;
+  const n=notices.find((x:any)=>x.href===`/sessions/${session.id}`);assert.ok(n);
+  await call('PATCH',`/api/academy/notices/${n.id}/read`,keys.stranger);
+  assert.equal((await prisma.academyNotice.findUnique({where:{id:n.id}})).readAt,null);
+  await call('PATCH',`/api/academy/notices/${n.id}/read`,keys.parent);
+  assert.ok((await prisma.academyNotice.findUnique({where:{id:n.id}})).readAt);
+  const adminDetails=(await call('GET',`/api/academy/sessions/${session.id}`,keys.admin)).json().data;
+  assert.ok(adminDetails.notificationReceipts.find((x:any)=>x.id===n.id).readAt);
+  assert.equal((await call('GET',`/api/academy/sessions/${session.id}`,keys.parent)).json().data.notificationReceipts,undefined);
+  const cancelled=await call('PATCH',`/api/academy/sessions/${session.id}/schedule`,keys.admin,{action:'CANCEL',updatedAt:change.json().data.updatedAt,reason:'تعذر حضور المعلم'});
+  assert.equal(cancelled.statusCode,200,cancelled.body);
+  const makeupBody={action:'MAKEUP',updatedAt:cancelled.json().data.updatedAt,reason:'تعويض للأسرة',scheduledAt:new Date(scheduledAt.getTime()+86400000).toISOString()};
+  const makeup=await call('PATCH',`/api/academy/sessions/${session.id}/schedule`,keys.admin,makeupBody);
+  assert.equal(makeup.statusCode,200,makeup.body);assert.equal(makeup.json().data.makeupForId,session.id);
+  assert.equal((await call('PATCH',`/api/academy/sessions/${session.id}/schedule`,keys.admin,makeupBody)).statusCode,409);
+});
+
+test('unified class respects report drafts, child isolation, reviewed skills and withdrawal history', async () => {
+  const {keys,users,course,childId}=await operationsFixture(3);
+  await prisma.enrollment.create({data:{courseId:course.id,studentId:childId,enrolledAt:new Date(Date.now()-86400000)}});
+  const session=await fixtureSession(course.id,'تعلم الباء');await prisma.classSession.update({where:{id:session.id},data:{status:'COMPLETED'}});
+  const report=await prisma.sessionReport.create({data:{sessionId:session.id,studentId:childId,note:'تقرير خاص حتى النشر'}});
+  const first=await call('GET',`/api/academy/sessions/${session.id}`,keys.parent);
+  assert.equal(first.statusCode,200,first.body);assert.equal(first.json().data.students[0].report,null);
+  await prisma.sessionReport.update({where:{id:report.id},data:{publishedAt:new Date()}});
+  assert.equal((await call('GET',`/api/academy/sessions/${session.id}`,keys.parent)).json().data.students[0].report.note,'تقرير خاص حتى النشر');
+  const skill=await call('POST',`/api/academy/courses/${course.id}/skills`,keys.teacher,{title:'يميّز صوت حرف الباء'});
+  assert.equal(skill.statusCode,201,skill.body);
+  const assessment=await call('PUT',`/api/academy/skills/${skill.json().data.id}/progress`,keys.teacher,{studentId:childId,status:'MASTERED',note:'أتقن التمييز؛ نراجع الكتابة',version:0});
+  assert.equal(assessment.statusCode,200,assessment.body);
+  assert.equal((await call('PUT',`/api/academy/skills/${skill.json().data.id}/progress`,keys.parent,{studentId:childId,status:'MASTERED',note:'',version:1})).statusCode,403);
+  assert.equal((await call('GET',`/api/academy/courses/${course.id}/skills`,keys.stranger)).statusCode,404);
+  const request=await call('POST','/api/academy/requests',keys.parent,{studentId:childId,courseId:course.id,kind:'WITHDRAWAL',reason:'ظروف الأسرة'});
+  assert.equal(request.statusCode,201,request.body);
+  const decision=await call('PATCH',`/api/academy/requests/${request.json().data.id}`,keys.admin,{version:1,status:'RESOLVED',response:'أُلغي التسجيل مع حفظ التقرير والواجب'});
+  assert.equal(decision.statusCode,200,decision.body);
+  assert.equal((await prisma.enrollment.findUnique({where:{courseId_studentId:{courseId:course.id,studentId:childId}}})).status,'CANCELLED');
+  assert.ok(await prisma.sessionReport.findUnique({where:{id:report.id}}));
+  assert.equal((await call('GET',`/api/academy/sessions/${session.id}`,keys.parent)).statusCode,200);
+  const privateChild=await prisma.studentProfile.findUniqueOrThrow({where:{id:childId}});
+  await prisma.studentProfile.update({where:{id:childId},data:{parentId:users.stranger.parentProfile.id}});
+  assert.equal((await call('GET',`/api/academy/sessions/${session.id}`,keys.parent)).statusCode,404);
+  await prisma.studentProfile.update({where:{id:childId},data:{parentId:privateChild.parentId}});
+});
+
+test('policy drafts remain private and updates use optimistic concurrency', async () => {
+  const {keys}=await operationsFixture();
+  const current=await prisma.academyPolicy.findUnique({where:{id:'academy'}});
+  const saved=await call('PUT','/api/academy/policy',keys.admin,{version:current?.version??0,published:false,content:'نص سياسات تجريبي غير منشور للأسرة'});
+  assert.equal(saved.statusCode,200,saved.body);
+  assert.equal((await call('GET','/api/academy/policy',keys.parent)).json().data,null);
+  assert.equal((await call('PUT','/api/academy/policy',keys.admin,{version:0,published:true,content:'نص قديم يحاول الكتابة'})).statusCode,409);
+  assert.equal((await call('PUT','/api/academy/policy',keys.parent,{version:saved.json().data.version,published:true,content:'محاولة تعديل الأسرة'})).statusCode,403);
+});
+
+test('a complete isolated database snapshot restores academy records and relations', async () => {
+  const before=await prisma.courseApplication.count();
+  assert.ok(before>0);
+  const snapshot=await local.db.dumpDataDir();
+  const {PGlite}=await import('@electric-sql/pglite');
+  const restored=new PGlite({loadDataDir:snapshot});await restored.waitReady;
+  try {
+    const result=await restored.query('SELECT count(*)::int AS n FROM "CourseApplication"');
+    assert.equal((result.rows[0] as {n:number}).n,before);
+    const relations=await restored.query('SELECT count(*)::int AS n FROM "CourseApplication" a JOIN "StudentProfile" s ON s.id=a."studentId" JOIN "Course" c ON c.id=a."courseId"');
+    assert.equal((relations.rows[0] as {n:number}).n,before);
+    assert.equal((await restored.query('SELECT count(*)::int AS n FROM "AuditEvent"')).rows[0].n,await prisma.auditEvent.count());
+  } finally {await restored.close();}
+});
+
+
+test('approving an intake request preserves an existing active enrollment history', async () => {
+  const { keys, course, childId } = await operationsFixture();
+  const application = (await call('POST', '/api/academy/applications', keys.parent, { studentId: childId, courseId: course.id })).json().data;
+  const enrolledAt = new Date(Date.now() - 7 * 86400000);
+  await prisma.enrollment.create({ data: { studentId: childId, courseId: course.id, enrolledAt } });
+  const result = await call('PATCH', `/api/academy/applications/${application.id}`, keys.admin, { version: application.version, action: 'APPROVE', paymentStatus: 'PAID' });
+  assert.equal(result.statusCode, 200, result.body);
+  assert.equal(result.json().data.paymentStatus, 'WAIVED');
+  assert.equal(result.json().data.paidAt, null);
+  const enrollment = await prisma.enrollment.findUniqueOrThrow({ where: { courseId_studentId: { courseId: course.id, studentId: childId } } });
+  assert.equal(enrollment.enrolledAt.toISOString(), enrolledAt.toISOString());
 });

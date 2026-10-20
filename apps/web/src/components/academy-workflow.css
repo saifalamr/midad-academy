@@ -1,0 +1,159 @@
+.academy-flow {
+  padding: 24px 20px 48px !important;
+  max-width: 1200px;
+}
+.academy-flow h1 {
+  font-size: 30px;
+  margin: 6px 0 12px;
+}
+.academy-flow h2 {
+  font-size: 22px;
+  margin-bottom: 12px;
+}
+.academy-flow h3 {
+  font-size: 18px;
+  margin: 10px 0;
+}
+.academy-flow p {
+  margin: 10px 0;
+  line-height: 1.8;
+}
+.flow-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.flow-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 14px 0;
+  margin-bottom: 16px;
+}
+.flow-tabs button {
+  white-space: nowrap;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: white;
+  color: var(--ink);
+  min-height: 44px;
+}
+.flow-tabs .active {
+  background: var(--navy);
+  color: white;
+}
+.flow-body {
+  border: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+.flow-body > .card,
+.flow-body > details {
+  margin-bottom: 16px;
+}
+.flow-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.flow-body .field {
+  margin: 14px 0;
+}
+.flow-body .field textarea {
+  min-height: 90px;
+}
+.flow-body select,
+.flow-body input {
+  width: 100%;
+}
+.flow-body input[type='checkbox'] {
+  width: auto;
+}
+.flow-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 16px 0;
+  line-height: 1.8;
+}
+.flow-check input {
+  margin-top: 7px;
+  flex: none;
+}
+.flow-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.flow-muted {
+  font-size: 13px;
+  color: var(--ink-3);
+}
+.flow-support {
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+  margin-top: 30px;
+}
+.flow-support a {
+  display: inline-block;
+  margin-inline-end: 20px;
+  color: var(--navy);
+  text-decoration: underline;
+}
+.flow-text {
+  white-space: pre-wrap;
+  line-height: 1.9;
+}
+.flow-body pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.flow-body summary {
+  cursor: pointer;
+  line-height: 1.8;
+}
+.flow-skill {
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+  margin-top: 16px;
+}
+.flow-help {
+  background: var(--cream);
+  border-radius: 12px;
+  padding: 16px;
+}
+.flow-body .btn {
+  min-height: 44px;
+}
+.flow-body .btn:focus-visible,
+.flow-tabs button:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 3px;
+}
+@media (max-width: 600px) {
+  .academy-flow {
+    padding: 20px 14px 36px !important;
+  }
+  .academy-flow h1 {
+    font-size: 25px;
+  }
+  .flow-body .card {
+    padding: 16px;
+  }
+  .flow-head > .btn {
+    width: 100%;
+  }
+  .flow-tabs {
+    margin-inline: -4px;
+  }
+  .flow-head {
+    align-items: flex-start;
+  }
+}

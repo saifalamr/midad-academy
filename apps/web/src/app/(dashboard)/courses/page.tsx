@@ -66,7 +66,7 @@ export default function CoursesPage() {
       </h1>
       <p className="sec-sub">
         {user?.role === 'PARENT'
-          ? 'تتولى الأكاديمية تسجيل أبنائك بعد التواصل واختيار الدورة المناسبة.'
+          ? 'اختر الدورة وأرسل طلب التسجيل من حسابك؛ ستصلك حالة الاعتماد داخل الموقع.'
           : 'الدورات والمعلمون والمواعيد تنظّمها إدارة الأكاديمية.'}
       </p>
       <label className="field">
@@ -140,14 +140,10 @@ export default function CoursesPage() {
                   </p>
                 )}
                 {user?.role === 'PARENT' ? (
-                  <a
-                    className="btn btn-gold"
-                    href={courseInquiryUrl(c)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {c.availableSeats > 0 ? 'طلب التسجيل عبر واتساب' : 'استفسر عن قائمة الانتظار'}
-                  </a>
+                  <div className="flow-actions">
+                    <Link className="btn btn-gold" href={`/academy?course=${encodeURIComponent(c.id)}`}>{c.availableSeats > 0 ? 'سجّل طفلك' : 'مكتملة — الانضمام لقائمة الانتظار'}</Link>
+                    <a className="btn btn-outline" href={courseInquiryUrl(c)} target="_blank" rel="noopener noreferrer">استفسار عبر واتساب</a>
+                  </div>
                 ) : (
                   <Link
                     className="btn btn-gold"

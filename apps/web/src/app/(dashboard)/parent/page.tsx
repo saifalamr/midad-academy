@@ -163,6 +163,7 @@ export default function ParentDashboard() {
           استعرض الدورات الشهرية
         </Link>
       </header>
+      <div className="flow-actions" style={{marginBottom:20}}><Link href="/academy" className="btn btn-outline">تسجيل الأبناء والدفع والغياب والتعويض</Link></div>
       {loading ? (
         <section className="card pad" role="status">
           جارٍ تحميل بيانات الأسرة…
@@ -178,15 +179,8 @@ export default function ParentDashboard() {
         <section className="card pad family-empty">
           <Icon name="family" size={42} />
           <h2>لنبدأ رحلة أبنائك</h2>
-          <p>تضيف الأكاديمية حسابات أبنائك وتربطها بك بعد التواصل وإكمال التسجيل.</p>
-          <a
-            className="btn btn-gold"
-            href={academyContactUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            تواصل مع الأكاديمية
-          </a>
+          <p>أضف طفلك من حسابك، ثم اختر دورة وأرسل طلب التسجيل. ستتابع حالة الطلب هنا بعد اعتماد الإدارة.</p>
+          <Link className="btn btn-gold" href="/academy">إضافة طفل وطلب التسجيل</Link>
         </section>
       ) : (
         <>
