@@ -31,6 +31,8 @@ jobs:
       - run: npm run lint
       - run: npm run test:api
       - run: node --import tsx --test tests/writing.test.ts
+      - name: Full browser journeys and embedded draft regression
+        run: npm run test:e2e
       - name: Real browser audio, video, moderation, observation and writing
         run: npm run test:classroom
         env:
