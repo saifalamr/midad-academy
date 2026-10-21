@@ -110,6 +110,17 @@ test('teacher and student exchange real media, synchronized ink, permissions and
       if (['error', 'warning'].includes(message.type()))
         console.error('Browser:', scrub(message.text()));
     });
+    page.on('response', async (response) => {
+      if (response.request().method() !== 'GET' || !response.url().includes('/api/writing/tasks/'))
+        return;
+      const json = await response.json().catch(() => null);
+      console.log('Writing access:', response.status(), {
+        staff: json?.data?.staff,
+        canSubmit: json?.data?.canSubmit,
+        attempts: json?.data?.attempts?.length,
+        error: json?.error,
+      });
+    });
     page.on('requestfailed', (request) =>
       console.error('Network:', scrub(request.url()), request.failure()?.errorText)
     );
@@ -268,11 +279,17 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   await student.getByRole('button', { name: 'نتدرّب على الكتابة', exact: true }).click();
   const writing = student.frameLocator('iframe[title="تمارين كتابة الحصة"]');
   await writing.getByRole('link', { name: 'فتح تمرين الكتابة', exact: true }).click();
-  await expect(
-    writing.getByRole('heading', { name: 'كتابة أثناء المكالمة', exact: true })
-  ).toBeVisible();
   const board = writing.getByRole('img', { name: 'لوحة تتبّع الكلمة', exact: true });
-  await board.scrollIntoViewIfNeeded();
+  try {
+    await expect(
+      writing.getByRole('heading', { name: 'كتابة أثناء المكالمة', exact: true })
+    ).toBeVisible({ timeout: 15000 });
+    await expect(board).toBeVisible({ timeout: 15000 });
+    await board.scrollIntoViewIfNeeded();
+  } catch (error) {
+    console.error('Writing frame:', await writing.locator('body').innerText());
+    throw error;
+  }
   const writingBox = (await board.boundingBox())!;
   await student.mouse.move(
     writingBox.x + writingBox.width * 0.7,

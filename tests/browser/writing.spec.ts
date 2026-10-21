@@ -170,6 +170,40 @@ test('teacher creates a custom guided word, pupil draws a recoverable draft, ret
       await login('student@preview.midad.test')
     );
     const pupil = await pupilContext.newPage();
+    // Exercise the real student page inside a native call-style modal as well as standalone.
+    const embeddedTask = await prisma.writingTask.create({
+      data: {
+        sessionId: session.id,
+        title: 'كتابة في نافذة الحصة',
+        word: 'مطر',
+        mode: 'SIMPLE',
+        fontSize: 120,
+        guides: [],
+        useAs: 'ACTIVITY',
+      },
+    });
+    await pupil.route('**/embedded-writing-check', (route) =>
+      route.fulfill({
+        contentType: 'text/html',
+        body:
+          '<!doctype html><meta charset="utf-8"><dialog aria-label="نشاط داخل الحصة" style="width:90vw;height:85vh"><iframe title="كتابة داخل الحصة" src="/writing/' +
+          embeddedTask.id +
+          '?embedded=1" style="width:100%;height:100%;border:0"></iframe></dialog><script>document.querySelector("dialog").showModal()</script>',
+      })
+    );
+    await pupil.goto('/embedded-writing-check');
+    const embeddedBoard = pupil.frameLocator('iframe[title="كتابة داخل الحصة"]');
+    try {
+      await expect(
+        embeddedBoard.getByRole('heading', { name: 'كتابة في نافذة الحصة', exact: true })
+      ).toBeVisible();
+      await expect(
+        embeddedBoard.getByRole('img', { name: 'لوحة تتبّع الكلمة', exact: true })
+      ).toBeVisible();
+    } catch (error) {
+      console.error('Embedded student writing:', await embeddedBoard.locator('body').innerText());
+      throw error;
+    }
     await pupil.goto('/student/homework');
     await pupil
       .getByRole('region', { name: 'واجبات الكتابة' })
@@ -244,7 +278,7 @@ test('teacher creates a custom guided word, pupil draws a recoverable draft, ret
       family.getByRole('heading', { name: 'تمارين هذه الحصة', exact: true })
     ).toBeVisible();
     await expect(family.getByRole('navigation', { name: 'تنقل مساحة العمل' })).toBeHidden();
-    const embeddedLink = family.getByRole('link', { name: 'فتح تمرين الكتابة', exact: true });
+    const embeddedLink = family.locator('a[href="/writing/' + task.id + '?embedded=1"]');
     await expect(embeddedLink).toHaveAttribute('href', '/writing/' + task.id + '?embedded=1');
     await embeddedLink.click();
     await expect(family.getByRole('heading', { name: 'أتقن التمرين', exact: true })).toBeVisible();
