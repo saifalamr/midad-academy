@@ -102,7 +102,7 @@ test('teacher and student exchange real media, synchronized ink, permissions and
     const scrub = (value: string) =>
       value.replace(/(access_token|token)=[^&\s]+/g, '$1=[redacted]');
     page.on('console', (message) => {
-      if (message.type() === 'error') console.error('Browser:', scrub(message.text()));
+      if (['error', 'warning'].includes(message.type())) console.error('Browser:', scrub(message.text()));
     });
     page.on('requestfailed', (request) =>
       console.error('Network:', scrub(request.url()), request.failure()?.errorText)
