@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuth } from './AuthProvider';
 import { homeworkApi } from '@/lib/homework';
 import './homework.css';
+import WritingHomework from './WritingHomework';
 type Item = {
   id: string;
   title: string;
@@ -131,6 +132,7 @@ export default function HomeworkList() {
         ))}
       </div>
       <p>تُعرض أحدث ١٠٠ حصة أو تسليم.</p>
+      <WritingHomework />
     </main>
   );
 }

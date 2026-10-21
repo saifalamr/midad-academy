@@ -6,6 +6,7 @@ import ClassroomMicrophones, {
   useSpeakingPermission,
 } from '@/components/ClassroomMicrophones';
 import ClassClock from '@/components/ClassClock';
+import ClassWriting from '@/components/ClassWriting';
 import CameraVideo from '@/components/CameraVideo';
 import Link from 'next/link';
 import Icon, { type IconName } from '@/components/Icon';
@@ -884,6 +885,7 @@ function ClassroomContent({
 
       <ClassroomPresence courseId={roomId} isObserver={isObserver} />
       <ClassClock courseId={roomId} editable={isTeacher} />
+      <ClassWriting courseId={roomId} />
       {/* ── Video strip ── */}
       <div className="video-strip">
         <div className="vtile vteacher">

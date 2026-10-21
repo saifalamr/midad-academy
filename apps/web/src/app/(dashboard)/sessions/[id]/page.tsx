@@ -95,6 +95,15 @@ export default function SessionWorkspace({ params }: { params: Promise<{ id: str
               تحديث حالة الحصة
             </button>
           </header>
+          <section className="card pad">
+            <h2>أنشطة الحصة</h2>
+            <p>تدرّب على كتابة الحروف والكلمات المرتبطة بهذا الدرس، وتابع تقييم المعلم.</p>
+            <Link className="btn btn-gold" href={'/sessions/' + data.id + '/writing'}>
+              {user?.role === 'TEACHER' || user?.role === 'ADMIN'
+                ? 'إعداد ومتابعة تمارين الكتابة'
+                : 'نتدرّب على الكتابة'}
+            </Link>
+          </section>
           <section className="flow-grid">
             <article className="card pad">
               <h2>الموعد والدخول</h2>

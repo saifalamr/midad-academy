@@ -127,6 +127,9 @@ export default function TeacherDashboard() {
                   >
                     خطة الحصة والمواد
                   </Link>
+                  <Link className="btn btn-outline btn-sm" href={'/sessions/' + s.id + '/writing'}>
+                    تمارين الكتابة
+                  </Link>
                   <button
                     className="btn btn-gold"
                     disabled={!!starting}

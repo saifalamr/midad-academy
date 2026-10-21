@@ -1,0 +1,251 @@
+.writing-page {
+  max-width: 1200px;
+  padding: 24px 20px 48px !important;
+  margin: auto;
+}
+.writing-page h1 {
+  font-size: 30px;
+  margin: 12px 0;
+}
+.writing-page h2 {
+  font-size: 22px;
+  margin: 12px 0;
+}
+.writing-page h3 {
+  font-size: 18px;
+  margin: 12px 0;
+}
+.writing-page p {
+  line-height: 1.9;
+  margin: 12px 0;
+}
+.writing-page .field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0;
+}
+.writing-page .input {
+  width: 100%;
+}
+.writing-page fieldset {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+}
+.writing-page .card {
+  margin: 16px 0;
+}
+.writing-row,
+.writing-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin: 16px 0;
+}
+.writing-row > .field {
+  flex: 1 1 200px;
+}
+.writing-board-wrap {
+  width: 100%;
+  min-width: 0;
+}
+.writing-board {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 5/2;
+  display: block;
+  background: #fffdf8;
+  border: 1px solid #e4d9bd;
+  border-radius: 16px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: crosshair;
+}
+.writing-board.readonly {
+  touch-action: auto;
+  cursor: default;
+}
+.writing-word {
+  fill: #dedbd3;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-weight: 500;
+  pointer-events: none;
+}
+.writing-baseline {
+  stroke: #eee9dd;
+  stroke-dasharray: 6 7;
+}
+.writing-ink {
+  fill: none;
+  stroke: #20836b;
+  stroke-width: 11;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+circle.writing-ink {
+  fill: #20836b;
+  stroke: none;
+}
+.writing-guide polyline {
+  fill: none;
+  stroke: #ba8b32;
+  stroke-width: 3;
+  stroke-dasharray: 8 7;
+  opacity: 0.7;
+}
+.writing-guide circle {
+  fill: #fff5d6;
+  stroke: #b7892e;
+  stroke-width: 2;
+}
+.writing-guide text {
+  font-family: Inter, sans-serif;
+  fill: #735015;
+  font-size: 20px;
+}
+.writing-guide {
+  pointer-events: none;
+}
+.writing-demo {
+  fill: none;
+  stroke: #193b67;
+  stroke-width: 10;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: writing-reveal 1.2s linear forwards;
+  pointer-events: none;
+}
+.writing-demo-dot {
+  fill: #193b67;
+  opacity: 0;
+  animation: writing-dot 1.2s linear forwards;
+  pointer-events: none;
+}
+@keyframes writing-reveal {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes writing-dot {
+  to {
+    opacity: 1;
+  }
+}
+.writing-page .writing-check {
+  padding: 16px;
+  background: #edf5f1;
+  border-radius: 12px;
+  margin: 16px 0;
+}
+.writing-page .writing-muted {
+  font-size: 14px;
+  color: #596273;
+}
+.writing-page .writing-checkbox {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 16px 0;
+  line-height: 1.8;
+}
+.writing-homework {
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+  margin-top: 24px;
+}
+.writing-homework .card {
+  margin: 12px 0;
+}
+.writing-page button,
+.writing-page .btn {
+  min-height: 44px;
+}
+.writing-page details summary {
+  cursor: pointer;
+  padding: 14px 0;
+  font-weight: 700;
+}
+.writing-page * {
+  overflow-wrap: anywhere;
+}
+.writing-page .writing-board text {
+  overflow-wrap: normal;
+}
+@media (max-width: 600px) {
+  .writing-page {
+    padding: 18px 12px 40px !important;
+  }
+  .writing-page h1 {
+    font-size: 25px;
+  }
+  .writing-board {
+    min-height: 0;
+  }
+  .writing-tools {
+    gap: 8px;
+  }
+  .writing-tools .btn {
+    font-size: 13px;
+    padding: 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .writing-demo {
+    animation-duration: 0.01s;
+  }
+  .writing-demo-dot {
+    animation-duration: 0.01s;
+  }
+}
+.class-writing-entry {
+  padding: 8px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  background: #f8f6f0;
+}
+.writing-class-dialog {
+  width: min(1100px, calc(100vw - 24px));
+  max-width: none;
+  padding: 12px;
+  border: 1px solid #d8dfe7;
+  border-radius: 16px;
+  max-height: 95dvh;
+  background: #f7f8fa;
+  color: #193b67;
+}
+.writing-class-dialog::backdrop {
+  background: rgb(12 29 49 / 0.55);
+}
+.writing-class-dialog .writing-row {
+  justify-content: space-between;
+  margin: 0 0 8px;
+}
+.writing-class-dialog h2 {
+  font-size: 18px;
+}
+.writing-class-dialog iframe {
+  border: 0;
+  width: 100%;
+  height: 76dvh;
+  background: #f7f8fa;
+  display: block;
+}
+/* The in-call view stays within writing activities, keeping classroom navigation
+   and device controls in the original document. Authorization is unchanged. */
+.midad.workspace-shell:has([data-writing-embedded='true']) {
+  display: block;
+  min-height: 0;
+}
+.workspace-shell:has([data-writing-embedded='true']) > .workspace-topbar,
+.workspace-shell:has([data-writing-embedded='true']) > .workspace-nav,
+.workspace-shell:has([data-writing-embedded='true']) > .workspace-skip {
+  display: none;
+}

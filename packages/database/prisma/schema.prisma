@@ -89,6 +89,7 @@ model User {
   teacherProfile      TeacherProfile?
   studentProfile      StudentProfile?
   parentProfile       ParentProfile?
+  writingTemplates    WritingTemplate[]
   academyNotices      AcademyNotice[]
   auditEvents         AuditEvent[]
   payments            Payment[]
@@ -139,6 +140,7 @@ model StudentProfile {
   seatReservations    SeatReservation[]
   applications        CourseApplication[]
   serviceRequests     AcademyServiceRequest[]
+  writingAttempts     WritingAttempt[]
   skillProgress       SkillProgress[]
 }
 
@@ -321,6 +323,7 @@ model ClassSession {
   attendance          SessionAttendance[]
   reports             SessionReport[]
   materialsVersion    Int                         @default(0)
+  writingTasks        WritingTask[]
   materials           SessionMaterial[]
   homework            SessionHomework?
   homeworkAudio       HomeworkAudio[]
@@ -713,4 +716,54 @@ model AcademyPolicy {
   published Boolean  @default(false)
   version   Int      @default(1)
   updatedAt DateTime @updatedAt
+}
+
+// Teacher-owned words and paths. Assignments snapshot the template so later edits
+// cannot change an existing child's work or its assessment reference.
+model WritingTemplate {
+  id        String   @id @default(uuid())
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  word      String
+  fontSize  Int      @default(140)
+  mode      String   @default("SIMPLE")
+  guides    Json     @default("[]")
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([authorId, createdAt])
+}
+
+model WritingTask {
+  id        String           @id @default(uuid())
+  sessionId String
+  session   ClassSession     @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  title     String
+  word      String
+  fontSize  Int
+  mode      String
+  guides    Json
+  useAs     String           @default("ACTIVITY")
+  createdAt DateTime         @default(now())
+  attempts  WritingAttempt[]
+
+  @@index([sessionId, createdAt])
+}
+
+model WritingAttempt {
+  id          String         @id @default(uuid())
+  taskId      String
+  task        WritingTask    @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  studentId   String
+  student     StudentProfile @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  strokes     Json
+  guidance    Json?
+  submittedAt DateTime       @default(now())
+  verdict     String         @default("PENDING")
+  feedback    String         @default("")
+  version     Int            @default(1)
+  reviewedAt  DateTime?
+
+  @@unique([taskId, studentId])
 }

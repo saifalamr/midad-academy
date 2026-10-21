@@ -27,6 +27,7 @@ import { rateLimitKey } from './lib/rate-limit';
 import { notificationRoutes } from './routes/notifications';
 import { homeworkAudioRoutes } from './routes/homework-audio';
 import { homeworkRoutes } from './routes/homework';
+import { writingRoutes } from './routes/writing';
 import { academyRoutes } from './routes/academy';
 import { adminRoutes } from './routes/admin';
 import { bootstrapAdmin } from './lib/bootstrap-admin';
@@ -126,6 +127,7 @@ export async function buildApp() {
   });
 
   // ── Routes ───────────────────────────────────────────────────────────────
+  await app.register(writingRoutes, { prefix: '/api/writing' });
   await app.register(academyRoutes, { prefix: '/api/academy' });
   await app.register(healthRoutes, { prefix: '/api' });
   await app.register(authRoutes, { prefix: '/api/auth' });
