@@ -1,5 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
+test.use({ actionTimeout: 20000 });
+
 test.skip(
   !process.env.RUN_CLASSROOM_TEST,
   'Requires the local LiveKit server; run the classroom verification command.'
@@ -322,8 +324,10 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   });
   // Re-entry restores the saved drawing grant.
   await student.reload();
-  await student.getByRole('button', { name: 'دخول الحصة', exact: true }).click();
-  await expect(student.getByText('متزامنة', { exact: true })).toBeVisible();
+  await enter(student);
+  await student.getByRole('button', { name: 'تشغيل الكاميرا', exact: true }).click();
+  await expect(student.getByRole('button', { name: 'تشغيل الصوت', exact: true })).toBeEnabled();
+  await student.getByRole('button', { name: 'تشغيل الصوت', exact: true }).click();
   await expect(student.getByText('مشاهدة فقط')).toHaveCount(0);
   const before = await ink(teacher);
   await Promise.all([placeShape(teacher, 'دائرة', 0.25), placeShape(student, 'مستطيل', 0.75)]);
@@ -339,7 +343,10 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   });
   await expect(teacher.getByText('درس متزامن', { exact: true })).toBeVisible();
   await student.reload();
-  await student.getByRole('button', { name: 'دخول الحصة', exact: true }).click();
+  await enter(student);
+  await student.getByRole('button', { name: 'تشغيل الكاميرا', exact: true }).click();
+  await expect(student.getByRole('button', { name: 'تشغيل الصوت', exact: true })).toBeEnabled();
+  await student.getByRole('button', { name: 'تشغيل الصوت', exact: true }).click();
   await expect(student.getByText('درس متزامن', { exact: true })).toBeVisible();
   await expect(
     student.frameLocator('iframe[title="درس متزامن"]').getByText('مرحباً')

@@ -45,10 +45,11 @@
 
 .observer-notice{color:#1b3a6b;font-size:13px;line-height:1.7;flex:1;text-align:center}
 .midad.classroom-observer .board-wrap{grid-template-rows:minmax(0,1fr)}.midad.classroom-observer .board-stage{grid-row:1}
-/* Reserve a dedicated clock row so it never displaces the board or call controls. */
-.midad.room.classroom-v2{grid-template-rows:auto auto minmax(0,1fr) auto}
+/* Keep the clock and writing entry in explicit rows above the live workspace. */
+.midad.room.classroom-v2{grid-template-rows:auto auto auto minmax(0,1fr) auto}
 .midad.classroom-v2 .class-clock{grid-column:1/-1;grid-row:2;min-width:0;max-height:30dvh;overflow:auto}
-.midad.classroom-v2 .video-strip,.midad.classroom-v2 .board-wrap{grid-row:3}
-.midad.classroom-v2 .room-controls{grid-row:4}
-@media(max-width:700px){.midad.room.classroom-v2{grid-template-rows:auto auto 78px minmax(0,1fr) auto}.midad.classroom-v2 .video-strip{grid-row:3}.midad.classroom-v2 .board-wrap{grid-row:4}.midad.classroom-v2 .room-controls{grid-row:5}}
-@media(max-height:550px) and (orientation:landscape){.midad.room.classroom-v2{grid-template-rows:auto auto minmax(0,1fr) auto}.midad.classroom-v2 .video-strip,.midad.classroom-v2 .board-wrap{grid-row:3}.midad.classroom-v2 .room-controls{grid-row:4}.midad.classroom-v2 .class-clock-phases{display:none}.midad.classroom-v2 .class-clock{padding:4px 12px}}
+.midad.classroom-v2 .class-writing-entry{grid-column:1/-1;grid-row:3;min-width:0;padding:4px 14px}
+.midad.classroom-v2 .video-strip,.midad.classroom-v2 .board-wrap{grid-row:4}
+.midad.classroom-v2 .room-controls{grid-row:5}
+@media(max-width:700px){.midad.room.classroom-v2{grid-template-rows:auto auto auto 78px minmax(0,1fr) auto}.midad.classroom-v2 .video-strip{grid-row:4}.midad.classroom-v2 .board-wrap{grid-row:5}.midad.classroom-v2 .room-controls{grid-row:6}}
+@media(max-height:550px) and (orientation:landscape){.midad.room.classroom-v2{grid-template-rows:auto auto auto minmax(0,1fr) auto}.midad.classroom-v2 .video-strip,.midad.classroom-v2 .board-wrap{grid-row:4}.midad.classroom-v2 .room-controls{grid-row:5}.midad.classroom-v2 .class-clock-phases{display:none}.midad.classroom-v2 .class-clock{padding:4px 12px}}
