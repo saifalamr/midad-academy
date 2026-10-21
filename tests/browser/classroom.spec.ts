@@ -98,6 +98,20 @@ test('teacher and student exchange real media, synchronized ink, permissions and
       errors.push(e.message);
       console.error('Classroom page error:', e.message);
     });
+  for (const page of [teacher, student]) {
+    const scrub = (value: string) =>
+      value.replace(/(access_token|token)=[^&\s]+/g, '$1=[redacted]');
+    page.on('console', (message) => {
+      if (message.type() === 'error') console.error('Browser:', scrub(message.text()));
+    });
+    page.on('requestfailed', (request) =>
+      console.error('Network:', scrub(request.url()), request.failure()?.errorText)
+    );
+    page.on('websocket', (socket) =>
+      socket.on('socketerror', (error) => console.error('Socket:', error))
+    );
+  }
+
   const enter = async (page: Page) => {
     await page.goto('/classroom/preview-arabic');
     await page.getByRole('button', { name: 'دخول الحصة', exact: true }).click();
