@@ -186,13 +186,15 @@ test('teacher creates a custom guided word, pupil draws a recoverable draft, ret
       route.fulfill({
         contentType: 'text/html',
         body:
-          '<!doctype html><meta charset="utf-8"><dialog aria-label="نشاط داخل الحصة" style="width:90vw;height:85vh"><iframe title="كتابة داخل الحصة" src="/writing/' +
-          embeddedTask.id +
-          '?embedded=1" style="width:100%;height:100%;border:0"></iframe></dialog><script>document.querySelector("dialog").showModal()</script>',
+          '<!doctype html><meta charset="utf-8"><dialog aria-label="نشاط داخل الحصة" style="width:90vw;height:85vh"><iframe title="كتابة داخل الحصة" src="/sessions/' +
+          session.id +
+          '/writing?embedded=1" style="width:100%;height:100%;border:0"></iframe></dialog><script>document.querySelector("dialog").showModal()</script>',
       })
     );
+    await pupil.setViewportSize({ width: 390, height: 844 });
     await pupil.goto('/embedded-writing-check');
     const embeddedBoard = pupil.frameLocator('iframe[title="كتابة داخل الحصة"]');
+    await embeddedBoard.locator('a[href="/writing/' + embeddedTask.id + '?embedded=1"]').click();
     try {
       await expect(
         embeddedBoard.getByRole('heading', { name: 'كتابة في نافذة الحصة', exact: true })
@@ -204,6 +206,7 @@ test('teacher creates a custom guided word, pupil draws a recoverable draft, ret
       console.error('Embedded student writing:', await embeddedBoard.locator('body').innerText());
       throw error;
     }
+    await pupil.setViewportSize({ width: 820, height: 1180 });
     await pupil.goto('/student/homework');
     await pupil
       .getByRole('region', { name: 'واجبات الكتابة' })

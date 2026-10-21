@@ -360,7 +360,8 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   });
   await expect(teacher.getByText('درس متزامن', { exact: true })).toBeVisible();
   await student.reload();
-  await enter(student);
+  await student.getByRole('button', { name: 'دخول الحصة', exact: true }).click();
+  await expect(student.getByText('درس متزامن', { exact: true })).toBeVisible();
   await student.getByRole('button', { name: 'تشغيل الكاميرا', exact: true }).click();
   await expect(student.getByRole('button', { name: 'تشغيل الصوت', exact: true })).toBeEnabled();
   await student.getByRole('button', { name: 'تشغيل الصوت', exact: true }).click();

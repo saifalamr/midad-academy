@@ -67,17 +67,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const update = () => {
       void refresh();
     };
+    // Drafts saved by an embedded activity also emit storage events in this tab.
+    // Only credential changes should revalidate authentication and replace protected views.
+    const storageUpdate = (event: StorageEvent) => {
+      if (event.key === 'token' || event.key === null) void refresh();
+    };
     const restore = (event: PageTransitionEvent) => {
       if (event.persisted) void refresh();
     };
     window.addEventListener('pageshow', restore);
     window.addEventListener('midad-auth', update);
-    window.addEventListener('storage', update);
+    window.addEventListener('storage', storageUpdate);
     return () => {
       ++requests.current;
       window.removeEventListener('pageshow', restore);
       window.removeEventListener('midad-auth', update);
-      window.removeEventListener('storage', update);
+      window.removeEventListener('storage', storageUpdate);
     };
   }, [refresh]);
   return <Context.Provider value={{ user, status, refresh, logout }}>{children}</Context.Provider>;
