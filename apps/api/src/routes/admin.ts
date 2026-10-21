@@ -1,3 +1,4 @@
+import { queueFamilyNotification } from '../lib/notifications';
 import type { FastifyInstance } from 'fastify';
 import { adminSessionRoutes } from './admin-sessions';
 import { adminMaterialRoutes } from './session-materials';
@@ -265,11 +266,13 @@ export async function adminRoutes(app: FastifyInstance) {
       if (existing?.status === 'ACTIVE') return existing;
       if (!(await availableSeat(tx, course.id, course.maxStudents)))
         throw httpError(409, 'اكتملت مقاعد الدورة');
-      return tx.enrollment.upsert({
+      const saved = await tx.enrollment.upsert({
         where: { courseId_studentId: { courseId: course.id, studentId } },
         create: { courseId: course.id, studentId },
         update: { status: 'ACTIVE' },
       });
+      await queueFamilyNotification(tx, 'ENROLLMENT', saved.id, studentId);
+      return saved;
     });
     return reply.status(201).send({ data: enrollment });
   });

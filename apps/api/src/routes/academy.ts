@@ -1,3 +1,4 @@
+import { queueFamilyNotification } from '../lib/notifications';
 import type { FastifyInstance } from 'fastify';
 import type { Prisma } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
@@ -313,7 +314,7 @@ export async function academyRoutes(app: FastifyInstance) {
             (!['PAID', 'WAIVED'].includes(body.paymentStatus ?? '') || !body.paymentReference)
           )
             throw httpError(400, 'أكد الدفع الفعلي بمرجع أو سجّل سبب إعفاء معتمد');
-          await tx.enrollment.upsert({
+          const enrollment = await tx.enrollment.upsert({
             where: { courseId_studentId: { courseId: course.id, studentId: current.studentId } },
             create: { courseId: course.id, studentId: current.studentId },
             update: {
@@ -321,6 +322,7 @@ export async function academyRoutes(app: FastifyInstance) {
               ...(existing?.status !== 'ACTIVE' ? { enrolledAt: new Date() } : {}),
             },
           });
+          await queueFamilyNotification(tx, 'ENROLLMENT', enrollment.id, current.studentId);
           data.status = 'APPROVED';
           data.paymentStatus = current.quotedAmount === 0 ? 'WAIVED' : body.paymentStatus;
           data.paymentReference = body.paymentReference;

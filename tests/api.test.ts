@@ -2636,9 +2636,9 @@ test('WhatsApp consent, durable deduplication, reminders and ambiguous failures 
       return new Response(JSON.stringify({ messages: [{ id: 'provider-1' }] }), { status: 200 });
     }) as any;
     await dispatchNotifications();
-    assert.equal(requests, 1, JSON.stringify(await prisma.whatsAppNotification.findMany({where:{referenceId:session.id},select:{status:true,lastError:true,availableAt:true,attempts:true}})));
+    assert.equal(requests, 2, JSON.stringify(await prisma.whatsAppNotification.findMany({where:{referenceId:session.id},select:{status:true,lastError:true,availableAt:true,attempts:true}})));
     await dispatchNotifications();
-    assert.equal(requests, 1);
+    assert.equal(requests, 2);
     assert.equal(
       (await prisma.whatsAppNotification.findFirst({ where: { referenceId: session.id } })).status,
       'ACCEPTED'
@@ -3216,4 +3216,66 @@ test('writing homework opens only after class end and preserves separate sibling
   assert.equal((await call('DELETE','/api/writing/tasks/'+activity.id,keys.teacher)).statusCode,200);
   const latest=await prisma.auditEvent.findMany({where:{targetId:activity.id}});
   assert.deepEqual(latest.map((a:any)=>a.action).sort(),['WRITING_ASSIGNED','WRITING_UNASSIGNED']);
+});
+
+
+test('enrollment confirmations are transactional, deduplicated and recheck active enrollment before sending', async () => {
+  const { keys, users, course, childId } = await operationsFixture(1);
+  const { config } = await import('../apps/api/src/config');
+  const { dispatchNotifications } = await import('../apps/api/src/lib/notifications');
+  const previous = { ...config };
+  const originalFetch = globalThis.fetch;
+  await prisma.user.update({ where: { id: users.parent.id }, data: { whatsappOptIn: true, whatsappPhone: '201000000001' } });
+  const application = (await call('POST', '/api/academy/applications', keys.parent, { studentId: childId, courseId: course.id })).json().data;
+  assert.equal(await prisma.whatsAppNotification.count({ where: { studentId: childId } }), 0);
+  const approved = await call('PATCH', `/api/academy/applications/${application.id}`, keys.admin, { version: application.version, action: 'APPROVE' });
+  assert.equal(approved.statusCode, 200, approved.body);
+  const enrollment = await prisma.enrollment.findFirstOrThrow({ where: { studentId: childId, courseId: course.id } });
+  const notice = await prisma.whatsAppNotification.findFirstOrThrow({ where: { referenceId: enrollment.id } });
+  assert.equal(notice.kind, 'ENROLLMENT');
+  assert.equal(notice.recipientUserId, users.parent.id);
+  assert.equal(notice.status, 'PENDING');
+  assert.equal((await call('POST', `/api/admin/courses/${course.id}/enrollments`, keys.admin, { studentId: childId })).statusCode, 201);
+  assert.equal((await call('PATCH', `/api/academy/applications/${application.id}`, keys.admin, { version: application.version, action: 'APPROVE' })).statusCode, 409);
+  assert.equal(await prisma.whatsAppNotification.count({ where: { referenceId: enrollment.id } }), 1);
+  let sent: any[] = [];
+  try {
+    Object.assign(config, { WHATSAPP_ENABLED: false, WHATSAPP_ACCESS_TOKEN: 'mock-only', WHATSAPP_PHONE_NUMBER_ID: '1234', WHATSAPP_API_VERSION: 'v25.0', WHATSAPP_TEMPLATE_NAME: 'academy_update' });
+    assert.equal((await dispatchNotifications()).processed, 0);
+    assert.equal((await prisma.whatsAppNotification.findUnique({ where: { id: notice.id } })).status, 'PENDING');
+    // Other scenarios' records must not be sent by this isolated provider mock.
+    await prisma.whatsAppNotification.updateMany({ where: { status: 'PENDING', studentId: { not: childId } }, data: { availableAt: new Date(Date.now() + 86400000) } });
+    config.WHATSAPP_ENABLED = true;
+    globalThis.fetch = (async (_url: any, options: any) => {
+      sent.push(JSON.parse(options.body));
+      return new Response(JSON.stringify({ messages: [{ id: 'mock-enrollment' }] }), { status: 200 });
+    }) as any;
+    await dispatchNotifications();
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].to, '201000000001');
+    const params = sent[0].template.components[0].parameters;
+    assert.equal(params.length, 4);
+    assert.equal(params[1].text, course.title);
+    assert.match(params[2].text, /تم تأكيد التسجيل/);
+    assert.match(params[3].text, /\/academy$/);
+    await dispatchNotifications();
+    assert.equal(sent.length, 1);
+    const second = await operationsFixture();
+    await prisma.user.update({ where: { id: second.users.parent.id }, data: { whatsappOptIn: true, whatsappPhone: '201000000002' } });
+    const manual = await call('POST', `/api/admin/courses/${second.course.id}/enrollments`, second.keys.admin, { studentId: second.childId });
+    assert.equal(manual.statusCode, 201, manual.body);
+    await prisma.enrollment.update({ where: { id: manual.json().data.id }, data: { status: 'CANCELLED' } });
+    await dispatchNotifications();
+    assert.equal(sent.length, 1);
+    assert.equal((await prisma.whatsAppNotification.findFirst({ where: { referenceId: manual.json().data.id } })).status, 'SKIPPED');
+    const status = await call('GET', '/api/notifications/status', keys.admin);
+    assert.equal(status.json().data.setupChecks.length, 5);
+    assert.ok(!status.body.includes('mock-only'));
+    const optedOut = await operationsFixture();
+    const skipped = await call('POST', `/api/admin/courses/${optedOut.course.id}/enrollments`, optedOut.keys.admin, { studentId: optedOut.childId });
+    assert.equal((await prisma.whatsAppNotification.findFirst({ where: { referenceId: skipped.json().data.id } })).status, 'SKIPPED');
+  } finally {
+    globalThis.fetch = originalFetch;
+    Object.assign(config, previous);
+  }
 });

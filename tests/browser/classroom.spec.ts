@@ -9,7 +9,7 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   browser,
   request,
 }) => {
-  test.setTimeout(180000);
+  test.setTimeout(300000);
   const login = async (email: string) => {
     const res = await request.post('http://127.0.0.1:4000/api/auth/login', {
       data: { email, password: 'MidadPreview2026!' },
@@ -167,7 +167,33 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   await expect(
     administrator.getByRole('button', { name: 'مايكات الطلاب', exact: true })
   ).toHaveCount(0);
+  await expect
+    .poll(async () => (await remoteMedia(administrator)).videos)
+    .toBeGreaterThanOrEqual(2);
   await adminContext.close();
+  const parentContext = await browser.newContext({ viewport: { width: 820, height: 1180 } });
+  await parentContext.addInitScript(
+    (token) => {
+      localStorage.setItem('token', token);
+      (window as any).__deviceRequests = 0;
+      navigator.mediaDevices.getUserMedia = async () => {
+        (window as any).__deviceRequests++;
+        throw new Error('An observer must never request devices');
+      };
+    },
+    await login('parent@preview.midad.test')
+  );
+  const parent = await parentContext.newPage();
+  await parent.goto('/classroom/preview-arabic');
+  await parent.getByRole('button', { name: 'دخول للمشاهدة', exact: true }).click();
+  await expect(parent.getByText('وضع المشاهدة · بدون كاميرا أو ميكروفون أو تفاعل')).toBeVisible();
+  await expect.poll(async () => (await remoteMedia(parent)).videos).toBeGreaterThanOrEqual(2);
+  await expect.poll(async () => (await remoteMedia(parent)).audio).toBeGreaterThan(0);
+  await expect(parent.getByRole('button', { name: 'تشغيل الكاميرا', exact: true })).toHaveCount(0);
+  await expect(parent.getByRole('button', { name: 'مايكات الطلاب', exact: true })).toHaveCount(0);
+  expect(await parent.evaluate(() => (window as any).__deviceRequests)).toBe(0);
+  await expect(teacher.locator('.rt-count')).toContainText('2');
+  await parentContext.close();
 
   const videoFrames = (page: Page) =>
     page.evaluate(() =>
@@ -187,6 +213,43 @@ test('teacher and student exchange real media, synchronized ink, permissions and
       )
       .toBeTruthy();
   };
+  await expectMovingVideo(teacher);
+  await expectMovingVideo(student);
+  const template = await api('post', '/api/writing/library', teacherToken, {
+    word: 'مطر',
+    mode: 'SIMPLE',
+    fontSize: 120,
+    guides: [],
+  });
+  await api('post', `/api/writing/sessions/${scheduled.data.id}`, teacherToken, {
+    templateId: template.data.id,
+    title: 'كتابة أثناء المكالمة',
+    useAs: 'ACTIVITY',
+  });
+  await student.getByRole('button', { name: 'نتدرّب على الكتابة', exact: true }).click();
+  const writing = student.frameLocator('iframe[title="تمارين كتابة الحصة"]');
+  await writing.getByRole('link', { name: 'فتح تمرين الكتابة', exact: true }).click();
+  await expect(
+    writing.getByRole('heading', { name: 'كتابة أثناء المكالمة', exact: true })
+  ).toBeVisible();
+  const board = writing.getByRole('img', { name: 'لوحة تتبّع الكلمة', exact: true });
+  await board.scrollIntoViewIfNeeded();
+  const writingBox = (await board.boundingBox())!;
+  await student.mouse.move(
+    writingBox.x + writingBox.width * 0.7,
+    writingBox.y + writingBox.height * 0.5
+  );
+  await student.mouse.down();
+  await student.mouse.move(
+    writingBox.x + writingBox.width * 0.3,
+    writingBox.y + writingBox.height * 0.55,
+    { steps: 12 }
+  );
+  await student.mouse.up();
+  await writing.getByRole('button', { name: 'تسليم محاولة الكتابة', exact: true }).click();
+  await expect(writing.getByText('حُفظت المحاولة وسُلّمت للمعلم.', { exact: true })).toBeVisible();
+  await expect.poll(async () => (await remoteMedia(teacher)).audio).toBeGreaterThan(0);
+  await student.getByRole('button', { name: 'إغلاق والعودة للمكالمة', exact: true }).click();
   await expectMovingVideo(teacher);
   await expectMovingVideo(student);
   const ink = (page: Page) =>

@@ -14,12 +14,19 @@ export function notificationConfiguration() {
     enabled: config.WHATSAPP_ENABLED,
     configured,
     schedulerConfigured: config.NOTIFICATIONS_CRON_SECRET.length >= 32,
+    setupChecks: [
+      { label: 'تفعيل الإرسال', ready: config.WHATSAPP_ENABLED },
+      { label: 'رمز وصول مزود واتساب', ready: !!config.WHATSAPP_ACCESS_TOKEN },
+      { label: 'معرّف رقم المرسل', ready: /^\d+$/.test(config.WHATSAPP_PHONE_NUMBER_ID) },
+      { label: 'إصدار واجهة المزود', ready: /^v\d+\.\d+$/.test(config.WHATSAPP_API_VERSION) },
+      { label: 'اسم قالب الرسائل المعتمد', ready: !!config.WHATSAPP_TEMPLATE_NAME },
+    ],
   };
 }
 const validPhone = (phone: string | null) => !!phone && /^\+?[1-9]\d{7,14}$/.test(phone);
 export async function queueFamilyNotification(
   tx: Tx,
-  kind: 'REPORT' | 'GRADE',
+  kind: 'REPORT' | 'GRADE' | 'ENROLLMENT',
   referenceId: string,
   studentId: string
 ) {
@@ -95,7 +102,17 @@ async function messageFor(item: WhatsAppNotification, now: Date) {
   )
     return null;
   let title: string, update: string, path: string;
-  if (item.kind === 'REMINDER') {
+  if (item.kind === 'ENROLLMENT') {
+    const enrollment = await prisma.enrollment.findUnique({
+      where: { id: item.referenceId },
+      include: { course: true },
+    });
+    if (!enrollment || enrollment.studentId !== child.id || enrollment.status !== 'ACTIVE')
+      return null;
+    title = enrollment.course.title;
+    update = `تم تأكيد التسجيل في ${title} لشهر ${enrollment.course.month}. يمكنك مراجعة التفاصيل والمواعيد في حسابك.`;
+    path = '/academy';
+  } else if (item.kind === 'REMINDER') {
     const session = await prisma.classSession.findUnique({
       where: { id: item.referenceId },
       include: { course: true },

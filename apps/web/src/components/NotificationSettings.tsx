@@ -13,6 +13,7 @@ const statusLabels: Record<string, string> = {
   UNKNOWN: 'تحتاج فحص تأكيد الإرسال',
 };
 const kindLabels: Record<string, string> = {
+  ENROLLMENT: 'تأكيد التسجيل',
   REPORT: 'تقرير الحصة',
   GRADE: 'نتيجة الواجب',
   REMINDER: 'تذكير الحصة',
@@ -23,6 +24,7 @@ type Data = {
   enabled?: boolean;
   configured?: boolean;
   schedulerConfigured?: boolean;
+  setupChecks?: { label: string; ready: boolean }[];
   notifications?: {
     id: string;
     kind: string;
@@ -104,7 +106,16 @@ export default function NotificationSettings() {
               <h2>
                 {data.enabled && data.configured ? 'الإرسال مفعّل' : 'الإرسال التلقائي غير مفعّل'}
               </h2>
-              <p>رسائل تقارير الحصص ودرجات الواجبات والتذكير قبل الحصة بعشر دقائق.</p>
+              <p>
+                رسائل تأكيد التسجيل وتقارير الحصص ودرجات الواجبات والتذكير قبل الحصة بعشر دقائق.
+              </p>
+              <ul aria-label="جاهزية خدمة واتساب">
+                {data.setupChecks?.map((check) => (
+                  <li key={check.label}>
+                    {check.label}: {check.ready ? 'جاهز' : 'يحتاج إعداد'}
+                  </li>
+                ))}
+              </ul>
               <p>
                 {data.schedulerConfigured
                   ? 'مفتاح تشغيل المجدول جاهز.'
@@ -140,8 +151,8 @@ export default function NotificationSettings() {
               رقم واتساب المسجل: <b dir="ltr">{data.whatsappPhone || 'لم يُضف رقم'}</b>
             </p>
             <p>
-              يمكن للأكاديمية إرسال تذكير الحصة وتقرير المعلم ونتيجة الواجب إلى هذا الرقم بعد تفعيل
-              خدمة الإرسال.
+              يمكن للأكاديمية إرسال تأكيد التسجيل وتذكير الحصة وتقرير المعلم ونتيجة الواجب إلى هذا
+              الرقم بعد تفعيل خدمة الإرسال.
             </p>
             <p>حالة الموافقة: {data.whatsappOptIn ? 'موافق على الرسائل' : 'الرسائل متوقفة'}</p>
             <button className="btn btn-gold" disabled={saving} onClick={toggle}>

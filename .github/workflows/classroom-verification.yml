@@ -1,0 +1,35 @@
+name: Classroom verification
+on:
+  push:
+    branches: [fix/client-ready]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  classroom:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:4000
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: cp .env.preview.example .env.preview
+      - run: npm ci
+      - name: Download verified local LiveKit server
+        run: |
+          curl --fail --location --retry 3 https://github.com/livekit/livekit/releases/download/v1.13.10/livekit_1.13.10_linux_amd64.tar.gz -o /tmp/livekit.tar.gz
+          echo "c25a3e45fb922e9a93c6443d10c0ed041ba64342097e38632331736630283165  /tmp/livekit.tar.gz" | sha256sum --check
+          mkdir /tmp/midad-livekit
+          tar --no-same-owner -xzf /tmp/livekit.tar.gz -C /tmp/midad-livekit livekit-server
+      - run: npm run build
+      - run: npm run lint
+      - run: npm run test:api
+      - run: node --import tsx --test tests/writing.test.ts
+      - name: Real browser audio, video, moderation, observation and writing
+        run: npm run test:classroom
+        env:
+          LIVEKIT_SERVER_BINARY: /tmp/midad-livekit/livekit-server
