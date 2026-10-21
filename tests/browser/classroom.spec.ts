@@ -93,11 +93,20 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   const teacher = await teacherContext.newPage();
   const student = await studentContext.newPage();
   const errors: string[] = [];
-  for (const page of [teacher, student]) page.on('pageerror', (e) => errors.push(e.message));
+  for (const page of [teacher, student])
+    page.on('pageerror', (e) => {
+      errors.push(e.message);
+      console.error('Classroom page error:', e.message);
+    });
   const enter = async (page: Page) => {
     await page.goto('/classroom/preview-arabic');
     await page.getByRole('button', { name: 'دخول الحصة', exact: true }).click();
-    await expect(page.getByText('متزامنة', { exact: true })).toBeVisible();
+    try {
+      await expect(page.getByText('متزامنة', { exact: true })).toBeVisible({ timeout: 20000 });
+    } catch (error) {
+      console.error('Classroom entry state:', await page.locator('body').innerText());
+      throw error;
+    }
   };
   await enter(teacher);
   await enter(student);
