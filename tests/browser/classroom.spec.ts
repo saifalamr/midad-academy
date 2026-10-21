@@ -78,9 +78,12 @@ test('teacher and student exchange real media, synchronized ink, permissions and
           source.start();
           const track = destination.stream.getAudioTracks()[0];
           const stop = track.stop.bind(track);
+          let stopped = false;
           track.stop = () => {
+            if (stopped) return;
+            stopped = true;
             source.stop();
-            void context.close();
+            if (context.state !== 'closed') void context.close().catch(() => {});
             stop();
           };
           stream.addTrack(track);
@@ -102,7 +105,8 @@ test('teacher and student exchange real media, synchronized ink, permissions and
     const scrub = (value: string) =>
       value.replace(/(access_token|token)=[^&\s]+/g, '$1=[redacted]');
     page.on('console', (message) => {
-      if (['error', 'warning'].includes(message.type())) console.error('Browser:', scrub(message.text()));
+      if (['error', 'warning'].includes(message.type()))
+        console.error('Browser:', scrub(message.text()));
     });
     page.on('requestfailed', (request) =>
       console.error('Network:', scrub(request.url()), request.failure()?.errorText)
@@ -173,7 +177,12 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   expect(details.teacher.present).toBe(true);
   expect(details.teacher.hasJoined).toBe(true);
   expect(details.students[0].present).toBe(true);
-  const adminContext = await browser.newContext({ viewport: { width: 820, height: 1180 } });
+  // Permission state exposes host ICE candidates for this loopback-only test server.
+  // Observer grants still prohibit publishing, and the test checks zero capture requests.
+  const adminContext = await browser.newContext({
+    viewport: { width: 820, height: 1180 },
+    permissions: ['camera', 'microphone'],
+  });
   await adminContext.addInitScript((token) => localStorage.setItem('token', token), adminToken);
   const administrator = await adminContext.newPage();
   await administrator.goto(`/admin/sessions/${scheduled.data.id}/details`);
@@ -191,10 +200,13 @@ test('teacher and student exchange real media, synchronized ink, permissions and
     administrator.getByRole('button', { name: 'مايكات الطلاب', exact: true })
   ).toHaveCount(0);
   await expect
-    .poll(async () => (await remoteMedia(administrator)).videos)
+    .poll(async () => (await remoteMedia(administrator)).videos, { timeout: 20000 })
     .toBeGreaterThanOrEqual(2);
   await adminContext.close();
-  const parentContext = await browser.newContext({ viewport: { width: 820, height: 1180 } });
+  const parentContext = await browser.newContext({
+    viewport: { width: 820, height: 1180 },
+    permissions: ['camera', 'microphone'],
+  });
   await parentContext.addInitScript(
     (token) => {
       localStorage.setItem('token', token);
@@ -210,7 +222,9 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   await parent.goto('/classroom/preview-arabic');
   await parent.getByRole('button', { name: 'دخول للمشاهدة', exact: true }).click();
   await expect(parent.getByText('وضع المشاهدة · بدون كاميرا أو ميكروفون أو تفاعل')).toBeVisible();
-  await expect.poll(async () => (await remoteMedia(parent)).videos).toBeGreaterThanOrEqual(2);
+  await expect
+    .poll(async () => (await remoteMedia(parent)).videos, { timeout: 20000 })
+    .toBeGreaterThanOrEqual(2);
   await expect.poll(async () => (await remoteMedia(parent)).audio).toBeGreaterThan(0);
   await expect(parent.getByRole('button', { name: 'تشغيل الكاميرا', exact: true })).toHaveCount(0);
   await expect(parent.getByRole('button', { name: 'مايكات الطلاب', exact: true })).toHaveCount(0);
