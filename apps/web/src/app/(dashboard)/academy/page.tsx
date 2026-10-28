@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/components/AuthProvider';
 import { PopupNotice, showPopup } from '@/components/FeedbackProvider';
@@ -62,8 +62,19 @@ export default function AcademyPage() {
     [revision, setRevision] = useState(0);
   const [selectedCourse, setSelectedCourse] = useState(''),
     [skillData, setSkillData] = useState<Skills | null>(null);
+  const intentLoaded = useRef(false);
   useEffect(() => {
     if (!user) return;
+    // Apply the incoming course intent once, before loading; late responses must
+    // not replace a tab the parent has already selected or is editing.
+    if (!intentLoaded.current) {
+      intentLoaded.current = true;
+      const pending = new URLSearchParams(location.search).get('course');
+      if (pending && parent) {
+        setSelectedCourse(pending);
+        setTab('apply');
+      }
+    }
     let active = true;
     setLoading(true);
     setError('');
@@ -95,11 +106,6 @@ export default function AcademyPage() {
         if (admin) {
           setOps(values[6] as Ops);
           setAudit(values[7] as Audit[]);
-        }
-        const pending = new URLSearchParams(location.search).get('course');
-        if (pending && parent) {
-          setSelectedCourse(pending);
-          setTab('apply');
         }
       })
       .catch((e) => {

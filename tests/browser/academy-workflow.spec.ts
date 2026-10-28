@@ -5,6 +5,14 @@ test('family chooses a course before login, adds a child, requests and receives 
   request,
   browser,
 }) => {
+  let releaseCatalog!: () => void;
+  const catalogReady = new Promise<void>((resolve) => {
+    releaseCatalog = resolve;
+  });
+  await page.route('**/api/courses/catalog', async (route) => {
+    await catalogReady;
+    await route.continue();
+  });
   const password = 'MidadPreview2026!';
   const parentEmail = `family-${Date.now()}@midad.test`;
   const registration = await request.post('http://127.0.0.1:4000/api/auth/register', {
@@ -61,6 +69,8 @@ test('family chooses a course before login, adds a child, requests and receives 
   await page.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/academy\\?course=${course.id}`));
   await page.getByRole('button', { name: 'أبنائي ودخولهم', exact: true }).click();
+  // A slow initial catalog must not switch the parent back out of this tab.
+  releaseCatalog();
   await page.getByLabel('اسم الطفل', { exact: true }).fill('نور رحلة التسجيل');
   await page.getByLabel('العمر', { exact: true }).fill('9');
   await page.getByRole('button', { name: 'إضافة الطفل', exact: true }).click();

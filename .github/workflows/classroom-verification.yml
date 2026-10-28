@@ -27,13 +27,16 @@ jobs:
           echo "c25a3e45fb922e9a93c6443d10c0ed041ba64342097e38632331736630283165  /tmp/livekit.tar.gz" | sha256sum --check
           mkdir /tmp/midad-livekit
           tar --no-same-owner -xzf /tmp/livekit.tar.gz -C /tmp/midad-livekit livekit-server
-      - run: npm run build
+      - name: Build application
+        id: build
+        run: npm run build
       - run: npm run lint
       - run: npm run test:api
       - run: node --import tsx --test tests/writing.test.ts
       - name: Full browser journeys and embedded draft regression
         run: npm run test:e2e
       - name: Real browser audio, video, moderation, observation and writing
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: npm run test:classroom
         env:
           LIVEKIT_SERVER_BINARY: /tmp/midad-livekit/livekit-server
