@@ -48,6 +48,7 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   // Media still travels through LiveKit/WebRTC and is decoded by the peer.
   for (const context of [teacherContext, studentContext])
     await context.addInitScript(() => {
+      if (location.origin !== 'http://127.0.0.1:3000' || !navigator.mediaDevices) return;
       navigator.mediaDevices.getUserMedia = async (constraints) => {
         const stream = new MediaStream();
         if (constraints.video) {
@@ -93,8 +94,12 @@ test('teacher and student exchange real media, synchronized ink, permissions and
         return stream;
       };
     });
-  await teacherContext.addInitScript((token) => localStorage.setItem('token', token), teacherToken);
-  await studentContext.addInitScript((token) => localStorage.setItem('token', token), studentToken);
+  await teacherContext.addInitScript((token) => {
+    if (location.origin === 'http://127.0.0.1:3000') localStorage.setItem('token', token);
+  }, teacherToken);
+  await studentContext.addInitScript((token) => {
+    if (location.origin === 'http://127.0.0.1:3000') localStorage.setItem('token', token);
+  }, studentToken);
   const teacher = await teacherContext.newPage();
   const student = await studentContext.newPage();
   const errors: string[] = [];
@@ -196,7 +201,9 @@ test('teacher and student exchange real media, synchronized ink, permissions and
     viewport: { width: 820, height: 1180 },
     permissions: ['camera', 'microphone'],
   });
-  await adminContext.addInitScript((token) => localStorage.setItem('token', token), adminToken);
+  await adminContext.addInitScript((token) => {
+    if (location.origin === 'http://127.0.0.1:3000') localStorage.setItem('token', token);
+  }, adminToken);
   const administrator = await adminContext.newPage();
   await administrator.goto(`/admin/sessions/${scheduled.data.id}/details`);
   await expect(administrator.getByRole('region', { name: 'حضور المعلم' })).toContainText(
@@ -222,6 +229,7 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   });
   await parentContext.addInitScript(
     (token) => {
+      if (location.origin !== 'http://127.0.0.1:3000') return;
       localStorage.setItem('token', token);
       (window as any).__deviceRequests = 0;
       navigator.mediaDevices.getUserMedia = async () => {
