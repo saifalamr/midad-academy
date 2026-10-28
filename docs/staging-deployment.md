@@ -53,7 +53,7 @@ These checks validate configuration only. They do not authenticate with provider
 
 After deployment, verify `/api/ready`, HTTPS login and CORS, enrollment and teacher grading, two-participant whiteboard edits/text/both erasers, reconnect and restart persistence, parent linking, signed Stripe webhook enrollment, a real reset email, actual PDF upload, and a two-device LiveKit class including End class. Configure callbacks at `/api/payments/webhook` and `/api/sessions/webhook` using their separate signed test credentials.
 
-The local real-media test remains unpassed because this execution host blocks LiveKit network-interface discovery. A ready healthcheck does not prove that calls, uploads, payments or email work.
+The real-media browser test [passes on the Ubuntu CI runner](https://github.com/saifalamr/midad-academy/actions/runs/40785423133), using a local LiveKit server and generated media sent through WebRTC. This execution host still blocks LiveKit network-interface discovery. That automated result does not verify the configured hosted provider or physical devices; a ready healthcheck also does not prove that uploads, payments or email work.
 
 ## Final production release
 

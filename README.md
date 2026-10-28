@@ -75,10 +75,11 @@ The course lessons page now links to `/courses/<courseId>/board`, an authenticat
 `npm run test:e2e` includes a two-browser board test (desktop teacher, mobile student). A separate real-media test is available with an official local LiveKit server:
 
 ```bash
+LIVEKIT_URL=ws://127.0.0.1:7880 NEXT_PUBLIC_API_URL=http://127.0.0.1:4000 npm run build:web
 LIVEKIT_SERVER_BINARY=/absolute/path/livekit-server npm run test:classroom
 ```
 
-Build the web app first. This starts an isolated database, API, LiveKit and two browser participants, using generated camera/audio tracks. The host must permit normal WebRTC networking and network-interface discovery. In the current execution environment LiveKit stops with `route ip+net: netlinkrib: operation not permitted`, so the real-media test is **not passed**. It remains a handover prerequisite on a suitable staging host and real devices.
+The build-time LiveKit URL above adds the exact loopback test origin to the connection policy. The test starts an isolated database, API and LiveKit, and sends generated camera/audio tracks through actual WebRTC between browser participants. It also verifies parent observation, hidden administration, microphone moderation, in-call writing submission with continuing media, shared content, drawing, re-entry and class completion. [Automated acceptance passed](https://github.com/saifalamr/midad-academy/actions/runs/40785423133) on an Ubuntu CI runner. This workspace still blocks local LiveKit network-interface discovery; use the CI workflow or a suitable host. Physical devices and the configured hosted provider still require the manual acceptance in [the Arabic test plan](docs/manual-test-ar.md).
 
 LiveKit room names are unique per scheduled class (`class-<sessionId>`). Shared material, PDF page and drawing grants are stored in PostgreSQL; late joiners and reconnecting users retrieve the current state. Apply the new `20261007190000_classroom_state` migration before deploying this code. The owner-private phone preview uses a separate single-user drawing demo and does not verify the production LiveKit/WebSocket integration.
 
@@ -111,7 +112,7 @@ Attendance totals and absence charts include only COMPLETED class sessions after
 - Starting, cancelling and ending a class now serialize against the course row. Concurrent starts create only one live room; re-entering an existing live class does not recreate a room that has expired.
 - A signed `room_finished` webhook completes the session identified by its unique LiveKit room name and removes its drawing grants. Repeated or delayed completion events do not close a newer class or remove its grants. The saved course board and shared materials remain available.
 - Classroom join failures and unrecoverable connection failures offer an Arabic retry action that requests a fresh participant token while preserving device choices. Intentional exits and provider-ended rooms return to the dashboard.
-- API checks exercise concurrent starts, signed completion, replay isolation, room deletion and revocation on an already-connected board socket. Browser checks exercise join retry and an offline mobile board receiving missed ink when reconnecting. These checks do not substitute for the pending real LiveKit audio/video acceptance test.
+- API checks exercise concurrent starts, signed completion, replay isolation, room deletion and revocation on an already-connected board socket. Browser checks exercise join retry and an offline mobile board receiving missed ink when reconnecting. The separate real LiveKit browser acceptance now passes in CI; physical-device and hosted-provider acceptance remains manual.
 - Database lifecycle operations allow up to 20 seconds for provider requests while holding the course lock. Provider room creation/deletion and database commits cannot be atomic; an outage during a commit requires reconciliation of provider rooms and session status before handover.
 
 ### Quiz attempt integrity and review (deployment paused)
