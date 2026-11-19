@@ -180,20 +180,46 @@ export async function academyRoutes(app: FastifyInstance) {
     const parent = await parentFor(request.user);
     const body = z
       .object({
-        studentId: z.string().min(1),
+        studentId: z.string().min(1).optional(),
+        newChild: z
+          .object({ name: z.string().trim().min(2).max(100), age: z.number().int().min(5).max(15) })
+          .optional(),
         courseId: z.string().min(1),
         kind: z.enum(['NEW', 'RENEWAL']).default('NEW'),
         preferredTime: text.default(''),
         levelNotes: text.default(''),
         needsAssessment: z.boolean().default(false),
       })
+      .refine((value) => !!value.studentId !== !!value.newChild, 'اختر طفلًا أو أضف طفلًا جديدًا')
       .parse(request.body);
+    const passwordHash = body.newChild
+      ? await bcrypt.hash(randomBytes(32).toString('hex'), 12)
+      : null;
     const result = await prisma.$transaction(async (tx) => {
       const course = await lockCourse(tx, body.courseId);
       if (courseHasEnded(course)) throw httpError(409, 'انتهى شهر الدورة؛ اختر دورة قادمة');
-      const child = await tx.studentProfile.findFirst({
-        where: { id: body.studentId, parentId: parent.id },
-      });
+      let child = body.studentId
+        ? await tx.studentProfile.findFirst({ where: { id: body.studentId, parentId: parent.id } })
+        : null;
+      if (body.newChild) {
+        await tx.$queryRaw`SELECT id FROM "ParentProfile" WHERE id = ${parent.id} FOR UPDATE`;
+        if ((await tx.studentProfile.count({ where: { parentId: parent.id } })) >= 20)
+          throw httpError(400, 'تواصل مع الإدارة لإضافة المزيد من الأبناء');
+        const username = `midad-${randomBytes(6).toString('hex')}`;
+        const user = await tx.user.create({
+          data: {
+            name: body.newChild.name,
+            username,
+            email: `${username}@students.midad.test`,
+            role: 'STUDENT',
+            passwordHash: passwordHash!,
+            studentProfile: { create: { age: body.newChild.age, parentId: parent.id } },
+          },
+          select: { studentProfile: { select: { id: true } } },
+        });
+        child = await tx.studentProfile.findUnique({ where: { id: user.studentProfile!.id } });
+        await audit(tx, request.user.id, 'CHILD_CREATED', child!.id, body.newChild);
+      }
       if (!child) throw httpError(404, 'اختر طفلًا من حسابك');
       const enrollment = await tx.enrollment.findUnique({
         where: { courseId_studentId: { courseId: course.id, studentId: child.id } },
@@ -210,7 +236,12 @@ export async function academyRoutes(app: FastifyInstance) {
       const hasSeat = await availableSeat(tx, course.id, course.maxStudents);
       const application = await tx.courseApplication.create({
         data: {
-          ...body,
+          studentId: child.id,
+          courseId: body.courseId,
+          kind: body.kind,
+          preferredTime: body.preferredTime,
+          levelNotes: body.levelNotes,
+          needsAssessment: body.needsAssessment,
           parentId: parent.id,
           status: hasSeat ? 'PENDING' : 'WAITLIST',
           quotedAmount: course.price,

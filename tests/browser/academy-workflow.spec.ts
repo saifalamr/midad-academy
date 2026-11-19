@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('family chooses a course before login, adds a child, requests and receives approval in-site, and opens the unified class', async ({
+test('family chooses a course before login, adds a child and requests in one form, receives approval, and opens the unified class', async ({
   page,
   request,
   browser,
@@ -68,19 +68,11 @@ test('family chooses a course before login, adds a child, requests and receives 
   await page.getByLabel('كلمة المرور', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/academy\\?course=${course.id}`));
-  await page.getByRole('button', { name: 'أبنائي ودخولهم', exact: true }).click();
-  // A slow initial catalog must not switch the parent back out of this tab.
+  // A slow initial catalog must not switch the parent out of the enrollment form.
   releaseCatalog();
+  await page.getByRole('combobox', { name: 'الطفل', exact: true }).selectOption('new');
   await page.getByLabel('اسم الطفل', { exact: true }).fill('نور رحلة التسجيل');
-  await page.getByLabel('العمر', { exact: true }).fill('9');
-  await page.getByRole('button', { name: 'إضافة الطفل', exact: true }).click();
-  await expect(page.getByRole('alertdialog')).toContainText('تم حفظ التحديث');
-  await page.getByRole('button', { name: 'حسنًا', exact: true }).click();
-  // Selected course remains attached to the intent while the family adds a child.
-  await page.getByRole('button', { name: 'تسجيل وتجديد', exact: true }).click();
-  await page
-    .getByRole('combobox', { name: 'الطفل', exact: true })
-    .selectOption({ label: 'نور رحلة التسجيل — 9 سنوات' });
+  await page.getByLabel('عمر الطفل', { exact: true }).fill('9');
   await page.getByRole('combobox', { name: 'الدورة', exact: true }).selectOption(course.id);
   await page
     .getByLabel('ما الذي يعرفه طفلك بالعربية؟')

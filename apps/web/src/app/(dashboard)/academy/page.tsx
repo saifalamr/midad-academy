@@ -62,6 +62,7 @@ export default function AcademyPage() {
     [revision, setRevision] = useState(0);
   const [selectedCourse, setSelectedCourse] = useState(''),
     [skillData, setSkillData] = useState<Skills | null>(null);
+  const [enrollmentChild, setEnrollmentChild] = useState('new');
   const intentLoaded = useRef(false);
   useEffect(() => {
     if (!user) return;
@@ -205,13 +206,10 @@ export default function AcademyPage() {
               <section className="flow-grid">
                 {parent && (
                   <article className="card pad">
-                    <h2>{children.length ? 'سجّل طفلك في رحلته القادمة' : 'ابدأ بإضافة طفلك'}</h2>
-                    <p>اختر طفلًا ودورة وأرسل الطلب. تأكيد التسجيل يظهر هنا بعد اعتماد الإدارة.</p>
-                    <button
-                      className="btn btn-gold"
-                      onClick={() => setTab(children.length ? 'apply' : 'children')}
-                    >
-                      {children.length ? 'اختيار الدورة' : 'إضافة طفل'}
+                    <h2>سجّل طفلك في رحلته القادمة</h2>
+                    <p>اختر الدورة وأضف طفلك أو اختره من أبنائك، ثم أرسل الطلب من مكان واحد.</p>
+                    <button className="btn btn-gold" onClick={() => setTab('apply')}>
+                      ابدأ التسجيل
                     </button>
                   </article>
                 )}
@@ -377,98 +375,127 @@ export default function AcademyPage() {
           )}
           {tab === 'apply' && parent && (
             <article className="card pad">
-              <h2>طلب تسجيل أو تجديد</h2>
-              {!children.length ? (
-                <button className="btn btn-gold" onClick={() => setTab('children')}>
-                  أضف طفلك أولًا
-                </button>
-              ) : (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const d = new FormData(e.currentTarget);
-                    void action(async () => {
-                      await api('/academy/applications', 'POST', {
-                        studentId: d.get('studentId'),
-                        courseId: selectedCourse,
-                        kind: d.get('kind'),
-                        preferredTime: d.get('preferredTime'),
-                        levelNotes: d.get('levelNotes'),
-                        needsAssessment: d.get('assessment') === 'on',
-                      });
-                      history.replaceState(history.state, '', '/academy');
-                      setTab('applications');
+              <h2>سجّل طفلك في دورة</h2>
+              <p>
+                بيانات الطفل والدورة في طلب واحد. دخول الطفل مستقل ويمكن تفعيله لاحقًا من «أبنائي
+                ودخولهم».
+              </p>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const d = new FormData(e.currentTarget);
+                  void action(async () => {
+                    await api('/academy/applications', 'POST', {
+                      ...(enrollmentChild === 'new'
+                        ? { newChild: { name: d.get('childName'), age: Number(d.get('childAge')) } }
+                        : { studentId: enrollmentChild }),
+                      courseId: selectedCourse,
+                      kind: d.get('kind'),
+                      preferredTime: d.get('preferredTime'),
+                      levelNotes: d.get('levelNotes'),
+                      needsAssessment: d.get('assessment') === 'on',
                     });
-                  }}
-                >
-                  <div className="flow-grid">
-                    <label className="field">
-                      الطفل
-                      <select name="studentId" className="input" required>
-                        <option value="">اختر الطفل</option>
-                        {children.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.user.name} — {c.age} سنوات
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="field">
-                      الدورة
-                      <select
-                        className="input"
-                        value={selectedCourse}
-                        onChange={(e) => setSelectedCourse(e.target.value)}
-                        required
-                      >
-                        <option value="">اختر الدورة</option>
-                        {catalog.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.title} · {c.month} · الأعمار {c.ageGroup} · {c.price} {c.currency} ·{' '}
-                            {c.availableSeats
-                              ? `${c.availableSeats} مقاعد`
-                              : 'مكتملة — قائمة انتظار'}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
+                    history.replaceState(history.state, '', '/academy');
+                    setEnrollmentChild('new');
+                    setTab('applications');
+                  });
+                }}
+              >
+                <div className="flow-grid">
                   <label className="field">
-                    نوع الطلب
-                    <select name="kind" className="input">
-                      <option value="NEW">تسجيل جديد</option>
-                      <option value="RENEWAL">تجديد لدورة الشهر القادم</option>
+                    الطفل
+                    <select
+                      className="input"
+                      value={enrollmentChild}
+                      onChange={(e) => setEnrollmentChild(e.target.value)}
+                      required
+                    >
+                      <option value="new">إضافة طفل جديد</option>
+                      {children.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.user.name} — {c.age} سنوات
+                        </option>
+                      ))}
                     </select>
                   </label>
+                  {enrollmentChild === 'new' && (
+                    <>
+                      <label className="field">
+                        اسم الطفل
+                        <input
+                          name="childName"
+                          className="input"
+                          minLength={2}
+                          maxLength={100}
+                          required
+                        />
+                      </label>
+                      <label className="field">
+                        عمر الطفل
+                        <input
+                          name="childAge"
+                          type="number"
+                          min={5}
+                          max={15}
+                          className="input"
+                          required
+                        />
+                      </label>
+                    </>
+                  )}
                   <label className="field">
-                    الوقت المناسب لكم (تراجع الإدارة الخيارات)
-                    <input
-                      name="preferredTime"
+                    الدورة
+                    <select
                       className="input"
-                      maxLength={1000}
-                      placeholder="مثال: مساء الثلاثاء بتوقيت إسطنبول"
-                    />
+                      value={selectedCourse}
+                      onChange={(e) => setSelectedCourse(e.target.value)}
+                      required
+                    >
+                      <option value="">اختر الدورة</option>
+                      {catalog.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.title} · {c.month} · الأعمار {c.ageGroup} · {c.price} {c.currency} ·{' '}
+                          {c.availableSeats ? `${c.availableSeats} مقاعد` : 'مكتملة — قائمة انتظار'}
+                        </option>
+                      ))}
+                    </select>
                   </label>
-                  <label className="field">
-                    ما الذي يعرفه طفلك بالعربية؟
-                    <textarea
-                      name="levelNotes"
-                      className="input"
-                      maxLength={3000}
-                      placeholder="هل يعرف الحروف؟ هل يقرأ كلمات؟"
-                    />
-                  </label>
-                  <label className="flow-check">
-                    <input type="checkbox" name="assessment" /> نحتاج مساعدة في تحديد المستوى قبل
-                    البداية
-                  </label>
-                  <p>
-                    إرسال الطلب لا يحجز مقعدًا ولا يخصم مبلغًا. لا تدفع قبل تأكيد الإدارة. التجديد
-                    يكون في دورة جديدة للشهر القادم.
-                  </p>
-                  <button className="btn btn-gold">إرسال طلب التسجيل</button>
-                </form>
-              )}
+                </div>
+                <label className="field">
+                  نوع الطلب
+                  <select name="kind" className="input">
+                    <option value="NEW">تسجيل جديد</option>
+                    <option value="RENEWAL">تجديد لدورة الشهر القادم</option>
+                  </select>
+                </label>
+                <label className="field">
+                  الوقت المناسب لكم (تراجع الإدارة الخيارات)
+                  <input
+                    name="preferredTime"
+                    className="input"
+                    maxLength={1000}
+                    placeholder="مثال: مساء الثلاثاء بتوقيت إسطنبول"
+                  />
+                </label>
+                <label className="field">
+                  ما الذي يعرفه طفلك بالعربية؟
+                  <textarea
+                    name="levelNotes"
+                    className="input"
+                    maxLength={3000}
+                    placeholder="هل يعرف الحروف؟ هل يقرأ كلمات؟"
+                  />
+                </label>
+                <label className="flow-check">
+                  <input type="checkbox" name="assessment" /> نحتاج مساعدة في تحديد المستوى قبل
+                  البداية
+                </label>
+                <p>
+                  إرسال الطلب لا يحجز مقعدًا ولا يخصم مبلغًا. لا تدفع قبل تأكيد الإدارة. التجديد
+                  يكون في دورة جديدة للشهر القادم.
+                </p>
+                <button className="btn btn-gold">إرسال طلب التسجيل</button>
+              </form>
             </article>
           )}
           {tab === 'applications' && (
