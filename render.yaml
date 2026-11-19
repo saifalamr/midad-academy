@@ -10,7 +10,7 @@ services:
     autoDeployTrigger: "off"
     buildCommand: npm ci --include=dev && npm run build:api
     # Free services do not offer a pre-deploy phase. Apply the tracked,
-    # additive migrations only to the new preview database before listening.
+    # additive migrations to the external preview database before listening.
     startCommand: >-
       export API_URL="$RENDER_EXTERNAL_URL";
       node scripts/check-deploy.mjs api &&
@@ -25,9 +25,7 @@ services:
       - key: HOST
         value: 0.0.0.0
       - key: DATABASE_URL
-        fromDatabase:
-          name: midad-preview-db
-          property: connectionString
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: TEACHER_INVITE_CODE
@@ -38,11 +36,5 @@ services:
       - key: CORS_ORIGIN
         sync: false
 
-databases:
-  - name: midad-preview-db
-    plan: free
-    region: frankfurt
-    databaseName: midad_preview
-    user: midad_preview
-    postgresMajorVersion: "17"
-    ipAllowList: []
+# Use an external PostgreSQL Free project (for example Supabase), configured
+# privately as DATABASE_URL. Render Free Postgres expires after 30 days.
