@@ -385,10 +385,24 @@ export default function AcademyPage() {
                   e.preventDefault();
                   const d = new FormData(e.currentTarget);
                   void action(async () => {
+                    let studentId = enrollmentChild;
+                    if (studentId === 'new') {
+                      const name = String(d.get('childName'));
+                      const age = Number(d.get('childAge'));
+                      const created = await api<{ id: string }>('/academy/children', 'POST', {
+                        name,
+                        age,
+                      });
+                      studentId = created.id;
+                      // Keep the child selected if submitting the course request fails.
+                      setChildren((current) => [
+                        ...current,
+                        { id: created.id, age, level: '', user: { name, username: null } },
+                      ]);
+                      setEnrollmentChild(created.id);
+                    }
                     await api('/academy/applications', 'POST', {
-                      ...(enrollmentChild === 'new'
-                        ? { newChild: { name: d.get('childName'), age: Number(d.get('childAge')) } }
-                        : { studentId: enrollmentChild }),
+                      studentId,
                       courseId: selectedCourse,
                       kind: d.get('kind'),
                       preferredTime: d.get('preferredTime'),

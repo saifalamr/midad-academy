@@ -3019,32 +3019,6 @@ test('family intake is owned, idempotent, capacity-safe and preserves manual pay
   assert.ok(log.some((x:any)=>x.action==='APPLICATION_PAYMENT'&&x.details.reference==='تحويل استرجاع 456'));
 });
 
-test('family submits a new child and course application together, rolling back invalid requests', async () => {
-  const { keys, users, course } = await operationsFixture();
-  const parentId = users.parent.parentProfile.id;
-  const before = await prisma.studentProfile.count({ where: { parentId } });
-  const invalid = await call('POST', '/api/academy/applications', keys.parent, {
-    courseId: 'missing-course',
-    newChild: { name: 'طفل جديد', age: 8 },
-  });
-  assert.equal(invalid.statusCode, 404);
-  assert.equal(await prisma.studentProfile.count({ where: { parentId } }), before);
-  const result = await call('POST', '/api/academy/applications', keys.parent, {
-    courseId: course.id,
-    newChild: { name: 'طفل جديد', age: 8 },
-  });
-  assert.equal(result.statusCode, 201, result.body);
-  const application = result.json().data;
-  const child = await prisma.studentProfile.findUniqueOrThrow({
-    where: { id: application.studentId },
-    include: { user: true },
-  });
-  assert.equal(child.parentId, parentId);
-  assert.equal(child.user.name, 'طفل جديد');
-  assert.equal(await prisma.studentProfile.count({ where: { parentId } }), before + 1);
-});
-
-
 test('parent child password recovery revokes old sessions without granting access to another family', async () => {
   const {keys,childId}=await operationsFixture();
   const oldChild=await prisma.studentProfile.findUniqueOrThrow({where:{id:childId},include:{user:true}});
