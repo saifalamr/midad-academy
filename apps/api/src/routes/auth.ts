@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
@@ -8,16 +8,25 @@ import { config } from '../config';
 
 const emailSchema = z.string().trim().toLowerCase().email();
 const tokenHash = (value: string) => createHash('sha256').update(value).digest('hex');
+// Scope credential attempts to the account after body parsing. The global IP
+// limiter still bounds identifier rotation without blocking other families
+// behind the same reverse proxy.
+const credentialRateKey = (request: FastifyRequest) => {
+  const email = (request.body as { email?: unknown } | null)?.email;
+  if (typeof email !== 'string' || !email.trim() || email.length > 254)
+    return `ip:${request.ip}`;
+  return `account:${tokenHash(email.trim().toLowerCase())}`;
+};
 
 const registerSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
+  name: z.string().trim().min(2, 'Name must be at least 2 characters').max(100),
   email: emailSchema,
   // Accept any case, normalise to uppercase to match Prisma enum
   role: z
     .string()
     .transform((r) => r.toUpperCase())
     .pipe(z.enum(['TEACHER', 'STUDENT', 'PARENT'])),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: z.string().min(10, 'Password must be at least 10 characters').max(128),
   inviteCode: z.string().optional(),
   whatsappOptIn: z.boolean().default(false),
   whatsappPhone: z
@@ -29,7 +38,7 @@ const registerSchema = z.object({
 
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().min(3).max(254),
-  password: z.string().min(1),
+  password: z.string().min(1).max(128),
 });
 
 // Fields that are safe to return — never include passwordHash
@@ -45,9 +54,13 @@ const safeUserSelect = {
 } as const;
 
 export async function authRoutes(app: FastifyInstance) {
+  app.addHook('onSend', async (_request, reply, payload) => {
+    reply.header('Cache-Control', 'no-store');
+    return payload;
+  });
   // ── POST /api/auth/register ────────────────────────────────────────────────
   // Creates a User + the matching role profile in one Prisma nested write.
-  app.post('/register', async (request, reply) => {
+  app.post('/register', { config: { rateLimit: { max: 5, timeWindow: '1 hour', hook: 'preHandler', keyGenerator: credentialRateKey } } }, async (request, reply) => {
     const body = registerSchema.parse(request.body);
 
     if (body.role !== 'PARENT')
@@ -82,7 +95,7 @@ export async function authRoutes(app: FastifyInstance) {
   // ── POST /api/auth/login ───────────────────────────────────────────────────
   // Returns a signed JWT valid for 7 days. Same error for bad email or bad
   // password so attackers can't enumerate registered accounts.
-  app.post('/login', async (request, reply) => {
+  app.post('/login', { config: { rateLimit: { max: 30, timeWindow: '15 minutes', hook: 'preHandler', keyGenerator: credentialRateKey } } }, async (request, reply) => {
     const body = loginSchema.parse(request.body);
 
     const user = await prisma.user.findUnique({
@@ -121,7 +134,9 @@ export async function authRoutes(app: FastifyInstance) {
       select: {
         ...safeUserSelect,
         teacherProfile: true,
-        studentProfile: true,
+        studentProfile: {
+          select: { id: true, userId: true, age: true, level: true, totalPoints: true, parentId: true },
+        },
         parentProfile: true,
       },
     });
@@ -215,7 +230,7 @@ export async function authRoutes(app: FastifyInstance) {
     { config: { rateLimit: { max: 10, timeWindow: '15 minutes' } } },
     async (request, reply) => {
       const { token, password } = z
-        .object({ token: z.string().length(64), password: z.string().min(8).max(128) })
+        .object({ token: z.string().length(64), password: z.string().min(10).max(128) })
         .parse(request.body);
       const hash = await bcrypt.hash(password, 10);
       const changed = await prisma.$transaction(async (tx) => {

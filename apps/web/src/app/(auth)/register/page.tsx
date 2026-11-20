@@ -89,7 +89,7 @@ export default function RegisterPage() {
 
           <h1 className="auth-title">إنشاء حساب ولي الأمر</h1>
           <p className="auth-sub">
-            بعد التسجيل والتواصل مع الأكاديمية، تضيف الإدارة أبناءك وتمنحهم حساباتهم الخاصة.
+            بعد إنشاء حسابك، اختر الدورة وأضف طفلك من نموذج التسجيل. يُفعّل دخول الطفل المستقل لاحقًا عند حاجتك إليه.
           </p>
 
           {error && <PopupNotice className="auth-error">{error}</PopupNotice>}
@@ -135,7 +135,8 @@ export default function RegisterPage() {
                   className="input"
                   type="password"
                   required
-                  minLength={8}
+                  minLength={10}
+                  maxLength={128}
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

@@ -1,5 +1,30 @@
 import { test, expect } from '@playwright/test';
 
+test('academy keeps usable sections when one dashboard request fails and recovers on refresh', async ({ page, request }) => {
+  const login = await request.post('http://127.0.0.1:4000/api/auth/login', {
+    data: { email: 'parent@preview.midad.test', password: 'MidadPreview2026!' },
+  });
+  expect(login.ok()).toBeTruthy();
+  const token = (await login.json()).data.token;
+  await page.addInitScript((value) => localStorage.setItem('token', value), token);
+  let failed = false;
+  await page.route('**/api/academy/notices', (route) => {
+    if (!failed) {
+      failed = true;
+      return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"Unavailable"}' });
+    }
+    return route.continue();
+  });
+  await page.goto('/academy');
+  await expect(page.getByRole('heading', { name: 'سجّل طفلك في رحلته القادمة' })).toBeVisible();
+  await expect(page.getByText(/تعذر تحديث بعض البيانات/)).toBeVisible();
+  await page.getByRole('button', { name: 'حسنًا', exact: true }).click();
+  await page.getByRole('button', { name: 'تحديث البيانات' }).click();
+  await expect(page.getByText(/تعذر تحديث بعض البيانات/)).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'سجّل طفلك في رحلته القادمة' })).toBeVisible();
+});
+
+
 test('family chooses a course before login, adds a child and requests in one form, receives approval, and opens the unified class', async ({
   page,
   request,

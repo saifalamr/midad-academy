@@ -51,7 +51,7 @@ export default function ResetPassword() {
             type="password"
             autoComplete="new-password"
             required
-            minLength={8}
+            minLength={10}
             maxLength={128}
             value={password}
             onChange={(e) => setPassword(e.target.value)}

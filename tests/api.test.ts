@@ -1438,6 +1438,33 @@ test('verified users sharing one network have separate request limits; forged to
   }
 });
 
+test('public login and registration have tighter per-IP limits', async () => {
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const response = await call('POST', '/api/auth/login', undefined, {
+      email: 'missing@midad.test', password: 'incorrect-password',
+    });
+    assert.equal(response.statusCode, 401, response.body);
+  }
+  assert.equal((await call('POST', '/api/auth/login', undefined, {
+    email: 'missing@midad.test', password: 'incorrect-password',
+  })).statusCode, 429);
+  assert.equal((await call('POST', '/api/auth/login', undefined, {
+    email: 'another-missing@midad.test', password: 'incorrect-password',
+  })).statusCode, 401);
+  const deniedRole = {
+    name: 'Public teacher', email: 'teacher-test@midad.test',
+    password: 'TestingPassword2026!', role: 'teacher',
+  };
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const response = await call('POST', '/api/auth/register', undefined, deniedRole);
+    assert.equal(response.statusCode, 403, response.body);
+  }
+  assert.equal((await call('POST', '/api/auth/register', undefined, deniedRole)).statusCode, 429);
+  assert.equal((await call('POST', '/api/auth/register', undefined, {
+    ...deniedRole, email: 'another-teacher-test@midad.test',
+  })).statusCode, 403);
+});
+
 test('admin boundaries, parent registration and account creation cannot be bypassed', async () => {
   assert.equal((await call('GET', '/api/admin/overview')).statusCode, 401);
   for (const role of ['teacher', 'student', 'parent'])
@@ -1501,7 +1528,13 @@ test('admin boundaries, parent registration and account creation cannot be bypas
     password: 'TestingPassword2026!',
   });
   assert.equal(login.statusCode, 200, login.body);
+  assert.equal(login.headers['cache-control'], 'no-store');
   assert.equal(login.json().data.user.role, 'STUDENT');
+  const current = await app.inject({ method: 'GET', url: '/api/auth/me',
+    headers: { authorization: `Bearer ${login.json().data.token}` }, remoteAddress });
+  assert.equal(current.statusCode, 200);
+  assert.equal(current.headers['cache-control'], 'no-store');
+  assert.ok(!current.body.includes('parentLinkHash'));
   assert.equal(
     (await prisma.studentProfile.findUniqueOrThrow({ where: { userId: created.json().data.id } }))
       .parentId,

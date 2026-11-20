@@ -64,6 +64,7 @@ export default function AcademyPage() {
     [skillData, setSkillData] = useState<Skills | null>(null);
   const [enrollmentChild, setEnrollmentChild] = useState('new');
   const intentLoaded = useRef(false);
+  const loadedFor = useRef<string | null>(null);
   useEffect(() => {
     if (!user) return;
     // Apply the incoming course intent once, before loading; late responses must
@@ -77,9 +78,9 @@ export default function AcademyPage() {
       }
     }
     let active = true;
-    setLoading(true);
+    if (loadedFor.current !== user.id) setLoading(true);
     setError('');
-    Promise.all([
+    Promise.allSettled([
       api<Course[]>('/academy/courses'),
       api<ScheduleItem[]>('/academy/schedule'),
       api<Notice[]>('/academy/notices'),
@@ -90,30 +91,36 @@ export default function AcademyPage() {
       ...(parent ? [api<Child[]>('/academy/children'), api<Course[]>('/courses/catalog')] : []),
       ...(admin ? [api<Ops>('/academy/operations'), api<Audit[]>('/academy/audit')] : []),
     ])
-      .then((values) => {
+      .then((results) => {
         if (!active) return;
-        setCourses(values[0] as Course[]);
-        setSchedule(values[1] as ScheduleItem[]);
-        setNotices(values[2] as Notice[]);
-        setPolicy(values[3] as Policy | null);
+        const values = results.map((result) => result.status === 'fulfilled' ? result.value : undefined);
+        if (values[0] !== undefined) setCourses(values[0] as Course[]);
+        if (values[1] !== undefined) setSchedule(values[1] as ScheduleItem[]);
+        if (values[2] !== undefined) setNotices(values[2] as Notice[]);
+        if (values[3] !== undefined) setPolicy(values[3] as Policy | null);
         if (parent || admin) {
-          setApplications(values[4] as Application[]);
-          setRequests(values[5] as ServiceRequest[]);
+          if (values[4] !== undefined) setApplications(values[4] as Application[]);
+          if (values[5] !== undefined) setRequests(values[5] as ServiceRequest[]);
         }
         if (parent) {
-          setChildren(values[6] as Child[]);
-          setCatalog(values[7] as Course[]);
+          if (values[6] !== undefined) setChildren(values[6] as Child[]);
+          if (values[7] !== undefined) setCatalog(values[7] as Course[]);
         }
         if (admin) {
-          setOps(values[6] as Ops);
-          setAudit(values[7] as Audit[]);
+          if (values[6] !== undefined) setOps(values[6] as Ops);
+          if (values[7] !== undefined) setAudit(values[7] as Audit[]);
         }
+        if (results.some((result) => result.status === 'rejected'))
+          setError('تعذر تحديث بعض البيانات. تحقق من الاتصال ثم اضغط تحديث البيانات.');
       })
       .catch((e) => {
         if (active) setError(e.message);
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) {
+          loadedFor.current = user.id;
+          setLoading(false);
+        }
       });
     return () => {
       active = false;
