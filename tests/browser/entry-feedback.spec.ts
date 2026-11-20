@@ -1,5 +1,24 @@
 import { test, expect } from '@playwright/test';
 
+test('security policy restricts remote scripts and external framing while keeping own writing iframe available', async ({ page }) => {
+  const response = await page.goto('/login');
+  const policy = response?.headers()['content-security-policy'] ?? '';
+  expect(policy).toContain("script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net;");
+  expect(policy).toContain("frame-ancestors 'self';");
+  expect(policy).toContain("frame-src 'self' https://www.youtube.com;");
+  expect(policy).toContain("object-src 'none';");
+  expect(policy).toContain("base-uri 'self';");
+  expect(policy).toContain("form-action 'self';");
+});
+
+test('password recovery removes its one-time token from the address and referrer', async ({ page }) => {
+  const response = await page.goto(`/reset-password?token=${'a'.repeat(64)}`);
+  expect(response?.headers()['referrer-policy']).toBe('no-referrer');
+  expect(response?.headers()['cache-control']).toContain('no-store');
+  await expect(page).toHaveURL(/\/reset-password$/);
+  await expect(page.getByRole('button', { name: 'Update password' })).toBeEnabled();
+});
+
 test('compact home exposes working entry links on phone, tablet and desktop', async ({ page }) => {
   await page.goto('/');
   for (const width of [320, 390, 820, 1440]) {

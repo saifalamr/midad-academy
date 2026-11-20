@@ -1,8 +1,8 @@
 // cache-bust deploy
-// Content Security Policy. 'unsafe-eval' is required by our whiteboard stack
-// (Fabric.js / Yjs); 'unsafe-inline' is required by Next.js's inline bootstrap
-// scripts. connect-src allows https/wss so the prod API and whiteboard socket
-// work. Kept as a single line — CSP header values cannot contain newlines.
+// Content Security Policy. Keep the compatibility allowances used by the
+// classroom, Next.js bootstrap and the pinned PDF.js worker CDN, but never
+// permit scripts from arbitrary HTTPS origins.
+// Same-origin framing is needed for the embedded writing activity.
 function connectionOrigins(value) {
   if (!value) return '';
   try {
@@ -15,7 +15,7 @@ function connectionOrigins(value) {
 }
 const configuredConnections = [process.env.NEXT_PUBLIC_API_URL, process.env.NEXT_PUBLIC_WHITEBOARD_WS_URL, process.env.LIVEKIT_URL].map(connectionOrigins).join(' ');
 const contentSecurityPolicy =
-  `default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https: blob:; media-src 'self' https: blob:; connect-src 'self' https: wss: http://localhost:4000 ws://localhost:4000 ${configuredConnections}; worker-src 'self' blob: 'unsafe-eval'; frame-src 'self' https:;`;
+  `default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https: blob:; media-src 'self' https: blob:; connect-src 'self' https: wss: http://localhost:4000 ws://localhost:4000 ${configuredConnections}; worker-src 'self' blob: 'unsafe-eval'; frame-src 'self' https://www.youtube.com; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self';`;
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -26,6 +26,13 @@ const nextConfig = {
         source: '/:path*',
         headers: [
           { key: 'Content-Security-Policy', value: contentSecurityPolicy },
+        ],
+      },
+      {
+        source: '/reset-password',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'Cache-Control', value: 'no-store' },
         ],
       },
     ];

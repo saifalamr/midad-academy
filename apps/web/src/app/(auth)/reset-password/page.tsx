@@ -11,7 +11,9 @@ export default function ResetPassword() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   useEffect(() => {
-    setToken(new URLSearchParams(window.location.search).get('token') ?? '');
+    const resetToken = new URLSearchParams(window.location.search).get('token') ?? '';
+    setToken(resetToken);
+    if (resetToken) window.history.replaceState(window.history.state, '', window.location.pathname);
   }, []);
   return (
     <main className="midad wrap" style={{ maxWidth: 520, padding: '80px 24px' }}>
