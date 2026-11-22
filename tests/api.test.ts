@@ -451,13 +451,16 @@ test(
       });
       ws.on('error', () => {});
     });
-    const connect = async (token: string) => {
+    const connect = async (role: 'student' | 'teacher') => {
+      const ticket = await call('POST', '/api/auth/whiteboard-ticket', role, { roomName: `whiteboard-${freeId}` });
+      assert.equal(ticket.statusCode, 200);
+      const token = ticket.json().data.token;
       const ws = new WebSocket(`${url}?token=${token}`);
       await once(ws, 'message'); // Server handshake means permissions and document are loaded.
       return ws;
     };
-    const student = await connect(actors.student.token);
-    const teacher = await connect(actors.teacher.token);
+    const student = await connect('student');
+    const teacher = await connect('teacher');
     const update = (key: string) => {
       const doc = new Y.Doc();
       doc.getMap('drawing').set(key, true);
@@ -1438,6 +1441,36 @@ test('verified users sharing one network have separate request limits; forged to
   }
 });
 
+test('browser login issues a protected cookie, enforces origin on writes, and scopes whiteboard tickets', async () => {
+  const origin = 'http://localhost:3000';
+  const login = await app.inject({ method: 'POST', url: '/api/auth/login', remoteAddress,
+    headers: { origin, 'x-midad-client': 'browser' },
+    payload: { email: actors.parent.email, password: 'TestingPassword2026!' },
+  });
+  assert.equal(login.statusCode, 200);
+  assert.equal(login.json().data.token, undefined);
+  const cookie = String(login.headers['set-cookie']).split(';')[0];
+  assert.match(String(login.headers['set-cookie']), /HttpOnly/);
+  assert.equal((await app.inject({ method: 'GET', url: '/api/auth/me', remoteAddress,
+    headers: { cookie } })).statusCode, 200);
+  const ticketPath = '/api/auth/whiteboard-ticket';
+  const badOrigin = await app.inject({ method: 'POST', url: ticketPath, remoteAddress,
+    headers: { cookie, origin: 'https://attacker.example' }, payload: { roomName: 'whiteboard-preview-arabic' },
+  });
+  assert.equal(badOrigin.statusCode, 403);
+  const ticket = await app.inject({ method: 'POST', url: ticketPath, remoteAddress,
+    headers: { cookie, origin }, payload: { roomName: 'whiteboard-preview-arabic' },
+  });
+  assert.equal(ticket.statusCode, 200);
+  const scoped = ticket.json().data.token;
+  assert.equal((await app.inject({ method: 'GET', url: '/api/auth/me', remoteAddress,
+    headers: { authorization: `Bearer ${scoped}` } })).statusCode, 401);
+  const logout = await app.inject({ method: 'POST', url: '/api/auth/logout', remoteAddress,
+    headers: { cookie, origin },
+  });
+  assert.match(String(logout.headers['set-cookie']), /Max-Age=0/);
+});
+
 test('public login and registration have tighter per-IP limits', async () => {
   for (let attempt = 0; attempt < 30; attempt++) {
     const response = await call('POST', '/api/auth/login', undefined, {
@@ -1907,8 +1940,10 @@ test('parents receive subscribe-only live tokens and cannot observe unrelated or
   );
   const port = (app.server.address() as { port: number }).port;
   const connect = async (role: string) => {
+    const ticket = await call('POST', '/api/auth/whiteboard-ticket', role, { roomName: `whiteboard-${courseId}` });
+    assert.equal(ticket.statusCode, 200);
     const ws = new WebSocket(
-      `ws://127.0.0.1:${port}/whiteboard-${courseId}?token=${actors[role].token}`
+      `ws://127.0.0.1:${port}/whiteboard-${courseId}?token=${ticket.json().data.token}`
     );
     await once(ws, 'message');
     return ws;

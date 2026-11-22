@@ -39,5 +39,5 @@ try {
     while (true) { try { const res = await fetch(url); if (res.ok) break; } catch {} if (Date.now() > deadline) throw new Error(`Preview did not start: ${url}`); await new Promise((r) => setTimeout(r, 300)); }
   }
   console.log('Preview ready: http://127.0.0.1:3000 (local only)');
-  if (process.argv.includes('--test') || classroom) { const executablePath = await (await import('./chromium.mjs')).chromiumPath(); await finished(run(['node_modules/@playwright/test/cli.js', 'test', ...(classroom ? ['classroom.spec.ts'] : [])], { PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: executablePath })); await stop(); }
+  if (process.argv.includes('--test') || classroom) { const executablePath = await (await import('./chromium.mjs')).chromiumPath(); await finished(run(['node_modules/@playwright/test/cli.js', 'test', ...(classroom ? ['classroom.spec.ts'] : process.argv.filter((arg) => arg.endsWith('.spec.ts')))], { PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: executablePath })); await stop(); }
 } catch (error) { console.error(error.message); await stop(); process.exitCode = 1; }

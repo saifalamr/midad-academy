@@ -22,7 +22,7 @@ import { WebsocketProvider } from 'y-websocket';
 import { API_URL } from '@/lib/config';
 
 function getWhiteboardWsUrl(): string {
-  return process.env.NEXT_PUBLIC_WHITEBOARD_WS_URL || API_URL.replace(/^http/, 'ws').replace(/\/$/, '');
+  return process.env.NEXT_PUBLIC_WHITEBOARD_WS_URL || (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/^http/, 'ws').replace(/\/$/, '');
 }
 
 export type Tool = 'select' | 'pen' | 'highlighter' | 'eraser' | 'text' | 'rectangle' | 'circle' | 'line';
@@ -164,22 +164,37 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
     });
     canvasRef.current = canvas;
     lockObjects(canvas, canDrawRef.current);
+    let disposed = false;
 
     // Independent Y.Map entries let two people add strokes concurrently without
     // replacing each other's board. Undo tracks only this participant's edits.
     const ydoc = new Y.Doc();
     const provider = new WebsocketProvider(getWhiteboardWsUrl(), `whiteboard-${roomId}`, ydoc, {
-      params: { token: localStorage.getItem('token') ?? sessionStorage.getItem('token') ?? '' },
+      params: {},
       disableBc: true,
-      connect: navigator.onLine,
+      connect: false,
     });
+    const refreshTicket = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/auth/whiteboard-ticket`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roomName: `whiteboard-${roomId}` }),
+        });
+        if (!response.ok) return;
+        const { data } = await response.json();
+        if (disposed) return;
+        provider.params = { token: data.token };
+        if (navigator.onLine && !provider.wsconnected) provider.connect();
+      } catch { /* Retry after the next connection change or ticket refresh. */ }
+    };
+    const ticketRefresh = window.setInterval(() => { void refreshTicket(); }, 5 * 60_000);
+    void refreshTicket();
     const state = ydoc.getMap<string>('objects');
     const origin = {};
     const undo = new Y.UndoManager(state, { trackedOrigins: new Set([origin]), captureTimeout: 300 });
     historyRef.current = undo;
     const ids = new WeakMap<FabricObject, string>();
     const applied = new Map<string, string>();
-    let disposed = false;
     let rendering: Promise<void> = Promise.resolve();
     const reconcile = () => {
       rendering = rendering.then(async () => {
@@ -239,7 +254,7 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
       canvas.isDrawingMode = false;
       provider.disconnect();
     };
-    const online = () => provider.connect();
+    const online = () => { void refreshTicket(); };
     window.addEventListener('offline', offline);
     window.addEventListener('online', online);
     provider.on('sync', (ok: boolean) => {
@@ -393,6 +408,7 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
     return () => {
       window.removeEventListener('offline', offline);
       window.removeEventListener('online', online);
+      window.clearInterval(ticketRefresh);
       disposed = true; connectedRef.current = false;
       observer.disconnect();
       canvas.off('mouse:down', onMouseDown);

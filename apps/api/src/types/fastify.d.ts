@@ -3,8 +3,8 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 // Extends @fastify/jwt so request.user is typed everywhere
 declare module '@fastify/jwt' {
   interface FastifyJWT {
-    payload: { id: string; email: string; role: string; name?: string; version?: number };
-    user: { id: string; email: string; role: string; name?: string; version?: number };
+    payload: { id: string; email?: string; role: string; name?: string; version?: number; purpose?: 'whiteboard'; roomName?: string };
+    user: { id: string; email?: string; role: string; name?: string; version?: number; purpose?: 'whiteboard'; roomName?: string };
   }
 }
 

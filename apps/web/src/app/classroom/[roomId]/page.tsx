@@ -1855,21 +1855,12 @@ export default function ClassroomPage() {
 
   useEffect(() => {
     if (!choices || exit) return;
-    const appToken = localStorage.getItem('token') ?? sessionStorage.getItem('token');
-
-    if (!appToken) {
+    if (!user) {
       router.push('/login');
       return;
     }
-
-    let currentRole = '';
-    try {
-      const payload = JSON.parse(atob(appToken.split('.')[1]));
-      currentRole = payload.role?.toLowerCase() ?? '';
-      setRole(currentRole);
-    } catch {
-      setRole(null);
-    }
+    const currentRole = user.role.toLowerCase();
+    setRole(currentRole);
 
     const controller = new AbortController();
     let active = true;
@@ -1879,7 +1870,6 @@ export default function ClassroomPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${appToken}`,
         },
         body: JSON.stringify({ roomName: roomId }),
         signal: controller.signal,
@@ -1911,36 +1901,11 @@ export default function ClassroomPage() {
       active = false;
       controller.abort();
     };
-  }, [roomId, router, choices, attempt, exit]);
+  }, [roomId, router, choices, attempt, exit, user]);
 
   const goDashboard = useCallback(() => {
-    const appToken = localStorage.getItem('token') ?? sessionStorage.getItem('token');
-    if (appToken) {
-      try {
-        const payload = JSON.parse(atob(appToken.split('.')[1]));
-        const r = payload.role?.toLowerCase();
-        if (r === 'teacher') {
-          router.push('/teacher');
-          return;
-        }
-        if (r === 'admin') {
-          router.push('/admin');
-          return;
-        }
-        if (r === 'parent') {
-          router.push('/parent');
-          return;
-        }
-        if (r === 'student') {
-          router.push('/student');
-          return;
-        }
-      } catch {
-        /* fall through */
-      }
-    }
-    router.push('/login');
-  }, [router]);
+    router.push(user ? `/${user.role.toLowerCase()}` : '/login');
+  }, [router, user]);
 
   const handleLeave = useCallback(() => setExit((value) => value ?? 'left'), []);
   const handleEnd = useCallback(() => setExit('ended'), []);

@@ -19,6 +19,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { API_URL } from '@/lib/config';
+import { useAuth } from '@/components/AuthProvider';
 
 type Enrollment = {
   id: string;
@@ -107,20 +108,11 @@ function authFetch(path: string, options: RequestInit = {}) {
   });
 }
 
-function getTokenPayload(): { name?: string } {
-  try {
-    const token = localStorage.getItem('token') ?? sessionStorage.getItem('token');
-    if (!token) return {};
-    return JSON.parse(atob(token.split('.')[1]));
-  } catch {
-    return {};
-  }
-}
-
 const THUMBS = ['th-1', 'th-2', 'th-3', 'th-4', 'th-5', 'th-6'];
 
 export default function StudentDashboard() {
   const router = useRouter();
+  const { user } = useAuth();
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
@@ -132,8 +124,7 @@ export default function StudentDashboard() {
   const [showProgress, setShowProgress] = useState(false);
 
   useEffect(() => {
-    const payload = getTokenPayload();
-    setUserName(payload.name ?? 'Student');
+    setUserName(user?.name ?? 'Student');
 
     const controller = new AbortController();
     setLoading(true);

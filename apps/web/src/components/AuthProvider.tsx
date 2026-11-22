@@ -16,22 +16,26 @@ type Auth = {
 };
 const Context = createContext<Auth | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { confirm } = useFeedback();
+  const { confirm, notice } = useFeedback();
   const [user, setUser] = useState<Account | null>(null);
   const [status, setStatus] = useState<Auth['status']>('loading');
   const sequence = useRef(0);
   const refresh = useCallback(async () => {
     const revision = ++sequence.current;
-    const token = localStorage.getItem('token') ?? sessionStorage.getItem('token');
-    if (!token) {
-      setUser(null);
-      setStatus('ready');
-      return;
-    }
     setStatus('loading');
     try {
+      const stored = localStorage.getItem('token') ?? sessionStorage.getItem('token');
+      if (stored && stored !== 'cookie') {
+        const remembered = localStorage.getItem('token') === stored;
+        localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
+        const upgrade = await fetch(`${API_URL}/api/auth/session`, {
+          method: 'POST', headers: { Authorization: `Bearer ${stored}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ remember: remembered }),
+        });
+        if (upgrade.ok) (remembered ? localStorage : sessionStorage).setItem('token', 'cookie');
+      }
       const res = await fetch(`${API_URL}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
         cache: 'no-store',
       });
       if (revision !== sequence.current) return;
@@ -45,6 +49,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok) throw new Error('Connection failed');
       const { data } = await res.json();
       if (revision !== sequence.current) return;
+      if (!localStorage.getItem('token') && !sessionStorage.getItem('token'))
+        sessionStorage.setItem('token', 'cookie');
       setUser(data);
       setStatus('ready');
     } catch {
@@ -53,6 +59,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
   const logout = useCallback(async () => {
     if (!(await confirm('هل تريد تسجيل الخروج من حسابك؟'))) return false;
+    try {
+      const res = await fetch(`${API_URL}/api/auth/logout`, { method: 'POST' });
+      if (!res.ok) throw new Error('Could not end the session');
+    } catch {
+      notice('logout-error', 'تعذر تسجيل الخروج الآن. تحقق من الاتصال وأعد المحاولة.');
+      return false;
+    }
     ++sequence.current;
     localStorage.removeItem('token');
     sessionStorage.removeItem('token');
@@ -60,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setStatus('ready');
     window.dispatchEvent(new Event('midad-auth'));
     return true;
-  }, [confirm]);
+  }, [confirm, notice]);
   useEffect(() => {
     const requests = sequence;
     void refresh();

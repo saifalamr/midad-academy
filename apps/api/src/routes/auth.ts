@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma';
 import { randomBytes, createHash } from 'node:crypto';
 import nodemailer from 'nodemailer';
 import { config } from '../config';
+import { clearSessionCookie, setSessionCookie, validBrowserOrigin } from '../lib/session-cookie';
 
 const emailSchema = z.string().trim().toLowerCase().email();
 const tokenHash = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -116,12 +117,46 @@ export async function authRoutes(app: FastifyInstance) {
       version: user.tokenVersion,
     });
 
+    if (request.headers['x-midad-client'] === 'browser') {
+      if (!validBrowserOrigin(request)) return reply.status(403).send({ error: 'Invalid request origin' });
+      const remember = (request.body as { remember?: unknown }).remember !== false;
+      setSessionCookie(reply, token, remember);
+      return reply.send({ data: { user: { id: user.id, name: user.name, email: user.email, role: user.role } } });
+    }
     return reply.send({
       data: {
         token,
         user: { id: user.id, name: user.name, email: user.email, role: user.role },
       },
     });
+  });
+
+  // One-time exchange for sessions created before the cookie migration. The
+  // browser deletes its old stored JWT after the response, successful or not.
+  app.post('/session', { preHandler: [app.authenticate] }, async (request, reply) => {
+    if (!validBrowserOrigin(request)) return reply.status(403).send({ error: 'Invalid request origin' });
+    const bearer = request.headers.authorization?.replace(/^Bearer /, '');
+    if (!bearer) return reply.status(401).send({ error: 'Unauthorized' });
+    setSessionCookie(reply, bearer, (request.body as { remember?: unknown } | null)?.remember !== false);
+    return reply.send({ data: { ok: true } });
+  });
+
+  app.post('/logout', async (request, reply) => {
+    if (!validBrowserOrigin(request)) return reply.status(403).send({ error: 'Invalid request origin' });
+    clearSessionCookie(reply);
+    return reply.send({ data: { ok: true } });
+  });
+
+  app.post('/whiteboard-ticket', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const { roomName } = z.object({ roomName: z.string().regex(/^whiteboard-[a-zA-Z0-9_-]+$/) }).parse(request.body);
+    const token = app.jwt.sign({
+      id: request.user.id,
+      role: request.user.role,
+      version: request.user.version,
+      purpose: 'whiteboard',
+      roomName,
+    }, { expiresIn: '10m' });
+    return reply.send({ data: { token } });
   });
 
   // ── GET /api/auth/me ───────────────────────────────────────────────────────
@@ -172,6 +207,7 @@ export async function authRoutes(app: FastifyInstance) {
         return true;
       });
       if (!changed) return reply.status(409).send({ error: 'Please log in again and retry' });
+      clearSessionCookie(reply);
       return reply.send({ message: 'Password updated. Log in with your new password.' });
     }
   );
@@ -249,6 +285,7 @@ export async function authRoutes(app: FastifyInstance) {
       });
       if (!changed)
         return reply.status(400).send({ error: 'This reset link is invalid or expired' });
+      clearSessionCookie(reply);
       return reply.send({ message: 'Password updated. Log in with your new password.' });
     }
   );

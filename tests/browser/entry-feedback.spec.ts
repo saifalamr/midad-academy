@@ -19,6 +19,27 @@ test('password recovery removes its one-time token from the address and referrer
   await expect(page.getByRole('button', { name: 'Update password' })).toBeEnabled();
 });
 
+test('login keeps the session secret in an HttpOnly cookie and blocks cross-site writes', async ({ page }) => {
+  await page.goto('/login');
+  await page.locator('#email').fill('parent@preview.midad.test');
+  await page.locator('#password').fill('MidadPreview2026!');
+  const loginResponse = page.waitForResponse((res) => res.url().endsWith('/api/auth/login'));
+  await page.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();
+  const response = await loginResponse;
+  expect((await response.json()).data.token).toBeUndefined();
+  await expect(page).toHaveURL(/\/parent$/);
+  expect(await page.evaluate(() => localStorage.getItem('token'))).toBe('cookie');
+  expect(await page.evaluate(() => document.cookie)).not.toContain('midad_session');
+  const cookies = await page.context().cookies();
+  const session = cookies.find((cookie) => cookie.name === 'midad_session');
+  expect(session?.httpOnly).toBe(true);
+  expect(session?.sameSite).toBe('Lax');
+  const denied = await page.request.post('http://127.0.0.1:3000/api/auth/whiteboard-ticket', {
+    headers: { Origin: 'https://attacker.example' }, data: { roomName: 'whiteboard-preview-arabic' },
+  });
+  expect(denied.status()).toBe(403);
+});
+
 test('compact home exposes working entry links on phone, tablet and desktop', async ({ page }) => {
   await page.goto('/');
   for (const width of [320, 390, 820, 1440]) {

@@ -20,6 +20,10 @@ const contentSecurityPolicy =
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ['@arabic-platform/ui', '@arabic-platform/shared-types'],
+  async rewrites() {
+    const api = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000';
+    return [{ source: '/api/:path*', destination: `${api.replace(/\/$/, '')}/api/:path*` }];
+  },
   async headers() {
     return [
       {

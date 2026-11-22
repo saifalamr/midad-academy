@@ -32,6 +32,7 @@ import { academyRoutes } from './routes/academy';
 import { adminRoutes } from './routes/admin';
 import { bootstrapAdmin } from './lib/bootstrap-admin';
 import { prepareReview } from './lib/prepare-review';
+import { readSessionCookie, validBrowserOrigin } from './lib/session-cookie';
 
 export async function buildApp() {
   validateConfig();
@@ -75,11 +76,24 @@ export async function buildApp() {
 
   // Reusable preHandler — attach to any route that needs authentication.
   app.decorate('authenticate', async (request: FastifyRequest, reply: FastifyReply) => {
+    const cookie = readSessionCookie(request);
+    const auth = request.headers.authorization;
+    // The browser no longer has a bearer token. Ignore the old client-side
+    // placeholder while old screens are migrated; never accept arbitrary bad
+    // bearer headers as a fallback to a cookie.
+    const cookieAuth = !!cookie && (!auth || auth === 'Bearer cookie');
+    if (cookieAuth) {
+      if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method) && !validBrowserOrigin(request))
+        return void reply.status(403).send({ error: 'Invalid request origin' });
+      request.headers.authorization = `Bearer ${cookie}`;
+    }
     try {
       await request.jwtVerify();
     } catch {
       return void reply.status(401).send({ error: 'Unauthorized — invalid or missing token' });
     }
+    if (request.user.purpose)
+      return void reply.status(401).send({ error: 'This ticket cannot access the API' });
     // A database outage is a server error, not a reason to invalidate a valid login.
     const user = await prisma.user.findUnique({ where: { id: request.user.id } });
     if (

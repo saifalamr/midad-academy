@@ -22,14 +22,16 @@ const script = buildSync({
   },
 }).outputFiles[0].text;
 
-test('embedded writing drafts preserve mounted account views while credential changes and storage clearing still revalidate', async ({
+test('embedded drafts preserve account views while credential changes revalidate and server revocation signs out', async ({
   page,
 }) => {
   let reads = 0;
+  let authorized = true;
   await page.route('**/api/auth/me', (route) => {
     reads++;
     return route.fulfill({
-      json: { data: { id: 'storage-user', name: 'Storage test', role: 'STUDENT' } },
+      status: authorized ? 200 : 401,
+      json: authorized ? { data: { id: 'storage-user', name: 'Storage test', role: 'STUDENT' } } : { error: 'Unauthorized' },
     });
   });
   await page.route('**/auth-storage-parent', (route) =>
@@ -72,6 +74,7 @@ test('embedded writing drafts preserve mounted account views while credential ch
     .evaluate(() => localStorage.setItem('token', 'changed-credential'));
   await expect.poll(() => reads).toBe(2);
   await expect(draft).toHaveValue('');
+  authorized = false;
   await activity.locator('body').evaluate(() => localStorage.clear());
   await expect(page.getByText('Signed out', { exact: true })).toBeVisible();
 });

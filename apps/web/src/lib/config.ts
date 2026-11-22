@@ -1,1 +1,2 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+// Browser requests stay on the site's origin; Next forwards /api to the backend.
+export const API_URL = '';

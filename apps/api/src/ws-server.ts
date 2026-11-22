@@ -297,9 +297,10 @@ export function startWhiteboardWebSocketServer(server: Server, app: FastifyInsta
       const url = new URL(req.url ?? '/', 'http://localhost');
       const roomName = url.pathname.slice(1);
       if (!/^whiteboard-[a-zA-Z0-9_-]+$/.test(roomName)) throw new Error('Invalid room');
-      const actor = app.jwt.verify<{ id: string; role: string; version?: number }>(
+      const actor = app.jwt.verify<{ id: string; role: string; version?: number; purpose?: string; roomName?: string }>(
         url.searchParams.get('token') ?? ''
       );
+      if (actor.purpose !== 'whiteboard' || actor.roomName !== roomName) throw new Error('Invalid ticket');
       const user = await prisma.user.findUnique({ where: { id: actor.id } });
       if (
         !user ||

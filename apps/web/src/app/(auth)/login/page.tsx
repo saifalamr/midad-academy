@@ -24,8 +24,8 @@ export default function LoginPage() {
     try {
       const res = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        headers: { 'Content-Type': 'application/json', 'X-Midad-Client': 'browser' },
+        body: JSON.stringify({ email, password, remember }),
       });
 
       const json = await res.json();
@@ -37,7 +37,9 @@ export default function LoginPage() {
 
       localStorage.removeItem('token');
       sessionStorage.removeItem('token');
-      (remember ? localStorage : sessionStorage).setItem('token', json.data.token);
+      // A marker keeps older UI guards working; the actual JWT only exists in
+      // the HttpOnly cookie and is never returned to browser JavaScript.
+      (remember ? localStorage : sessionStorage).setItem('token', 'cookie');
       window.dispatchEvent(new Event('midad-auth'));
 
       const role: string = json.data.user?.role?.toLowerCase() ?? '';
