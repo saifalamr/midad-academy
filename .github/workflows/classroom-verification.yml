@@ -40,3 +40,18 @@ jobs:
         run: npm run test:classroom
         env:
           LIVEKIT_SERVER_BINARY: /tmp/midad-livekit/livekit-server
+  hosted-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Check deployed preview and cross-family access
+        run: node scripts/hosted-smoke.mjs
+        env:
+          HOSTED_TEST_MODE: staging
+          API_URL: https://midad-test-api.onrender.com
+          WEB_URL: https://midad-academy-preview.vercel.app
+          EXPECTED_COMMIT: ${{ github.sha }}

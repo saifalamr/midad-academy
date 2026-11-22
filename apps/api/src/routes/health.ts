@@ -3,7 +3,10 @@ import { prisma } from '../lib/prisma';
 
 export async function healthRoutes(app: FastifyInstance) {
   app.get('/ready', async (_request, reply) => {
-    try { await prisma.$queryRaw`SELECT 1`; return { status: 'ready' }; }
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      return { status: 'ready', ...(process.env.RENDER_GIT_COMMIT ? { revision: process.env.RENDER_GIT_COMMIT } : {}) };
+    }
     catch { return reply.status(503).send({ status: 'unavailable' }); }
   });
   app.get('/health', async () => ({

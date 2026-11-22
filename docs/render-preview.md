@@ -1,44 +1,53 @@
-# Free development preview on Render
+# بيئة تست مداد الحالية
 
-Use `render.yaml` from branch `fix/client-ready`. This creates only a free API
-and a new free PostgreSQL database in Frankfurt. The frontend stays on Vercel.
-It does not touch the previous Railway services or any production database.
+الواجهة: `https://midad-academy-preview.vercel.app/academy`، والخادم:
+`https://midad-test-api.onrender.com`. الفرع `fix/client-ready` ينشر تلقائياً
+على خدمة رندر `midad-test-api` (الخطة المجانية). القاعدة التجريبية في Supabase؛
+لا تعتمد على قاعدة Render القديمة المنتهية. هذه بيئة تطوير وبياناتها وهمية.
 
-1. Open https://dashboard.render.com/blueprint/new?repo=https://github.com/saifalamr/midad-academy
-2. Connect GitHub and allow access to this repository if prompted.
-3. Choose branch `fix/client-ready` and Blueprint path `render.yaml`.
-4. Before Apply, enter the same stable Vercel preview HTTPS origin for
-   `FRONTEND_URL` and `CORS_ORIGIN`, without a trailing slash or path. Obtain
-   the actual frontend URL first; do not enter localhost or a made-up URL.
-5. Verify both resources show Free, then Apply. Generated JWT/invitation
-   secrets and the internal database URL are wired by Render; do not paste
-   those secrets into chat. The database rejects external connections.
-6. Confirm `/api/ready` returns 200. Set the real API origin in the frontend's
-   `NEXT_PUBLIC_API_URL`, then rebuild the Vercel preview and test CORS/login.
+## فحص النشر
 
-Render supplies `PORT` and `RENDER_EXTERNAL_URL`. The start command derives
-`API_URL` from the latter, validates configuration, applies tracked migrations,
-then replaces the shell with the compiled API process for graceful shutdown.
-Migrations run at startup because Free services have no pre-deploy phase.
-Never point this startup configuration at an existing customer database.
-No local seed passwords are created in the hosted database.
+1. افتح `/api/ready` على خادم رندر. الرد `status: ready` يعني أن الاستعلام
+   إلى قاعدة البيانات نجح، و`revision` يبين SHA المنشور عند وجود
+   `RENDER_GIT_COMMIT`. خادم Free قد يحتاج وقتاً ليستيقظ.
+2. من Render > `midad-test-api` > Settings > Health Checks، اضبط مسار HTTP
+   على `/api/ready`. وجوده في `render.yaml` لا يغيّر إعداد الخدمة التي
+   أنشئت يدوياً. تحقق من أن Settings تعرض المسار بعد حفظه.
+3. تحقق من أن Vercel Preview وRender Live على SHA نفسه قبل اختبار الواجهة.
+   فيرسل يحتاج توجيه alias الثابت إلى النسخة الجديدة إذا لم يحدث تلقائياً.
+4. GitHub Actions يشغّل الاختبارات المحلية وصوت/فيديو LiveKit الحقيقي، ثم
+   اختبار `hosted-smoke` لبيئة التست: ينتظر SHA رندر، يفحص وسيط الواجهة،
+   يسجل وليّي أمر وهميين، ينشئ طفلاً، ويحاول الوصول من الأسرة الأخرى،
+   ويختبر الكوكي وCSRF والخروج. كل تشغيل يترك حسابات وهمية قليلة؛ لا يُستخدم
+   مع بيانات حقيقية أو مع بيئة الإنتاج.
 
-Auto-deployment is disabled. Deploy tested updates manually between test
-classes. Use one API instance: in-memory whiteboard rooms and rate limits do
-not support multiple instances or overlapping old/new versions. Reconnection
-and saved-board recovery must be checked after each restart.
+## حماية القاعدة
 
-Free services sleep after inactivity. This is temporary test infrastructure,
-not an uptime commitment. Free Render PostgreSQL expires after 30 days;
-export needed test data or move to suitable hosting before expiry. Render may
-request account/card verification; do not choose a paid resource without an
-explicit budget decision.
+مداد يتصل بقاعدة PostgreSQL من الخادم عبر Prisma. الواجهة لا تستخدم Supabase
+Data API. الهجرة `20261122190000_private_application_tables` تفعّل RLS
+على جداول التطبيق وتحذف صلاحيات القراءة والكتابة المباشرة لأدوار
+`anon` و`authenticated` و`service_role` على الجداول الحالية، وتزيل
+صلاحياتها التلقائية للجداول الجديدة التي ينشئها مستخدم الهجرة. بعد نشرها،
+راجع Supabase Security Advisors والصلاحيات في مشروع مداد الفعلي. من إعدادات
+Data API عطّل **Enable Data API** إذا لم يوجد استخدام آخر لها في المشروع.
+لا تدخل عنوان القاعدة أو كلمة مرورها في الرسائل أو في Git.
 
-Initial credentials for LiveKit, Stripe, Cloudinary and SMTP are omitted.
-Core account/course/quiz/board checks can begin independently. Add separate
-test provider credentials in Render's Environment screen before checking
-real calls, test checkout/webhooks, uploads or email. Configure both LiveKit
-and Stripe callbacks against the actual API URL. A healthy API alone does
-not verify those integrations.
+## النسخ والاستعادة
 
-References: https://render.com/docs/blueprint-spec and https://render.com/docs/free
+الاختبارات المحلية تتحقق من نسخة بيانات معزولة وعلاقاتها. هذا لا يثبت نسخة
+Supabase مستضافة. عند الحاجة للاحتفاظ ببيانات تست معينة، ثبّت أدوات
+PostgreSQL المتوافقة، ثم شغّل `scripts/database-backup.mjs create` باستخدام
+`DIRECT_DATABASE_URL` أو `DATABASE_URL` في بيئة خاصة. شغّل `verify` على
+قاعدة فارغة منفصلة ينتهي اسمها بـ `restore_check`. السكربت يرفض الكتابة فوق
+قاعدة غير فارغة. احفظ الأرشيف خارج المستودع مع صلاحيات مقيدة. وبما أن
+المشروع في التطوير، يمكن البدء من قاعدة تست جديدة بدلاً من استرجاع بيانات
+لا تهم التجربة.
+
+## قبول الأجهزة والخدمات
+
+نفّذ [الخطة اليدوية](manual-test-ar.md) على كمبيوتر المعلم وآيباد الطالب
+وجوال ولي الأمر: حصة LiveKit حقيقية، انقطاع الشبكة والعودة، السبورة،
+التقرير والواجب، وخصوصية الأسرة الثانية. رفع Cloudinary، البريد، الدفع
+التجريبي، وواتساب لا تُعد ناجحة إلا بعد ضبط مزودها وإثبات النتيجة فعلياً.
+خادم Free ينام بعد الخمول، ومزامنة السبورة الحية تعتمد على نسخة خادم واحدة؛
+اختبر إعادة الدخول بعد كل نشر بين الحصص.

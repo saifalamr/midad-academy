@@ -148,6 +148,17 @@ after(async () => {
   }
 });
 
+test('application tables require server access rather than direct Data API grants', async () => {
+  const rows = await prisma.$queryRawUnsafe<Array<{ relname: string; relrowsecurity: boolean }>>(
+    `SELECT c.relname, c.relrowsecurity
+       FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public' AND c.relkind = 'r'
+        AND c.relname NOT IN ('_prisma_migrations', '_local_migrations')`
+  );
+  assert.ok(rows.length >= 40);
+  assert.deepEqual(rows.filter((row) => !row.relrowsecurity).map((row) => row.relname), []);
+});
+
 test('anonymous requests and uninvited teachers are rejected', async () => {
   assert.equal((await call('GET', '/api/courses')).statusCode, 401);
   assert.equal(
