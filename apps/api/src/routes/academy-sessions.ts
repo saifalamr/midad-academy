@@ -29,6 +29,7 @@ async function courseAccess(actor: Actor, courseId: string) {
 export async function academySessionRoutes(app: FastifyInstance) {
   app.get('/schedule', async (request) => {
     const actor = request.user;
+    const now = new Date();
     return {
       data: await prisma.classSession.findMany({
         where:
@@ -37,16 +38,38 @@ export async function academySessionRoutes(app: FastifyInstance) {
             : actor.role === 'TEACHER'
               ? { teacher: { userId: actor.id } }
               : {
-                  course: {
-                    enrollments: {
-                      some: {
-                        student:
-                          actor.role === 'PARENT'
-                            ? { parent: { userId: actor.id } }
-                            : { userId: actor.id },
+                  AND: [
+                    {
+                      course: {
+                        enrollments: {
+                          some: {
+                            student:
+                              actor.role === 'PARENT'
+                                ? { parent: { userId: actor.id } }
+                                : { userId: actor.id },
+                          },
+                        },
                       },
                     },
-                  },
+                    {
+                      OR: [
+                        { scheduledAt: { lte: now } },
+                        {
+                          course: {
+                            enrollments: {
+                              some: {
+                                status: 'ACTIVE',
+                                student:
+                                  actor.role === 'PARENT'
+                                    ? { parent: { userId: actor.id } }
+                                    : { userId: actor.id },
+                              },
+                            },
+                          },
+                        },
+                      ],
+                    },
+                  ],
                 },
         select: {
           id: true,
@@ -81,6 +104,7 @@ export async function academySessionRoutes(app: FastifyInstance) {
       if (!['PARENT', 'STUDENT'].includes(actor.role)) throw httpError(403, 'لا تملك صلاحية الحصة');
       await courseAccess(actor, session.courseId);
     }
+    const historical = session.scheduledAt <= new Date();
     const students = await prisma.studentProfile.findMany({
       where: {
         ...(staff
@@ -91,7 +115,11 @@ export async function academySessionRoutes(app: FastifyInstance) {
         OR: [
           {
             enrollments: {
-              some: { courseId: session.courseId, enrolledAt: { lte: session.scheduledAt } },
+              some: {
+                courseId: session.courseId,
+                enrolledAt: { lte: session.scheduledAt },
+                ...(staff || historical ? {} : { status: 'ACTIVE' }),
+              },
             },
           },
           { attendance: { some: { sessionId: session.id } } },

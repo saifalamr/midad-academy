@@ -3131,6 +3131,54 @@ test('rescheduling is conflict-safe, durable, acknowledged per user and links on
   assert.equal((await call('PATCH',`/api/academy/sessions/${session.id}/schedule`,keys.admin,makeupBody)).statusCode,409);
 });
 
+test('withdrawn families retain past classes but lose future schedule and class details', async () => {
+  const { keys, users, course, childId } = await operationsFixture();
+  const child = await prisma.studentProfile.findUniqueOrThrow({
+    where: { id: childId }, include: { user: true },
+  });
+  const childKey = `withdrawn-child-${randomUUID()}`;
+  actors[childKey] = {
+    id: child.userId,
+    email: child.user.email,
+    token: app.jwt.sign({ id: child.userId, email: child.user.email, role: 'STUDENT', version: 0 }),
+  };
+  const past = await prisma.classSession.create({
+    data: {
+      courseId: course.id, teacherId: users.teacher.teacherProfile.id,
+      title: 'حصة سابقة', scheduledAt: new Date(Date.now() - 86400000), durationMinutes: 45,
+      status: 'COMPLETED',
+    },
+  });
+  const future = await prisma.classSession.create({
+    data: {
+      courseId: course.id, teacherId: users.teacher.teacherProfile.id,
+      title: 'حصة قادمة', scheduledAt: new Date(Date.now() + 86400000), durationMinutes: 45,
+    },
+  });
+  await prisma.enrollment.create({
+    data: { courseId: course.id, studentId: childId, enrolledAt: new Date(Date.now() - 2 * 86400000) },
+  });
+  for (const role of [keys.parent, childKey]) {
+    assert.equal((await call('GET', `/api/academy/sessions/${future.id}`, role)).statusCode, 200);
+    assert.ok((await call('GET', '/api/academy/schedule', role)).json().data.some((s: any) => s.id === future.id));
+  }
+  assert.equal((await call('GET', `/api/academy/sessions/${future.id}`, keys.stranger)).statusCode, 404);
+  assert.equal((await call('GET', `/api/academy/sessions/${future.id}`, 'otherTeacher')).statusCode, 403);
+  await prisma.enrollment.update({
+    where: { courseId_studentId: { courseId: course.id, studentId: childId } },
+    data: { status: 'CANCELLED' },
+  });
+  for (const role of [keys.parent, childKey]) {
+    assert.equal((await call('GET', `/api/academy/sessions/${future.id}`, role)).statusCode, 404);
+    assert.equal((await call('GET', `/api/academy/sessions/${past.id}`, role)).statusCode, 200);
+    const schedule = (await call('GET', '/api/academy/schedule', role)).json().data;
+    assert.ok(schedule.some((s: any) => s.id === past.id));
+    assert.ok(!schedule.some((s: any) => s.id === future.id));
+  }
+  assert.equal((await call('GET', `/api/academy/sessions/${future.id}`, keys.teacher)).statusCode, 200);
+  assert.equal((await call('GET', `/api/academy/sessions/${future.id}`, keys.admin)).statusCode, 200);
+});
+
 test('unified class respects report drafts, child isolation, reviewed skills and withdrawal history', async () => {
   const {keys,users,course,childId}=await operationsFixture(3);
   await prisma.enrollment.create({data:{courseId:course.id,studentId:childId,enrolledAt:new Date(Date.now()-86400000)}});
