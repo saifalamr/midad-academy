@@ -16,13 +16,19 @@ export default function WorkspaceShell({ children }: { children: React.ReactNode
       href: dashboard,
       label:
         user.role === 'ADMIN'
-          ? 'إدارة الأكاديمية'
+          ? 'الإدارة'
           : user.role === 'PARENT'
-            ? 'أبنائي وتقدمهم'
-            : 'صفوفي وحصصي',
+            ? 'أبنائي'
+            : user.role === 'TEACHER'
+              ? 'حصصي'
+              : 'تعلمي',
       icon: 'calendar',
     },
-    { href: '/academy', label: user.role === 'ADMIN' ? 'الطلبات والمتابعة' : 'التسجيل والمتابعة', icon: 'family' },
+    {
+      href: '/academy',
+      label: user.role === 'ADMIN' ? 'الطلبات والمتابعة' : 'التسجيل والمتابعة',
+      icon: 'family',
+    },
     { href: '/courses', label: 'الدورات', icon: 'book' },
     ...(user.role !== 'ADMIN'
       ? [
@@ -56,6 +62,17 @@ export default function WorkspaceShell({ children }: { children: React.ReactNode
       : []),
     { href: '/account', label: 'حسابي', icon: 'family' },
   ];
+  const mainPaths = [
+    '/',
+    dashboard,
+    user.role === 'TEACHER'
+      ? '/teacher/homework'
+      : user.role === 'STUDENT'
+        ? '/courses'
+        : '/academy',
+  ];
+  const mainLinks = links.filter((link) => mainPaths.includes(link.href));
+  const otherLinks = links.filter((link) => !mainPaths.includes(link.href));
   return (
     <div className="midad workspace-shell">
       <a className="workspace-skip" href="#workspace-content">
@@ -95,7 +112,7 @@ export default function WorkspaceShell({ children }: { children: React.ReactNode
         </div>
       </header>
       <nav className="workspace-nav" aria-label="تنقل مساحة العمل">
-        {links.map((link) => (
+        {mainLinks.map((link) => (
           <Link
             key={link.href}
             href={link.href}
@@ -105,6 +122,27 @@ export default function WorkspaceShell({ children }: { children: React.ReactNode
             <span>{link.label}</span>
           </Link>
         ))}
+        <details className="workspace-more" key={user.role}>
+          <summary
+            aria-label="المزيد من الصفحات"
+            aria-current={otherLinks.some((link) => path === link.href) ? 'page' : undefined}
+          >
+            <Icon name="family" />
+            <span>المزيد</span>
+          </summary>
+          <div className="workspace-more-links">
+            {otherLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={path === link.href ? 'page' : undefined}
+              >
+                <Icon name={link.icon} />
+                <span>{link.label}</span>
+              </Link>
+            ))}
+          </div>
+        </details>
       </nav>
       <div className="workspace-content" id="workspace-content">
         {children}

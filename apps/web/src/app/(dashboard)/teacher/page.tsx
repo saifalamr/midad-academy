@@ -73,22 +73,17 @@ export default function TeacherDashboard() {
       setStarting('');
     }
   }
+  const nextSession = sessions.find((session) => session.status === 'LIVE') ?? sessions[0];
   return (
-    <main className="wrap" style={{ padding: '32px 24px' }}>
+    <main className="wrap teacher-home" dir="rtl" style={{ padding: '32px 24px' }}>
       <header className="dash-head">
         <div>
           <p className="dh-hi">
             أهلاً، <b>{user?.name}</b>
           </p>
-          <h1 className="dh-title">دوراتي وحصصي</h1>
-          <p>الإدارة تعيّن دوراتك وتجهّز المنهج والمواعيد. من هنا تبدأ الحصة وتتابع الطلاب.</p>
+          <h1 className="dh-title">ما التالي في حصصك؟</h1>
+          <p>الحصة الأقرب أولًا. أدوات التحضير والمتابعة متاحة تحتها.</p>
         </div>
-        <Link className="btn btn-gold" href="/teacher/reports">
-          <Icon name="edit" /> تقارير الحصص
-        </Link>
-        <Link className="btn btn-outline" href="/teacher/review-answers">
-          <Icon name="edit" /> مراجعة الإجابات
-        </Link>
       </header>
       {error && (
         <PopupNotice className="auth-error" role="alert">
@@ -99,54 +94,98 @@ export default function TeacherDashboard() {
         <p role="status">جارٍ تحميل دوراتك…</p>
       ) : (
         <>
-          <section className="card pad" style={{ marginBottom: 24 }}>
-            <h2>الحصص القادمة والمباشرة</h2>
-            {sessions.length ? (
-              sessions.map((s) => (
-                <div
-                  key={s.id}
-                  style={{
-                    display: 'flex',
-                    gap: 16,
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    padding: '18px 0',
-                    borderBottom: '1px solid var(--line)',
-                  }}
-                >
-                  <div>
-                    <b>{s.title}</b>
-                    <p>
-                      {s.course.title} · {new Date(s.scheduledAt).toLocaleString('ar')}
-                    </p>
-                  </div>
+          {nextSession ? (
+            <section className="card pad teacher-next">
+              <span className="pill">
+                {nextSession.status === 'LIVE' ? 'مباشرة الآن' : 'حصتك القادمة'}
+              </span>
+              <h2>{nextSession.title}</h2>
+              <p>
+                {nextSession.course.title} ·{' '}
+                {new Date(nextSession.scheduledAt).toLocaleString('ar', {
+                  dateStyle: 'full',
+                  timeStyle: 'short',
+                })}
+              </p>
+              <button
+                className="btn btn-gold"
+                disabled={!!starting}
+                onClick={() => void start(nextSession)}
+              >
+                {starting === nextSession.id
+                  ? 'جارٍ فتح الحصة…'
+                  : nextSession.status === 'LIVE'
+                    ? 'العودة للحصة'
+                    : 'بدء الحصة'}
+              </button>
+              <details className="teacher-session-tools">
+                <summary>تحضير هذه الحصة</summary>
+                <div className="learning-actions">
                   <Link
                     className="btn btn-outline btn-sm"
-                    href={`/teacher/sessions/${s.id}/materials`}
+                    href={`/teacher/sessions/${nextSession.id}/materials`}
                   >
                     خطة الحصة والمواد
                   </Link>
-                  <Link className="btn btn-outline btn-sm" href={'/sessions/' + s.id + '/writing'}>
+                  <Link
+                    className="btn btn-outline btn-sm"
+                    href={`/sessions/${nextSession.id}/writing`}
+                  >
                     تمارين الكتابة
                   </Link>
-                  <button
-                    className="btn btn-gold"
-                    disabled={!!starting}
-                    onClick={() => void start(s)}
-                  >
-                    {starting === s.id
-                      ? 'جارٍ فتح الحصة…'
-                      : s.status === 'LIVE'
-                        ? 'العودة للحصة'
-                        : 'بدء الحصة'}
-                  </button>
                 </div>
-              ))
-            ) : (
-              <p>لم تحدد الإدارة مواعيد قادمة بعد.</p>
-            )}
-          </section>
+              </details>
+            </section>
+          ) : (
+            <section className="card pad teacher-next">
+              <h2>لا توجد حصة قادمة بعد</h2>
+              <p>ستظهر هنا عندما تحدد الإدارة الموعد. تستطيع متابعة الواجبات والتقارير الآن.</p>
+              <Link className="btn btn-gold" href="/teacher/homework">
+                تصحيح الواجبات
+              </Link>
+            </section>
+          )}
+          <nav className="teacher-quick-links" aria-label="أدوات المعلم">
+            <Link href="/teacher/reports">
+              <Icon name="edit" /> تقارير الحصص
+            </Link>
+            <Link href="/teacher/review-answers">
+              <Icon name="edit" /> مراجعة الإجابات
+            </Link>
+            <Link href="/teacher/students">
+              <Icon name="graduate" /> الطلاب
+            </Link>
+          </nav>
+          {sessions.length > 1 && (
+            <details className="card pad teacher-more-sessions">
+              <summary>بقية الحصص القادمة ({sessions.length - 1})</summary>
+              {sessions
+                .filter((s) => s.id !== nextSession?.id)
+                .map((s) => (
+                  <div className="teacher-session-row" key={s.id}>
+                    <div>
+                      <b>{s.title}</b>
+                      <p>
+                        {s.course.title} · {new Date(s.scheduledAt).toLocaleString('ar')}
+                      </p>
+                    </div>
+                    <button
+                      className="btn btn-outline btn-sm"
+                      disabled={!!starting}
+                      onClick={() => void start(s)}
+                    >
+                      {starting === s.id
+                        ? 'جارٍ فتح الحصة…'
+                        : s.status === 'LIVE'
+                          ? 'العودة للحصة'
+                          : 'بدء الحصة'}
+                    </button>
+                    <Link href={`/teacher/sessions/${s.id}/materials`}>خطة الحصة والمواد</Link>
+                    <Link href={`/sessions/${s.id}/writing`}>تمارين الكتابة</Link>
+                  </div>
+                ))}
+            </details>
+          )}
           <div className="col-head">
             <h2>الدورات الشهرية ({courses.length})</h2>
           </div>

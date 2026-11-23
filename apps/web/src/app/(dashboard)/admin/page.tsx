@@ -269,6 +269,40 @@ export default function AdminPage() {
           <Icon name="refresh" /> تحديث
         </button>
       </header>
+      {!loading && !error && (
+        <section className="card pad admin-next" aria-label="الخطوة التالية للإدارة">
+          <div>
+            <span className="eyebrow">الخطوة التالية</span>
+            <h2>
+              {!data.teachers.length
+                ? 'أضف المعلم الأول'
+                : !data.courses.length
+                  ? 'جهّز أول دورة'
+                  : 'تابع طلبات الأسر'}
+            </h2>
+            <p>
+              {!data.teachers.length
+                ? 'أنشئ حساب المعلم، ثم عيّنه على دورة.'
+                : !data.courses.length
+                  ? 'أنشئ الدورة وحدد المعلم والمواعيد ليظهر التسجيل للأسر.'
+                  : 'راجع طلبات التسجيل، ثم ارجع هنا لإدارة الدورات والحصص.'}
+            </p>
+          </div>
+          {!data.teachers.length ? (
+            <button className="btn btn-gold" onClick={() => setTab('teachers')}>
+              إضافة معلم
+            </button>
+          ) : !data.courses.length ? (
+            <button className="btn btn-gold" onClick={() => setTab('courses')}>
+              إنشاء دورة
+            </button>
+          ) : (
+            <Link className="btn btn-gold" href="/academy">
+              طلبات التسجيل
+            </Link>
+          )}
+        </section>
+      )}
       <nav className="admin-tabs" aria-label="أقسام الإدارة">
         {[
           ['courses', 'الدورات والمواعيد'],

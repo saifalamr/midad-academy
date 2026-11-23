@@ -908,4 +908,47 @@ img[src*="midad-logo-transparent.png"]{clip-path:polygon(0 0,100% 0,100% 80%,70%
  .midad .auth-identity .auth-logo{width:88px;height:72px}
 }
 
+/* Keep the current task visible; tuck secondary destinations into one menu. */
+.workspace-more{min-width:0}
+.workspace-more summary{display:flex;align-items:center;gap:12px;padding:12px;border-radius:9px;color:var(--ink-2);font-size:14px;font-weight:600;min-height:46px;cursor:pointer;list-style:none}
+.workspace-more summary::-webkit-details-marker{display:none}
+.workspace-more summary:hover,.workspace-more summary[aria-current=page]{background:#edf2f8;color:var(--navy)}
+.workspace-more-links{padding-inline-start:8px;border-inline-start:1px solid var(--line);margin-inline-start:20px}
+.workspace-more-links a{font-size:13px;min-height:42px}
+.workspace-nav{z-index:40}
+@media(max-width:700px){
+ .workspace-nav{overflow:visible;justify-content:space-between}
+ .workspace-nav>a,.workspace-more{min-width:0;flex:1}
+ .workspace-nav>a,.workspace-more summary{justify-content:center;padding:8px 4px;gap:4px;white-space:nowrap;font-size:11px}
+ .workspace-more summary svg{width:17px;height:17px}
+ .workspace-more-links{position:absolute;top:calc(100% + 1px);inset-inline-end:8px;width:min(260px,calc(100vw - 16px));max-height:65dvh;overflow:auto;margin:0;padding:8px;background:#fff;border:1px solid var(--line);border-radius:0 0 12px 12px;box-shadow:0 12px 24px #162c4c20}
+ .workspace-more-links a{justify-content:flex-start;padding:10px;font-size:13px;white-space:normal}
+}
+.student-metrics{margin:16px 0 20px}
+.student-metrics summary,.teacher-session-tools summary,.teacher-more-sessions summary{cursor:pointer;color:var(--navy);font-weight:700;min-height:44px;display:flex;align-items:center}
+.student-metrics .stat-row{margin:8px 0 0}
+.teacher-home .dash-head{margin-bottom:20px}
+.teacher-next{margin-bottom:16px}
+.teacher-next h2{font-size:clamp(21px,2.5vw,28px);margin:12px 0 4px}
+.teacher-next p{margin:0 0 16px;color:var(--ink-2)}
+.teacher-session-tools{border-top:1px solid var(--line);margin-top:18px;padding-top:6px}
+.teacher-session-tools summary{font-size:14px}
+.teacher-quick-links{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px}
+.teacher-quick-links a{display:flex;align-items:center;gap:8px;min-height:44px;padding:8px 12px;color:var(--navy);font-size:14px;border:1px solid var(--line);border-radius:9px;background:#fff}
+.teacher-more-sessions{margin-bottom:24px}
+.teacher-session-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-top:1px solid var(--line);padding:14px 0}
+.teacher-session-row>div{flex:1 1 220px}
+.teacher-session-row p{color:var(--ink-3);margin:4px 0}
+.teacher-session-row>a{font-size:13px;color:var(--navy);min-height:44px;display:flex;align-items:center}
+.admin-next{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:20px}
+.admin-next h2{margin:4px 0}
+.admin-next p{margin:0}
+.admin-next .btn{flex-shrink:0}
+@media(max-width:700px){
+ .admin-next{align-items:stretch;flex-direction:column}
+ .teacher-quick-links a{flex:1 1 140px;justify-content:center}
+ .teacher-session-row{align-items:stretch;flex-direction:column}
+ .teacher-session-row>div{flex:auto}
+}
+
 

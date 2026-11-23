@@ -117,15 +117,13 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
   const [error, setError] = useState('');
-  const [userName, setUserName] = useState('Student');
   const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
   const [upcomingSessions, setUpcomingSessions] = useState<UpcomingSession[]>([]);
   const [stats, setStats] = useState<StudentStats | null>(null);
   const [showProgress, setShowProgress] = useState(false);
+  const userName = user?.name ?? 'الطالب';
 
   useEffect(() => {
-    setUserName(user?.name ?? 'Student');
-
     const controller = new AbortController();
     setLoading(true);
     setError('');
@@ -232,16 +230,15 @@ export default function StudentDashboard() {
         <div className="dash-hero card">
           <div>
             <p className="dh-hi">
-              Welcome back, <b>{userName}</b> <span className="ar dh-ar">أهلاً</span>
+              أهلًا، <b>{userName}</b>
             </p>
             <h1 className="dh-title">خطوتك التالية</h1>
             <p className="dh-sub">
               {liveEnrollments.length > 0 ? (
                 <>
-                  <b>
-                    {liveEnrollments.length} live class{liveEnrollments.length > 1 ? 'es' : ''}
-                  </b>{' '}
-                  waiting for you right now.
+                  {liveEnrollments.length === 1
+                    ? 'حصتك المباشرة بانتظارك الآن.'
+                    : `${liveEnrollments.length} حصص مباشرة بانتظارك الآن.`}
                 </>
               ) : loading ? (
                 'نجهّز حصصك وخطوتك التالية…'
@@ -311,7 +308,7 @@ export default function StudentDashboard() {
               <div className="lvl-ring" style={{ '--p': `${xpPct}%` } as React.CSSProperties}>
                 <div className="lvl-in">
                   <b>{level}</b>
-                  <span>Level</span>
+                  <span>المستوى</span>
                 </div>
               </div>
               <div className="lvl-meta">
@@ -323,7 +320,7 @@ export default function StudentDashboard() {
                   <i style={{ width: `${xpPct}%` }}></i>
                 </div>
                 <p className="lvl-note">
-                  <b>{xpToNext} XP</b> to next level
+                  بقي <b>{xpToNext} نقطة</b> للمستوى التالي
                 </p>
               </div>
             </div>
@@ -332,44 +329,47 @@ export default function StudentDashboard() {
 
         {/* ── Stats row ── */}
         {!loading && stats && (
-          <div className="stat-row">
-            <div className="stat card">
-              <div className="st-ic st-gold">
-                <Icon name="star" />
+          <details className="student-metrics">
+            <summary>إنجازاتي بالأرقام</summary>
+            <div className="stat-row">
+              <div className="stat card">
+                <div className="st-ic st-gold">
+                  <Icon name="star" />
+                </div>
+                <div>
+                  <b>{totalPoints}</b>
+                  <span>مجموع النقاط</span>
+                </div>
               </div>
-              <div>
-                <b>{totalPoints}</b>
-                <span>Total XP</span>
+              <div className="stat card">
+                <div className="st-ic st-fire">
+                  <Icon name="flame" />
+                </div>
+                <div>
+                  <b>{streak} أيام</b>
+                  <span>المواظبة</span>
+                </div>
+              </div>
+              <div className="stat card">
+                <div className="st-ic st-navy">
+                  <Icon name="book" />
+                </div>
+                <div>
+                  <b>{lessonsCompleted}</b>
+                  <span>مواد مكتملة</span>
+                </div>
+              </div>
+              <div className="stat card">
+                <div className="st-ic st-green">
+                  <Icon name="check" />
+                </div>
+                <div>
+                  <b>{enrollments.length}</b>
+                  <span>دورات مسجلة</span>
+                </div>
               </div>
             </div>
-            <div className="stat card">
-              <div className="st-ic st-fire">
-                <Icon name="flame" />
-              </div>
-              <div>
-                <b>{streak} days</b>
-                <span>Current streak</span>
-              </div>
-            </div>
-            <div className="stat card">
-              <div className="st-ic st-navy">
-                <Icon name="book" />
-              </div>
-              <div>
-                <b>{lessonsCompleted}</b>
-                <span>Lessons done</span>
-              </div>
-            </div>
-            <div className="stat card">
-              <div className="st-ic st-green">
-                <Icon name="check" />
-              </div>
-              <div>
-                <b>{enrollments.length}</b>
-                <span>Enrolled classes</span>
-              </div>
-            </div>
-          </div>
+          </details>
         )}
 
         {error && (
@@ -430,9 +430,7 @@ export default function StudentDashboard() {
           {/* ── My Classes column ── */}
           <div className="dash-col">
             <div className="col-head">
-              <h2>
-                My Classes <span className="ar muted">صفوفي</span>
-              </h2>
+              <h2>صفوفي</h2>
               <Link href="/courses" className="link-gold">
                 عرض دوراتي <Icon name="right" />
               </Link>
@@ -443,7 +441,7 @@ export default function StudentDashboard() {
                 className="card pad"
                 style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14 }}
               >
-                Loading your classes…
+                جارٍ تحميل صفوفك…
               </div>
             ) : enrollments.length === 0 ? (
               <div className="card pad" style={{ textAlign: 'center' }}>
@@ -467,7 +465,7 @@ export default function StudentDashboard() {
                     {enrollment.isLive && (
                       <div className="cc-badge">
                         <span className="badge-live">
-                          <span className="dot"></span> Live now
+                          <span className="dot"></span> مباشرة الآن
                         </span>
                       </div>
                     )}
@@ -477,7 +475,7 @@ export default function StudentDashboard() {
                       </div>
                       <div className="cc-info">
                         <div className="cc-title ar">{course.title}</div>
-                        <div className="cc-en">Ages {course.ageGroup}</div>
+                        <div className="cc-en">الأعمار {course.ageGroup}</div>
                         <div className="cc-meta">
                           <span className="avatar" style={{ width: 24, height: 24 }}>
                             {course.teacherName.charAt(0)}
@@ -490,7 +488,7 @@ export default function StudentDashboard() {
                           href={`/courses/${course.id}/lessons`}
                           className="btn btn-sm btn-outline"
                         >
-                          View Lessons
+                          مواد الدورة
                         </Link>
                         {enrollment.isLive ? (
                           <button
@@ -527,9 +525,7 @@ export default function StudentDashboard() {
           <div className="dash-col">
             <div id="student-agenda" className="card pad">
               <div className="col-head sm">
-                <h3>
-                  Upcoming Classes <span className="ar muted">الحصص القادمة</span>
-                </h3>
+                <h3>الحصص القادمة</h3>
               </div>
               {upcomingSessions.length === 0 ? (
                 <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>
@@ -554,7 +550,7 @@ export default function StudentDashboard() {
                           <b>{session.title}</b>
                           <span>
                             {session.course.title} · {session.teacherName} ·{' '}
-                            {session.durationMinutes} min
+                            {session.durationMinutes} دقيقة
                           </span>
                           <AddToCalendar session={session} />
                         </div>
