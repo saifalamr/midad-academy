@@ -124,7 +124,7 @@ test('parent switches children, retries errors and sees scoped attendance and ex
   await expect(page.getByRole('heading', { name: 'دورات مريم' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'مشاهدة الحصة', exact: true })).toHaveCount(0);
   await expect(page.getByText('تمرين مصحح', { exact: true })).toHaveCount(0);
-  await expect(page.getByText('لم تسجل الأكاديمية طفلك في دورة بعد.')).toBeVisible();
+  await expect(page.getByText('اختر دورة لطفلك وأرسل طلب التسجيل؛ ستظهر حالته هنا.')).toBeVisible();
   await page.getByRole('button', { name: /أحمد/ }).click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'تحميل سجل الحضور الأخير' }).click();
