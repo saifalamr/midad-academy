@@ -1,5 +1,29 @@
 import { test, expect } from '@playwright/test';
 
+test('lesson loading failure offers a retry without showing an empty course', async ({ page }) => {
+  await page.goto('/login');
+  await page.locator('#email').fill('student@preview.midad.test');
+  await page.locator('#password').fill('MidadPreview2026!');
+  await page.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();
+  await expect(page).toHaveURL(/\/student$/);
+  let attempts = 0;
+  await page.route('**/api/courses/preview-arabic/lessons', async (route) => {
+    if (++attempts === 1)
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'تعذر التحميل' }),
+      });
+    else await route.continue();
+  });
+  await page.goto('/courses/preview-arabic/lessons');
+  await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText('تعذر تحميل الدروس');
+  await expect(page.getByText('لم تُضف مواد لهذه الدورة بعد.')).toHaveCount(0);
+  await page.getByRole('alertdialog').getByRole('button', { name: 'إعادة المحاولة' }).click();
+  await expect(page.getByRole('heading', { name: 'First Arabic words' })).toBeVisible();
+  expect(attempts).toBe(2);
+});
+
 test('mobile student login, enrollment, quiz and account linking code', async ({ page }) => {
   await page.goto('/login');
   await page.locator('#email').fill('student@preview.midad.test');
@@ -62,11 +86,11 @@ test('mobile student login, enrollment, quiz and account linking code', async ({
   await page.locator('textarea').blur();
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: 'test-results/learning-workspace-mobile.png', fullPage: true });
-  await page.getByRole('button', { name: 'Take Quiz' }).click();
+  await page.getByRole('button', { name: 'بدء الاختبار' }).click();
   await page.getByLabel('Hello', { exact: true }).check();
-  await page.getByPlaceholder('Type your answer…').fill('مرحباً');
-  await page.getByRole('button', { name: 'Submit Quiz' }).click();
-  await expect(page.getByText('Pending Review', { exact: true })).toBeVisible();
+  await page.getByPlaceholder('اكتب إجابتك…').fill('مرحباً');
+  await page.getByRole('button', { name: 'تسليم الاختبار' }).click();
+  await expect(page.getByText('بانتظار تصحيح المعلم', { exact: true })).toBeVisible();
   await page.goto('/account');
   await expect(page.getByRole('heading', { name: 'حساب الأسرة' })).toBeVisible();
   expect(
@@ -280,9 +304,9 @@ test('mobile quiz delivery retries one saved attempt, teacher feedback and final
     .filter({
       has: studentPage.getByRole('heading', { name: 'Written feedback lesson', exact: true }),
     })
-    .getByRole('button', { name: 'Take Quiz' })
+    .getByRole('button', { name: 'بدء الاختبار' })
     .click();
-  await studentPage.getByRole('button', { name: 'Submit Quiz', exact: true }).click();
+  await studentPage.getByRole('button', { name: 'تسليم الاختبار', exact: true }).click();
   await expect(
     studentPage
       .getByRole('alertdialog')
@@ -302,7 +326,7 @@ test('mobile quiz delivery retries one saved attempt, teacher feedback and final
       await route.abort('failed');
     } else await route.continue();
   });
-  await studentPage.getByRole('button', { name: 'Submit Quiz', exact: true }).click();
+  await studentPage.getByRole('button', { name: 'تسليم الاختبار', exact: true }).click();
   await expect(
     studentPage
       .getByRole('alertdialog')
@@ -310,8 +334,8 @@ test('mobile quiz delivery retries one saved attempt, teacher feedback and final
       .filter({ hasText: 'تعذر تأكيد التسليم' })
   ).toBeVisible();
   await studentPage.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
-  await studentPage.getByRole('button', { name: 'Submit Quiz', exact: true }).click();
-  await expect(studentPage.getByText('Pending Review', { exact: true })).toBeVisible();
+  await studentPage.getByRole('button', { name: 'تسليم الاختبار', exact: true }).click();
+  await expect(studentPage.getByText('بانتظار تصحيح المعلم', { exact: true })).toBeVisible();
   expect(keys.length).toBe(2);
   expect(keys[0]).toBe(keys[1]);
   const results = await request.get('http://127.0.0.1:4000/api/students/results', {

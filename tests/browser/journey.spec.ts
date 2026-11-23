@@ -32,9 +32,9 @@ test('student sees the next session, retries failed data and prepares devices be
     });
     expect(levelFits).toBe(true);
   }
-  await expect(page.getByRole('heading', { name: /My Badges/ })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'أوسمتي' })).toHaveCount(0);
   await page.locator('.student-progress summary').click();
-  await expect(page.getByRole('heading', { name: /My Badges/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'أوسمتي' })).toBeVisible();
   await page.getByRole('button', { name: 'تجهيز ودخول الحصة', exact: true }).first().click();
   await expect(page.getByRole('heading', { name: 'جاهز للتعلّم؟' })).toBeVisible();
   expect(joins).toBe(0);
