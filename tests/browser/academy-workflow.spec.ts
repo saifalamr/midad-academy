@@ -126,7 +126,7 @@ test('family chooses a course before login, adds a child and requests in one for
   await card.getByLabel('مرجع الدفع أو سبب الإعفاء').fill('وصل نقدي تجريبي 991');
   await card.getByLabel('رد يظهر للأسرة').fill('تم التسجيل؛ راجع الحصة القادمة');
   await card.getByRole('button', { name: 'حفظ القرار' }).click();
-  await expect(admin.getByRole('alertdialog')).toContainText('تم حفظ التحديث');
+  await expect(admin.getByRole('alertdialog')).toContainText('تأكد مقعد الطفل');
   await admin.getByRole('button', { name: 'حسنًا', exact: true }).click();
   await page.getByRole('button', { name: 'تحديث البيانات' }).click();
   await expect(page.getByText('التسجيل مؤكد', { exact: true })).toBeVisible();

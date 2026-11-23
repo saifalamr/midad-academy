@@ -97,7 +97,9 @@ export default function AcademyPage() {
     ])
       .then((results) => {
         if (!active) return;
-        const values = results.map((result) => result.status === 'fulfilled' ? result.value : undefined);
+        const values = results.map((result) =>
+          result.status === 'fulfilled' ? result.value : undefined
+        );
         if (values[0] !== undefined) setCourses(values[0] as Course[]);
         if (values[1] !== undefined) setSchedule(values[1] as ScheduleItem[]);
         if (values[2] !== undefined) setNotices(values[2] as Notice[]);
@@ -175,7 +177,8 @@ export default function AcademyPage() {
     ...(admin ? [{ id: 'audit', title: 'سجل التعديلات' }] : []),
   ];
   const nextApplication = parent
-    ? applications.find((a) => a.status === 'PENDING' || a.status === 'WAITLIST') ?? applications[0]
+    ? (applications.find((a) => a.status === 'PENDING' || a.status === 'WAITLIST') ??
+      applications[0])
     : undefined;
   return (
     <main className="academy-flow wrap" dir="rtl">
@@ -865,7 +868,7 @@ function ApplicationCard({
 }: {
   item: Application;
   admin: boolean;
-  action: (work: () => Promise<unknown>) => Promise<void>;
+  action: (work: () => Promise<unknown>, success?: string) => Promise<void>;
 }) {
   const [decision, setDecision] = useState('');
   return (
@@ -898,18 +901,24 @@ function ApplicationCard({
             onSubmit={(e) => {
               e.preventDefault();
               const d = new FormData(e.currentTarget);
-              void action(() =>
-                api(`/academy/applications/${a.id}`, 'PATCH', {
-                  version: a.version,
-                  action: decision,
-                  response: d.get('response'),
-                  ...(decision === 'APPROVE'
-                    ? {
-                        paymentStatus: d.get('paymentStatus'),
-                        paymentReference: d.get('paymentReference'),
-                      }
-                    : {}),
-                })
+              void action(
+                () =>
+                  api(`/academy/applications/${a.id}`, 'PATCH', {
+                    version: a.version,
+                    action: decision,
+                    response: d.get('response'),
+                    ...(decision === 'APPROVE'
+                      ? {
+                          paymentStatus: d.get('paymentStatus'),
+                          paymentReference: d.get('paymentReference'),
+                        }
+                      : {}),
+                  }),
+                decision === 'APPROVE'
+                  ? 'تأكد مقعد الطفل. سيظهر القرار لولي الأمر؛ الخطوة التالية هي تجهيز موعد الحصة.'
+                  : decision === 'WAITLIST'
+                    ? 'نُقل الطلب إلى الانتظار. سيظهر التحديث لولي الأمر.'
+                    : 'حُفظ قرار عدم الاعتماد وسيظهر ردك لولي الأمر.'
               );
             }}
           >
@@ -921,7 +930,9 @@ function ApplicationCard({
                 onChange={(e) => setDecision(e.target.value)}
                 required
               >
-                <option value="" disabled>اختر القرار بعد المراجعة</option>
+                <option value="" disabled>
+                  اختر القرار بعد المراجعة
+                </option>
                 <option value="APPROVE">تأكيد التسجيل والمقعد</option>
                 <option value="WAITLIST">قائمة الانتظار</option>
                 <option value="REJECT">عدم اعتماد الطلب</option>
@@ -932,7 +943,9 @@ function ApplicationCard({
                 <label className="field">
                   حالة الدفع
                   <select name="paymentStatus" className="input" required defaultValue="">
-                    <option value="" disabled>اختر بعد التأكد من الدفع أو الإعفاء</option>
+                    <option value="" disabled>
+                      اختر بعد التأكد من الدفع أو الإعفاء
+                    </option>
                     <option value="PAID">تم استلام الدفع فعليًا</option>
                     <option value="WAIVED">مجاني / إعفاء معتمد</option>
                   </select>
@@ -958,11 +971,13 @@ function ApplicationCard({
           <button
             className="btn btn-outline"
             onClick={() =>
-              void action(() =>
-                api(`/academy/applications/${a.id}`, 'PATCH', {
-                  version: a.version,
-                  action: 'CANCEL',
-                })
+              void action(
+                () =>
+                  api(`/academy/applications/${a.id}`, 'PATCH', {
+                    version: a.version,
+                    action: 'CANCEL',
+                  }),
+                'أُلغي الطلب. يمكنك اختيار دورة أخرى من «تسجيل وتجديد».'
               )
             }
           >

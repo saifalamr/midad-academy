@@ -347,6 +347,7 @@ test('mobile quiz delivery retries one saved attempt, teacher feedback and final
   await answerCard.getByRole('spinbutton').fill('2');
   await answerCard.getByRole('button', { name: 'حفظ التصحيح', exact: true }).click();
   await expect(answerCard).toHaveCount(0);
+  await expect(teacherPage.getByRole('status')).toContainText('حُفظ تصحيح إجابة');
   await studentPage.goto('/student');
   const ownResult = studentPage
     .locator('li')

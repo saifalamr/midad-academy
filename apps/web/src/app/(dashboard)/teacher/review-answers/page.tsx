@@ -40,6 +40,7 @@ export default function ReviewAnswersPage() {
   const [error, setError] = useState('');
   const [drafts, setDrafts] = useState<Record<string, { points: string; feedback: string }>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [savedMessage, setSavedMessage] = useState('');
 
   useEffect(() => {
     authFetch('/api/teacher/pending-reviews')
@@ -90,6 +91,7 @@ export default function ReviewAnswersPage() {
     }
     if (savingId) return;
     setError('');
+    setSavedMessage('');
     setSavingId(a.id);
     try {
       const res = await authFetch(`/api/teacher/answers/${a.id}/grade`, {
@@ -102,6 +104,9 @@ export default function ReviewAnswersPage() {
         return;
       }
       setPending((prev) => prev.filter((p) => p.id !== a.id));
+      setSavedMessage(
+        `حُفظ تصحيح إجابة ${a.studentName}. ستظهر النتيجة للطالب وولي أمره بعد اكتمال تصحيح الاختبار.`
+      );
     } catch {
       setError('تعذر الاتصال بالخادم. أعد المحاولة.');
     } finally {
@@ -131,6 +136,11 @@ export default function ReviewAnswersPage() {
           <PopupNotice role="alert" className="auth-error" style={{ marginBottom: 16 }}>
             {error}
           </PopupNotice>
+        )}
+        {savedMessage && (
+          <p className="admin-success" role="status">
+            {savedMessage}
+          </p>
         )}
 
         {loading ? (
