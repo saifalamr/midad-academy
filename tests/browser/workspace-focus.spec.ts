@@ -29,6 +29,8 @@ test('each role sees a short mobile navigation while secondary pages stay reacha
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)
       ).toBeTruthy();
     }
+    await nav.getByRole('link', { name: secondary, exact: true }).click();
+    await expect(nav.getByRole('link', { name: secondary, exact: true })).toBeHidden();
     await page.getByRole('button', { name: 'Log out · خروج' }).click();
     await page.getByRole('alertdialog').getByRole('button', { name: 'تسجيل الخروج', exact: true }).click();
     await expect(page).toHaveURL(/\/login$/);

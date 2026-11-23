@@ -122,7 +122,7 @@ export default function WorkspaceShell({ children }: { children: React.ReactNode
             <span>{link.label}</span>
           </Link>
         ))}
-        <details className="workspace-more" key={user.role}>
+        <details className="workspace-more" key={`${user.role}:${path}`}>
           <summary
             aria-label="المزيد من الصفحات"
             aria-current={otherLinks.some((link) => path === link.href) ? 'page' : undefined}
