@@ -44,6 +44,14 @@ test('teacher and student exchange real media, synchronized ink, permissions and
     viewport: { width: 390, height: 844 },
     permissions: ['camera', 'microphone'],
   });
+  const session = async (context: typeof teacherContext, token: string) => {
+    await context.addCookies([{
+      name: 'midad_session', value: token, domain: '127.0.0.1', path: '/',
+      httpOnly: true, sameSite: 'Lax',
+    }]);
+  };
+  await session(teacherContext, teacherToken);
+  await session(studentContext, studentToken);
   // Generate moving video and a speech-like tone in this device-less runtime.
   // Media still travels through LiveKit/WebRTC and is decoded by the peer.
   for (const context of [teacherContext, studentContext])
@@ -94,12 +102,6 @@ test('teacher and student exchange real media, synchronized ink, permissions and
         return stream;
       };
     });
-  await teacherContext.addInitScript((token) => {
-    if (location.origin === 'http://127.0.0.1:3000') localStorage.setItem('token', token);
-  }, teacherToken);
-  await studentContext.addInitScript((token) => {
-    if (location.origin === 'http://127.0.0.1:3000') localStorage.setItem('token', token);
-  }, studentToken);
   const teacher = await teacherContext.newPage();
   const student = await studentContext.newPage();
   const errors: string[] = [];
@@ -201,9 +203,7 @@ test('teacher and student exchange real media, synchronized ink, permissions and
     viewport: { width: 820, height: 1180 },
     permissions: ['camera', 'microphone'],
   });
-  await adminContext.addInitScript((token) => {
-    if (location.origin === 'http://127.0.0.1:3000') localStorage.setItem('token', token);
-  }, adminToken);
+  await session(adminContext, adminToken);
   const administrator = await adminContext.newPage();
   await administrator.goto(`/admin/sessions/${scheduled.data.id}/details`);
   await expect(administrator.getByRole('region', { name: 'حضور المعلم' })).toContainText(
@@ -227,18 +227,15 @@ test('teacher and student exchange real media, synchronized ink, permissions and
     viewport: { width: 820, height: 1180 },
     permissions: ['camera', 'microphone'],
   });
-  await parentContext.addInitScript(
-    (token) => {
-      if (location.origin !== 'http://127.0.0.1:3000') return;
-      localStorage.setItem('token', token);
-      (window as any).__deviceRequests = 0;
-      navigator.mediaDevices.getUserMedia = async () => {
-        (window as any).__deviceRequests++;
-        throw new Error('An observer must never request devices');
-      };
-    },
-    await login('parent@preview.midad.test')
-  );
+  await session(parentContext, await login('parent@preview.midad.test'));
+  await parentContext.addInitScript(() => {
+    if (location.origin !== 'http://127.0.0.1:3000') return;
+    (window as any).__deviceRequests = 0;
+    navigator.mediaDevices.getUserMedia = async () => {
+      (window as any).__deviceRequests++;
+      throw new Error('An observer must never request devices');
+    };
+  });
   const parent = await parentContext.newPage();
   await parent.goto('/classroom/preview-arabic');
   await parent.getByRole('button', { name: 'دخول للمشاهدة', exact: true }).click();
@@ -286,7 +283,12 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   });
   await student.getByRole('button', { name: 'نتدرّب على الكتابة', exact: true }).click();
   const writing = student.frameLocator('iframe[title="تمارين كتابة الحصة"]');
-  await writing.getByRole('link', { name: 'فتح تمرين الكتابة', exact: true }).click();
+  try {
+    await writing.getByRole('link', { name: 'فتح تمرين الكتابة', exact: true }).click();
+  } catch (error) {
+    console.error('Writing activity list:', await writing.locator('body').innerText().catch(() => 'Frame unavailable'));
+    throw error;
+  }
   const board = writing.getByRole('img', { name: 'لوحة تتبّع الكلمة', exact: true });
   try {
     await expect(
