@@ -222,7 +222,7 @@ export default function StudentDashboard() {
     }));
 
   return (
-    <div className="midad" style={{ minHeight: '100vh', background: 'var(--cream)' }}>
+    <div className="midad" dir="rtl" style={{ minHeight: '100vh', background: 'var(--cream)' }}>
       {/* ── App bar ── */}
 
       <main className="dash" aria-busy={loading}>
@@ -573,9 +573,7 @@ export default function StudentDashboard() {
                 <div className="student-progress-content">
                   <div className="card pad">
                     <div className="col-head sm">
-                      <h3>
-                        My Badges <span className="ar muted">أوسمتي</span>
-                      </h3>
+                      <h3>أوسمتي</h3>
                     </div>
                     <div className="badge-grid">
                       {stats?.badges?.length ? (
@@ -588,20 +586,16 @@ export default function StudentDashboard() {
                           </div>
                         ))
                       ) : (
-                        <p className="muted">
-                          Pass a quiz with a perfect score to earn your first badge.
-                        </p>
+                        <p className="muted">أكمل اختبارًا بدرجة كاملة لتحصل على أول وسام.</p>
                       )}
                     </div>
                   </div>
 
                   <div className="card pad">
                     <div className="col-head sm">
-                      <h3>
-                        Streak <span className="ar muted">المواظبة</span>
-                      </h3>
+                      <h3>المواظبة</h3>
                       <span className="pill">
-                        <Icon name="flame" /> {streak} days
+                        <Icon name="flame" /> {streak} أيام
                       </span>
                     </div>
                     <div className="streak-week">
@@ -618,10 +612,10 @@ export default function StudentDashboard() {
                     <p className="streak-note">
                       {streak > 0 ? (
                         <>
-                          <Icon name="flame" /> {streak}-day streak — keep it going!
+                          <Icon name="flame" /> مواظبة {streak} أيام، واصل التقدّم!
                         </>
                       ) : (
-                        'Attend a class today to start your streak!'
+                        'احضر حصة لتبدأ سلسلة مواظبتك.'
                       )}
                     </p>
                   </div>
@@ -629,12 +623,12 @@ export default function StudentDashboard() {
                   {/* ── Quiz performance (LineChart) ── */}
                   <div className="card pad">
                     <div className="col-head sm">
-                      <h3>
-                        Quiz Performance <span className="ar muted">أداء الاختبارات</span>
-                      </h3>
+                      <h3>أداء الاختبارات</h3>
                     </div>
                     {quizChart.length === 0 ? (
-                      <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No quiz data yet.</p>
+                      <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>
+                        لا توجد نتائج اختبارات بعد.
+                      </p>
                     ) : (
                       <ResponsiveContainer width="100%" height={200}>
                         <LineChart
@@ -660,12 +654,12 @@ export default function StudentDashboard() {
                   {/* ── Lesson progress by course (BarChart) ── */}
                   <div className="card pad">
                     <div className="col-head sm">
-                      <h3>
-                        Lesson Progress by Course <span className="ar muted">التقدّم</span>
-                      </h3>
+                      <h3>التقدّم في الدورات</h3>
                     </div>
                     {courseChart.length === 0 ? (
-                      <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No course data yet.</p>
+                      <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>
+                        لا توجد بيانات تقدّم بعد.
+                      </p>
                     ) : (
                       <ResponsiveContainer width="100%" height={200}>
                         <BarChart
@@ -691,12 +685,12 @@ export default function StudentDashboard() {
                   {/* ── Recent attendance (BarChart, green = attended / red = missed) ── */}
                   <div className="card pad">
                     <div className="col-head sm">
-                      <h3>
-                        Recent Attendance <span className="ar muted">الحضور</span>
-                      </h3>
+                      <h3>الحضور الأخير</h3>
                     </div>
                     {attendanceChart.length === 0 ? (
-                      <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No attendance data yet.</p>
+                      <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>
+                        لا توجد بيانات حضور بعد.
+                      </p>
                     ) : (
                       <ResponsiveContainer width="100%" height={200}>
                         <BarChart
@@ -728,14 +722,10 @@ export default function StudentDashboard() {
             {/* ── Quiz results feed ── */}
             <div className="card pad">
               <div className="col-head sm">
-                <h3>
-                  Quiz Results <span className="ar muted">نتائج الاختبارات</span>
-                </h3>
+                <h3>نتائج الاختبارات</h3>
               </div>
               {quizResults.length === 0 ? (
-                <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>
-                  You haven&apos;t taken any quizzes yet.
-                </p>
+                <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>لم تُكمل اختبارًا بعد.</p>
               ) : (
                 <ul className="feed">
                   {quizResults.map((r) => {
@@ -758,11 +748,11 @@ export default function StudentDashboard() {
                           <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
                             {r.status === 'PENDING_REVIEW' ? (
                               <>
-                                <Icon name="clock" /> Pending Review · {r.score}% so far
+                                <Icon name="clock" /> بانتظار مراجعة المعلم · {r.score}% حتى الآن
                               </>
                             ) : (
                               <>
-                                Score: {r.score}% · {r.passed ? 'Passed' : 'Not passed'}
+                                الدرجة: {r.score}% · {r.passed ? 'ناجح' : 'يحتاج مراجعة'}
                               </>
                             )}
                           </span>

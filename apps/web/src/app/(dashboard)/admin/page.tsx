@@ -471,7 +471,7 @@ export default function AdminPage() {
           )}
           {tab === 'courses' && (
             <>
-              <div className="admin-columns">
+              <div className="admin-columns admin-courses-columns">
                 <section className="card pad">
                   <h2>إنشاء دورة شهرية</h2>
                   <form

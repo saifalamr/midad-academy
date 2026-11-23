@@ -19,7 +19,10 @@ type PendingAnswer = {
 };
 
 function authFetch(path: string, options: RequestInit = {}) {
-  const token = typeof window !== 'undefined' ? (localStorage.getItem('token') ?? sessionStorage.getItem('token')) : null;
+  const token =
+    typeof window !== 'undefined'
+      ? (localStorage.getItem('token') ?? sessionStorage.getItem('token'))
+      : null;
   return fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
@@ -41,12 +44,18 @@ export default function ReviewAnswersPage() {
   useEffect(() => {
     authFetch('/api/teacher/pending-reviews')
       .then(async (res) => {
-        if (res.status === 401) { router.push('/login'); return; }
+        if (res.status === 401) {
+          router.push('/login');
+          return;
+        }
         const json = await res.json();
-        if (!res.ok) { setError(json.error || 'Failed to load pending reviews'); return; }
+        if (!res.ok) {
+          setError(json.error || 'تعذر تحميل الإجابات التي تنتظر المراجعة');
+          return;
+        }
         setPending(json.data ?? []);
       })
-      .catch(() => setError('Could not connect to server'))
+      .catch(() => setError('تعذر الاتصال بالخادم. أعد المحاولة.'))
       .finally(() => setLoading(false));
   }, [router]);
 
@@ -55,14 +64,28 @@ export default function ReviewAnswersPage() {
   }
 
   function updateDraft(id: string, patch: Partial<{ points: string; feedback: string }>) {
-    setDrafts((prev) => ({ ...prev, [id]: { ...(prev[id] ?? { points: String(pending.find(answer => answer.id === id)?.points ?? ''), feedback: '' }), ...patch } }));
+    setDrafts((prev) => ({
+      ...prev,
+      [id]: {
+        ...(prev[id] ?? {
+          points: String(pending.find((answer) => answer.id === id)?.points ?? ''),
+          feedback: '',
+        }),
+        ...patch,
+      },
+    }));
   }
 
   async function handleGrade(a: PendingAnswer) {
     const draft = getDraft(a);
     const pointsAwarded = Number(draft.points);
-    if (!draft.points.trim() || !Number.isInteger(pointsAwarded) || pointsAwarded < 0 || pointsAwarded > a.points) {
-      setError(`Score for "${a.questionText}" must be between 0 and ${a.points}`);
+    if (
+      !draft.points.trim() ||
+      !Number.isInteger(pointsAwarded) ||
+      pointsAwarded < 0 ||
+      pointsAwarded > a.points
+    ) {
+      setError(`درجة «${a.questionText}» يجب أن تكون بين 0 و${a.points}.`);
       return;
     }
     if (savingId) return;
@@ -74,39 +97,55 @@ export default function ReviewAnswersPage() {
         body: JSON.stringify({ pointsAwarded, feedback: draft.feedback.trim() || undefined }),
       });
       const json = await res.json();
-      if (!res.ok) { setError(json.error || 'Failed to save grade'); return; }
+      if (!res.ok) {
+        setError(json.error || 'تعذر حفظ الدرجة');
+        return;
+      }
       setPending((prev) => prev.filter((p) => p.id !== a.id));
     } catch {
-      setError('Could not connect to server');
+      setError('تعذر الاتصال بالخادم. أعد المحاولة.');
     } finally {
       setSavingId(null);
     }
   }
 
   return (
-    <div className="midad" style={{ background: 'var(--paper)', minHeight: '100vh' }}>
-
+    <div className="midad" dir="rtl" style={{ background: 'var(--paper)', minHeight: '100vh' }}>
       <div className="wrap" style={{ paddingTop: 32, paddingBottom: 48 }}>
-        <button className="btn btn-sm btn-outline" onClick={() => router.push('/teacher')} style={{ marginBottom: 16 }}>
-          <Icon name="left" /> Back to dashboard
+        <button
+          className="btn btn-sm btn-outline"
+          onClick={() => router.push('/teacher')}
+          style={{ marginBottom: 16 }}
+        >
+          <Icon name="left" /> العودة إلى حصصي
         </button>
 
         <div className="page-head" style={{ marginBottom: 24 }}>
           <div>
-            <h1 className="dh-title">Review Written Answers</h1>
-            <p className="dh-hi">Grade pending written answers and leave feedback for your students.</p>
+            <h1 className="dh-title">مراجعة الإجابات الكتابية</h1>
+            <p className="dh-hi">صحّح الإجابات المعلّقة، وأضف ملاحظة واضحة للطالب عند الحاجة.</p>
           </div>
         </div>
 
-        {error && <PopupNotice role="alert" className="auth-error" style={{ marginBottom: 16 }}>{error}</PopupNotice>}
+        {error && (
+          <PopupNotice role="alert" className="auth-error" style={{ marginBottom: 16 }}>
+            {error}
+          </PopupNotice>
+        )}
 
         {loading ? (
-          <div className="card pad" style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14 }}>
-            Loading pending answers…
+          <div
+            className="card pad"
+            style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14 }}
+          >
+            جارٍ تحميل الإجابات…
           </div>
         ) : pending.length === 0 ? (
-          <div className="card pad" style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14 }}>
-            <Icon name="celebration" /> No written answers are waiting for review.
+          <div
+            className="card pad"
+            style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 14 }}
+          >
+            <Icon name="celebration" /> لا توجد إجابات تنتظر المراجعة الآن.
           </div>
         ) : (
           pending.map((a) => {
@@ -117,13 +156,21 @@ export default function ReviewAnswersPage() {
                   {a.courseTitle} · {a.quizTitle} · {a.studentName}
                 </div>
                 <b style={{ fontSize: 14, display: 'block', marginBottom: 8 }}>{a.questionText}</b>
-                <div className="card pad" style={{ background: 'var(--paper)', marginBottom: 12, fontSize: 14, whiteSpace: 'pre-wrap' }}>
-                  {a.answerText || <i style={{ color: 'var(--ink-3)' }}>No answer submitted</i>}
+                <div
+                  className="card pad"
+                  style={{
+                    background: 'var(--paper)',
+                    marginBottom: 12,
+                    fontSize: 14,
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
+                  {a.answerText || <i style={{ color: 'var(--ink-3)' }}>لم تُقدّم إجابة</i>}
                 </div>
 
                 <div className="grid-2">
                   <div className="field">
-                    <label htmlFor={`grade-${a.id}`}>Score (out of {a.points})</label>
+                    <label htmlFor={`grade-${a.id}`}>الدرجة من {a.points}</label>
                     <input
                       id={`grade-${a.id}`}
                       className="input"
@@ -138,13 +185,18 @@ export default function ReviewAnswersPage() {
                 </div>
 
                 <div className="field">
-                  <label htmlFor={`feedback-${a.id}`}>Feedback <span className="muted" style={{ fontSize: 12 }}>(optional)</span></label>
+                  <label htmlFor={`feedback-${a.id}`}>
+                    ملاحظة للطالب{' '}
+                    <span className="muted" style={{ fontSize: 12 }}>
+                      (اختيارية)
+                    </span>
+                  </label>
                   <textarea
                     id={`feedback-${a.id}`}
                     maxLength={5000}
                     className="input"
                     rows={2}
-                    placeholder="Leave a comment for the student…"
+                    placeholder="اكتب ملاحظة تساعد الطالب…"
                     value={draft.feedback}
                     onChange={(e) => updateDraft(a.id, { feedback: e.target.value })}
                     style={{ height: 60, padding: '12px 16px' }}
@@ -158,7 +210,7 @@ export default function ReviewAnswersPage() {
                     style={{ opacity: savingId === a.id ? 0.65 : 1 }}
                     onClick={() => handleGrade(a)}
                   >
-                    {savingId === a.id ? 'Saving…' : 'Mark as Graded'}
+                    {savingId === a.id ? 'جارٍ الحفظ…' : 'حفظ التصحيح'}
                   </button>
                 </div>
               </div>

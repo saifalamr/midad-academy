@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { dashboardPath, useAuth } from './AuthProvider';
 import WorkspaceShell from './WorkspaceShell';
+import AcademyLoading from './AcademyLoading';
 export default function DashboardTools({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const path = usePathname();
@@ -14,10 +15,10 @@ export default function DashboardTools({ children }: { children: React.ReactNode
     user.role.toLowerCase() !== area;
   useEffect(() => {
     if (status === 'ready' && !user) {
-      if (path === '/academy') sessionStorage.setItem('midad-return-to', location.pathname + location.search);
+      if (path === '/academy')
+        sessionStorage.setItem('midad-return-to', location.pathname + location.search);
       router.replace('/login');
-    }
-    else if (wrongRole && user) router.replace(dashboardPath(user.role));
+    } else if (wrongRole && user) router.replace(dashboardPath(user.role));
   }, [user, status, wrongRole, router, path]);
   if (status === 'error' && !user)
     return (
@@ -30,10 +31,6 @@ export default function DashboardTools({ children }: { children: React.ReactNode
       </main>
     );
   if (status === 'loading' || !user || wrongRole)
-    return (
-      <main className="midad wrap connection-state" role="status">
-        جارٍ فتح مساحة عملك…
-      </main>
-    );
+    return <AcademyLoading message="جارٍ فتح مساحة عملك…" />;
   return <WorkspaceShell>{children}</WorkspaceShell>;
 }

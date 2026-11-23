@@ -1,5 +1,34 @@
 import { expect, test } from '@playwright/test';
 
+test('academy opening keeps the Midad theme and respects reduced motion', async ({ page }) => {
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/api/auth/me', async (route) => {
+    await pending;
+    await route.continue();
+  });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  const loading = page.getByRole('status', { name: /جارٍ فتح الأكاديمية/ });
+  await expect(loading).toBeVisible();
+  await expect(loading.locator('img')).toBeVisible();
+  expect(
+    await loading
+      .locator('.academy-loading-orbit')
+      .evaluate((el) => getComputedStyle(el).animationName)
+  ).toBe('none');
+  for (const width of [320, 820, 1440]) {
+    await page.setViewportSize({ width, height: 800 });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)
+    ).toBeTruthy();
+  }
+  release();
+  await expect(loading).toBeHidden();
+});
+
 async function signIn(page: import('@playwright/test').Page, email: string) {
   await page.goto('/login');
   await page.locator('#email').fill(email);
@@ -32,7 +61,10 @@ test('each role sees a short mobile navigation while secondary pages stay reacha
     await nav.getByRole('link', { name: secondary, exact: true }).click();
     await expect(nav.getByRole('link', { name: secondary, exact: true })).toBeHidden();
     await page.getByRole('button', { name: 'Log out · خروج' }).click();
-    await page.getByRole('alertdialog').getByRole('button', { name: 'تسجيل الخروج', exact: true }).click();
+    await page
+      .getByRole('alertdialog')
+      .getByRole('button', { name: 'تسجيل الخروج', exact: true })
+      .click();
     await expect(page).toHaveURL(/\/login$/);
     await page.setViewportSize({ width: 390, height: 844 });
   }
@@ -43,7 +75,10 @@ test('student, teacher and admin home screens lead with the next action', async 
   await expect(page.getByRole('heading', { name: 'خطوتك التالية' })).toBeVisible();
   await expect(page.locator('main').getByText('إنجازاتي بالأرقام')).toBeVisible();
   await page.getByRole('button', { name: 'Log out · خروج' }).click();
-  await page.getByRole('alertdialog').getByRole('button', { name: 'تسجيل الخروج', exact: true }).click();
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'تسجيل الخروج', exact: true })
+    .click();
 
   await signIn(page, 'teacher@preview.midad.test');
   await expect(page.getByRole('heading', { name: 'ما التالي في حصصك؟' })).toBeVisible();
@@ -53,7 +88,10 @@ test('student, teacher and admin home screens lead with the next action', async 
       .getByRole('link', { name: 'تقارير الحصص' })
   ).toBeVisible();
   await page.getByRole('button', { name: 'Log out · خروج' }).click();
-  await page.getByRole('alertdialog').getByRole('button', { name: 'تسجيل الخروج', exact: true }).click();
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'تسجيل الخروج', exact: true })
+    .click();
 
   await signIn(page, 'admin@preview.midad.test');
   await expect(page.getByRole('region', { name: 'الخطوة التالية للإدارة' })).toBeVisible();

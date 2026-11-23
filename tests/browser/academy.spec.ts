@@ -46,9 +46,9 @@ test('mobile student login, enrollment, quiz and account linking code', async ({
     })
   );
   await page.getByRole('button', { name: 'حفظ الملاحظة', exact: true }).click();
-  await expect(page.getByRole('alertdialog').getByRole('alert').filter({ hasText: 'تعذر الحفظ' })).toContainText(
-    'تعذر الحفظ'
-  );
+  await expect(
+    page.getByRole('alertdialog').getByRole('alert').filter({ hasText: 'تعذر الحفظ' })
+  ).toContainText('تعذر الحفظ');
   await page.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
   await expect(page.getByLabel('ملاحظتك الخاصة لهذا الدرس')).toHaveValue(
     'ملاحظة تبقى هنا عند تعذر الحفظ'
@@ -96,7 +96,10 @@ test('teacher creates a course and sees students; logout protects the dashboard'
     page.getByRole('cell', { name: 'Preview Student', exact: true }).first()
   ).toBeVisible();
   await page.getByRole('button', { name: /Log out/ }).click();
-  await page.getByRole('alertdialog').getByRole('button', { name: 'تسجيل الخروج', exact: true }).click();
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'تسجيل الخروج', exact: true })
+    .click();
   await page.goto('/teacher');
   await expect(page).toHaveURL(/\/login$/);
 });
@@ -205,7 +208,9 @@ test('a student can retry joining after a connection failure without leaving the
   });
   await page.goto('/classroom/preview-arabic');
   await page.getByRole('button', { name: 'دخول الحصة', exact: true }).click();
-  await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText('الحصة غير مباشرة الآن');
+  await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText(
+    'الحصة غير مباشرة الآن'
+  );
   await page.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
   expect(attempts).toBe(1);
   await page.getByRole('button', { name: 'إعادة دخول الحصة', exact: true }).click();
@@ -279,7 +284,10 @@ test('mobile quiz delivery retries one saved attempt, teacher feedback and final
     .click();
   await studentPage.getByRole('button', { name: 'Submit Quiz', exact: true }).click();
   await expect(
-    studentPage.getByRole('alertdialog').getByRole('alert').filter({ hasText: 'أجب عن جميع الأسئلة' })
+    studentPage
+      .getByRole('alertdialog')
+      .getByRole('alert')
+      .filter({ hasText: 'أجب عن جميع الأسئلة' })
   ).toBeVisible();
   await studentPage.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
   await studentPage.getByLabel('إجابتك: اكتب جملة عربية', { exact: true }).fill('مرحباً يا معلم');
@@ -296,7 +304,10 @@ test('mobile quiz delivery retries one saved attempt, teacher feedback and final
   });
   await studentPage.getByRole('button', { name: 'Submit Quiz', exact: true }).click();
   await expect(
-    studentPage.getByRole('alertdialog').getByRole('alert').filter({ hasText: 'تعذر تأكيد التسليم' })
+    studentPage
+      .getByRole('alertdialog')
+      .getByRole('alert')
+      .filter({ hasText: 'تعذر تأكيد التسليم' })
   ).toBeVisible();
   await studentPage.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
   await studentPage.getByRole('button', { name: 'Submit Quiz', exact: true }).click();
@@ -324,21 +335,23 @@ test('mobile quiz delivery retries one saved attempt, teacher feedback and final
   const answerCard = teacherPage
     .locator('.card.pad')
     .filter({ has: teacherPage.getByText('اكتب جملة عربية', { exact: true }) })
-    .filter({ has: teacherPage.getByRole('button', { name: 'Mark as Graded', exact: true }) });
-  await answerCard.getByLabel('Feedback', { exact: false }).fill('أحسنت، جملة واضحة');
+    .filter({ has: teacherPage.getByRole('button', { name: 'حفظ التصحيح', exact: true }) });
+  await answerCard.getByLabel('ملاحظة للطالب', { exact: false }).fill('أحسنت، جملة واضحة');
   await expect(answerCard.getByRole('spinbutton')).toHaveValue('2'); // Feedback alone preserves the default grade.
   await answerCard.getByRole('spinbutton').fill('1.5');
-  await answerCard.getByRole('button', { name: 'Mark as Graded', exact: true }).click();
-  await expect(teacherPage.getByRole('alertdialog').getByRole('alert').filter({ hasText: 'must be between' })).toBeVisible();
+  await answerCard.getByRole('button', { name: 'حفظ التصحيح', exact: true }).click();
+  await expect(
+    teacherPage.getByRole('alertdialog').getByRole('alert').filter({ hasText: 'يجب أن تكون بين' })
+  ).toBeVisible();
   await teacherPage.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
   await answerCard.getByRole('spinbutton').fill('2');
-  await answerCard.getByRole('button', { name: 'Mark as Graded', exact: true }).click();
+  await answerCard.getByRole('button', { name: 'حفظ التصحيح', exact: true }).click();
   await expect(answerCard).toHaveCount(0);
   await studentPage.goto('/student');
   const ownResult = studentPage
     .locator('li')
     .filter({ has: studentPage.getByText('Mobile feedback quiz', { exact: true }) });
-  await expect(ownResult).toContainText('Score: 100%');
+  await expect(ownResult).toContainText('الدرجة: 100%');
   await expect(ownResult).toContainText('أحسنت، جملة واضحة');
   await parentPage.reload();
   await expect(familyResults).toContainText('الدرجة النهائية: 100%');
@@ -386,7 +399,10 @@ test('signed-in home stays a workspace across navigation, reloads and connection
   await page.getByRole('button', { name: 'إعادة المحاولة', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'أهلاً، Preview Teacher' })).toBeVisible();
   await page.getByRole('button', { name: 'Log out · خروج', exact: true }).click();
-  await page.getByRole('alertdialog').getByRole('button', { name: 'تسجيل الخروج', exact: true }).click();
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'تسجيل الخروج', exact: true })
+    .click();
   await expect(page).toHaveURL(/\/login$/);
   await page.goto('/');
   await expect(

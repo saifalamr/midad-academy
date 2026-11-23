@@ -3,15 +3,11 @@ import Link from 'next/link';
 import { PopupNotice } from './FeedbackProvider';
 import Icon from './Icon';
 import WorkspaceShell from './WorkspaceShell';
+import AcademyLoading from './AcademyLoading';
 import { dashboardPath, useAuth } from './AuthProvider';
 export default function HomeExperience({ children }: { children: React.ReactNode }) {
   const { user, status, refresh } = useAuth();
-  if (status === 'loading')
-    return (
-      <main className="midad connection-state" role="status">
-        جارٍ فتح الأكاديمية…
-      </main>
-    );
+  if (status === 'loading') return <AcademyLoading />;
   if (!user && status === 'error')
     return (
       <main className="midad connection-state">
