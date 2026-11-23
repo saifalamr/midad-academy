@@ -63,6 +63,9 @@ export async function authRoutes(app: FastifyInstance) {
   // Creates a User + the matching role profile in one Prisma nested write.
   app.post('/register', { config: { rateLimit: { max: 5, timeWindow: '1 hour', hook: 'preHandler', keyGenerator: credentialRateKey } } }, async (request, reply) => {
     const body = registerSchema.parse(request.body);
+    const browser = request.headers['x-midad-client'] === 'browser';
+    if (browser && !validBrowserOrigin(request))
+      return reply.status(403).send({ error: 'Invalid request origin' });
 
     if (body.role !== 'PARENT')
       return reply
@@ -72,7 +75,7 @@ export async function authRoutes(app: FastifyInstance) {
 
     const existing = await prisma.user.findUnique({ where: { email: body.email } });
     if (existing) {
-      return reply.status(409).send({ error: 'Email already registered' });
+      return reply.status(409).send({ error: 'هذا البريد مسجل بالفعل. استخدم تسجيل الدخول أو استعادة كلمة المرور.' });
     }
 
     const passwordHash = await bcrypt.hash(body.password, 10);
@@ -87,10 +90,20 @@ export async function authRoutes(app: FastifyInstance) {
         role: body.role,
         parentProfile: { create: {} },
       },
-      select: safeUserSelect,
+      select: { ...safeUserSelect, tokenVersion: true },
     });
-
-    return reply.status(201).send({ data: user });
+    const { tokenVersion, ...publicUser } = user;
+    if (browser) {
+      const token = app.jwt.sign({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        name: user.name,
+        version: tokenVersion,
+      });
+      setSessionCookie(reply, token, true);
+    }
+    return reply.status(201).send({ data: publicUser });
   });
 
   // ── POST /api/auth/login ───────────────────────────────────────────────────

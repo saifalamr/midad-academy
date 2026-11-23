@@ -25,7 +25,7 @@ export default function RegisterPage() {
     try {
       const res = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Midad-Client': 'browser' },
         body: JSON.stringify({
           name,
           email,
@@ -43,7 +43,14 @@ export default function RegisterPage() {
         return;
       }
 
-      router.push('/login');
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      localStorage.setItem('token', 'cookie');
+      window.dispatchEvent(new Event('midad-auth'));
+      const pending = sessionStorage.getItem('midad-return-to');
+      sessionStorage.removeItem('midad-return-to');
+      router.replace(pending && /^\/academy\?course=[a-zA-Z0-9_-]+$/.test(pending)
+        ? pending : '/academy?start=1');
     } catch {
       setError('تعذر الاتصال بالخادم. حاول مرة أخرى.');
     } finally {
@@ -89,7 +96,7 @@ export default function RegisterPage() {
 
           <h1 className="auth-title">إنشاء حساب ولي الأمر</h1>
           <p className="auth-sub">
-            بعد إنشاء حسابك، اختر الدورة وأضف طفلك من نموذج التسجيل. يُفعّل دخول الطفل المستقل لاحقًا عند حاجتك إليه.
+            بعدها تختار الدورة وتضيف طفلك في طلب واحد. سنوضح لك حالة الطلب والخطوة التالية.
           </p>
 
           {error && <PopupNotice className="auth-error">{error}</PopupNotice>}
@@ -187,7 +194,7 @@ export default function RegisterPage() {
               className="btn btn-gold btn-block btn-lg"
               style={{ opacity: loading ? 0.65 : 1 }}
             >
-              {loading ? 'جارٍ إنشاء الحساب…' : 'إنشاء الحساب'}
+              {loading ? 'جارٍ تجهيز حسابك…' : 'إنشاء الحساب ومتابعة تسجيل الطفل'}
             </button>
           </form>
         </div>

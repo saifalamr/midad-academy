@@ -104,9 +104,13 @@ test('family chooses a course before login, adds a child and requests in one for
     .fill('يعرف الحروف ويحتاج مساعدة في القراءة');
   await page.getByRole('checkbox', { name: 'نحتاج مساعدة في تحديد المستوى قبل البداية' }).check();
   await page.getByRole('button', { name: 'إرسال طلب التسجيل', exact: true }).click();
-  await expect(page.getByRole('alertdialog')).toContainText('تم حفظ التحديث');
+  await expect(page.getByRole('alertdialog')).toContainText('وصل طلب التسجيل');
   await page.getByRole('button', { name: 'حسنًا', exact: true }).click();
   await expect(page.getByText('قيد مراجعة الإدارة', { exact: true })).toBeVisible();
+  await page.goto('/parent');
+  await expect(page.getByText('وصل طلب التسجيل للإدارة. انتظر تأكيد المقعد قبل الدفع.')).toBeVisible();
+  await page.getByRole('link', { name: 'تفاصيل الطلب', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'تسجيلاتي والدفع', exact: true })).toHaveAttribute('aria-pressed', 'true');
   const adminContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   await adminContext.addInitScript((token) => localStorage.setItem('token', token), adminToken);
   const admin = await adminContext.newPage();
@@ -115,6 +119,10 @@ test('family chooses a course before login, adds a child and requests in one for
   const card = admin.locator('article').filter({
     has: admin.getByRole('heading', { name: `نور رحلة التسجيل · ${courseTitle}`, exact: true }),
   });
+  await expect(card.getByLabel('قرار الإدارة')).toHaveValue('');
+  await card.getByLabel('قرار الإدارة').selectOption('APPROVE');
+  await expect(card.getByLabel('حالة الدفع')).toHaveValue('');
+  await card.getByLabel('حالة الدفع').selectOption('PAID');
   await card.getByLabel('مرجع الدفع أو سبب الإعفاء').fill('وصل نقدي تجريبي 991');
   await card.getByLabel('رد يظهر للأسرة').fill('تم التسجيل؛ راجع الحصة القادمة');
   await card.getByRole('button', { name: 'حفظ القرار' }).click();

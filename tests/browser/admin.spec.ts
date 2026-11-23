@@ -13,8 +13,14 @@ test('parent registration, admin child account, monthly course, enrollment and s
   await page.locator('#password').fill('TestingPassword2026!');
   await page.locator('#whatsappPhone').fill('+905001234567');
   await page.getByRole('checkbox').last().check();
-  await page.getByRole('button', { name: 'إنشاء الحساب', exact: true }).click();
-  await expect(page).toHaveURL(/login$/);
+  const registrationResponse = page.waitForResponse((res) => res.url().endsWith('/api/auth/register'));
+  await page.getByRole('button', { name: 'إنشاء الحساب ومتابعة تسجيل الطفل', exact: true }).click();
+  const registered = await registrationResponse;
+  expect((await registered.json()).data.token).toBeUndefined();
+  await expect(page).toHaveURL(/\/academy\?start=1$/);
+  await expect(page.getByRole('heading', { name: 'سجّل طفلك في دورة' })).toBeVisible();
+  expect((await page.context().cookies()).some((cookie) => cookie.name === 'midad_session' && cookie.httpOnly)).toBe(true);
+  await page.goto('/login');
   await page.locator('#email').fill('admin@preview.midad.test');
   await page.locator('#password').fill('MidadPreview2026!');
   await page.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();

@@ -8,6 +8,7 @@ import { API_URL } from '@/lib/config';
 import { academyContactUrl, sessionDate } from '@/lib/academy-contact';
 import './parent.css';
 import { performanceLabels, homeworkLabels, type Report } from '@/lib/session-reports';
+import { academyApi, statusLabels, type Application } from '@/lib/academy-workflow';
 
 type Session = {
   id: string;
@@ -67,6 +68,7 @@ export default function ParentDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [reload, setReload] = useState(0);
+  const [applications, setApplications] = useState<Application[]>([]);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
@@ -97,6 +99,10 @@ export default function ParentDashboard() {
       }
     }
     void refresh(true);
+    let active = true;
+    void academyApi<Application[]>('/academy/applications')
+      .then((items) => { if (active) setApplications(items); })
+      .catch(() => { /* The family overview remains usable if status is temporarily unavailable. */ });
     const timer = setInterval(() => {
       if (!document.hidden) void refresh();
     }, 30000);
@@ -108,9 +114,14 @@ export default function ParentDashboard() {
       clearInterval(timer);
       window.removeEventListener('focus', focus);
       controller.abort();
+      active = false;
     };
   }, [reload]);
   const child = children.find((c) => c.id === selected) ?? children[0];
+  const application = child && (
+    applications.find((a) => a.student.id === child.id && ['PENDING', 'WAITLIST'].includes(a.status)) ??
+    applications.find((a) => a.student.id === child.id)
+  );
   const next = child?.courses
     .flatMap((course) => course.upcomingSessions.map((s) => ({ ...s, course })))
     .sort((a, b) =>
@@ -158,9 +169,9 @@ export default function ParentDashboard() {
           <h1>متابعة أبنائك</h1>
           <p className="muted">الدورات والمواعيد والحضور والتمارين، في مكان واحد.</p>
         </div>
-        <Link href="/courses" className="btn btn-gold">
+        <Link href="/academy?start=1" className="btn btn-gold">
           <Icon name="book" />
-          استعرض الدورات الشهرية
+          تسجيل طفل في دورة
         </Link>
       </header>
       <div className="flow-actions" style={{marginBottom:20}}><Link href="/academy" className="btn btn-outline">تسجيل الأبناء والدفع والغياب والتعويض</Link></div>
@@ -179,8 +190,8 @@ export default function ParentDashboard() {
         <section className="card pad family-empty">
           <Icon name="family" size={42} />
           <h2>لنبدأ رحلة أبنائك</h2>
-          <p>أضف طفلك من حسابك، ثم اختر دورة وأرسل طلب التسجيل. ستتابع حالة الطلب هنا بعد اعتماد الإدارة.</p>
-          <Link className="btn btn-gold" href="/academy">إضافة طفل وطلب التسجيل</Link>
+          <p>اختر الدورة وأضف طفلك في طلب واحد. ستتابع حالة الطلب في «التسجيل والمتابعة».</p>
+          <Link className="btn btn-gold" href="/academy?start=1">ابدأ تسجيل طفلك</Link>
         </section>
       ) : (
         <>
@@ -247,9 +258,21 @@ export default function ParentDashboard() {
           </div>
           {!child.courses.length ? (
             <section className="card pad">
-              <p>لم تسجل الأكاديمية طفلك في دورة بعد.</p>
-              <Link href="/courses" className="link-gold">
-                اختر دورة وتواصل لطلب التسجيل
+              {application ? (
+                <>
+                  <span className="tag">{statusLabels[application.status]}</span>
+                  <p>{application.course.title}</p>
+                  <p>
+                    {application.status === 'PENDING'
+                      ? 'وصل طلب التسجيل للإدارة. انتظر تأكيد المقعد قبل الدفع.'
+                      : application.status === 'WAITLIST'
+                        ? 'طفلك في قائمة الانتظار. تابع أي تحديث من الإدارة في تفاصيل الطلب.'
+                        : 'راجع قرار الإدارة والخطوة التالية في تفاصيل الطلب.'}
+                  </p>
+                </>
+              ) : <p>اختر دورة لطفلك وأرسل طلب التسجيل؛ ستظهر حالته هنا.</p>}
+              <Link href={application ? '/academy?view=applications' : '/academy?start=1'} className="link-gold">
+                {application ? 'تفاصيل الطلب' : 'اختيار دورة وإرسال الطلب'}
               </Link>
             </section>
           ) : (

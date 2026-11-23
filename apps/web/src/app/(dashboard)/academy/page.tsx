@@ -75,6 +75,10 @@ export default function AcademyPage() {
       if (pending && parent) {
         setSelectedCourse(pending);
         setTab('apply');
+      } else if (parent && new URLSearchParams(location.search).get('start') === '1') {
+        setTab('apply');
+      } else if (parent && new URLSearchParams(location.search).get('view') === 'applications') {
+        setTab('applications');
       }
     }
     let active = true;
@@ -126,13 +130,13 @@ export default function AcademyPage() {
       active = false;
     };
   }, [user, parent, admin, revision]);
-  async function action(work: () => Promise<unknown>) {
+  async function action(work: () => Promise<unknown>, success = 'تم حفظ التحديث بنجاح') {
     setBusy(true);
     setError('');
     try {
       await work();
       setRevision((x) => x + 1);
-      showPopup('تم حفظ التحديث بنجاح');
+      showPopup(success);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'تعذر الحفظ');
     } finally {
@@ -170,6 +174,9 @@ export default function AcademyPage() {
     { id: 'policy', title: 'سياسات الأكاديمية' },
     ...(admin ? [{ id: 'audit', title: 'سجل التعديلات' }] : []),
   ];
+  const nextApplication = parent
+    ? applications.find((a) => a.status === 'PENDING' || a.status === 'WAITLIST') ?? applications[0]
+    : undefined;
   return (
     <main className="academy-flow wrap" dir="rtl">
       <header className="flow-head">
@@ -213,11 +220,33 @@ export default function AcademyPage() {
               <section className="flow-grid">
                 {parent && (
                   <article className="card pad">
-                    <h2>سجّل طفلك في رحلته القادمة</h2>
-                    <p>اختر الدورة وأضف طفلك أو اختره من أبنائك، ثم أرسل الطلب من مكان واحد.</p>
-                    <button className="btn btn-gold" onClick={() => setTab('apply')}>
-                      ابدأ التسجيل
-                    </button>
+                    {nextApplication ? (
+                      <>
+                        <span className="tag">{labels[nextApplication.status]}</span>
+                        <h2>طلب {nextApplication.student.user.name}</h2>
+                        <p>{nextApplication.course.title}</p>
+                        <p>
+                          {nextApplication.status === 'PENDING'
+                            ? 'وصل طلبك للإدارة. ستجد القرار هنا بعد مراجعته؛ لا تدفع قبل تأكيد المقعد.'
+                            : nextApplication.status === 'WAITLIST'
+                              ? 'الطلب في قائمة الانتظار. ستظهر لك أي تحديثات من الإدارة هنا.'
+                              : nextApplication.status === 'APPROVED'
+                                ? 'تأكد التسجيل. راجع الحصة القادمة أدناه، وستظهر المواعيد عندما تحددها الأكاديمية.'
+                                : 'هذا الطلب مغلق. تستطيع اختيار دورة أخرى أو مراجعة رد الإدارة.'}
+                        </p>
+                        <button className="btn btn-gold" onClick={() => setTab('applications')}>
+                          تفاصيل الطلب
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <h2>سجّل طفلك في رحلته القادمة</h2>
+                        <p>اختر الدورة وأضف طفلك أو اختره من أبنائك، ثم أرسل الطلب من مكان واحد.</p>
+                        <button className="btn btn-gold" onClick={() => setTab('apply')}>
+                          ابدأ التسجيل
+                        </button>
+                      </>
+                    )}
                   </article>
                 )}
                 {admin && ops && (
@@ -419,7 +448,7 @@ export default function AcademyPage() {
                     history.replaceState(history.state, '', '/academy');
                     setEnrollmentChild('new');
                     setTab('applications');
-                  });
+                  }, 'وصل طلب التسجيل. ستظهر نتيجة مراجعة الإدارة هنا؛ لا تدفع قبل تأكيد المقعد.');
                 }}
               >
                 <div className="flow-grid">
@@ -522,8 +551,8 @@ export default function AcademyPage() {
           {tab === 'applications' && (
             <>
               <p>
-                الأسعار المسجلة هنا تخص الطلب وقت إرساله. الدفع والاسترجاع يسجلهما المسؤول بعد
-                العملية الفعلية.
+                تابع قرار الإدارة وردها هنا. إرسال الطلب لا يؤكد المقعد ولا يتطلب دفعًا الآن.
+                الأسعار المسجلة تخص وقت الإرسال، ويسجل المسؤول الدفع بعد العملية الفعلية.
               </p>
               {applications.map((a) => (
                 <ApplicationCard
@@ -838,7 +867,7 @@ function ApplicationCard({
   admin: boolean;
   action: (work: () => Promise<unknown>) => Promise<void>;
 }) {
-  const [decision, setDecision] = useState('APPROVE');
+  const [decision, setDecision] = useState('');
   return (
     <article className="card pad">
       <span className="tag">{labels[a.status]}</span>
@@ -890,17 +919,20 @@ function ApplicationCard({
                 className="input"
                 value={decision}
                 onChange={(e) => setDecision(e.target.value)}
+                required
               >
+                <option value="" disabled>اختر القرار بعد المراجعة</option>
                 <option value="APPROVE">تأكيد التسجيل والمقعد</option>
                 <option value="WAITLIST">قائمة الانتظار</option>
                 <option value="REJECT">عدم اعتماد الطلب</option>
               </select>
             </label>
-            {decision === 'APPROVE' && (
+            {decision === 'APPROVE' && a.quotedAmount > 0 && (
               <>
                 <label className="field">
                   حالة الدفع
-                  <select name="paymentStatus" className="input">
+                  <select name="paymentStatus" className="input" required defaultValue="">
+                    <option value="" disabled>اختر بعد التأكد من الدفع أو الإعفاء</option>
                     <option value="PAID">تم استلام الدفع فعليًا</option>
                     <option value="WAIVED">مجاني / إعفاء معتمد</option>
                   </select>

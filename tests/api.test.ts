@@ -1482,6 +1482,29 @@ test('browser login issues a protected cookie, enforces origin on writes, and sc
   assert.match(String(logout.headers['set-cookie']), /Max-Age=0/);
 });
 
+test('new parent registration starts a browser session only for the allowed site', async () => {
+  const payload = {
+    name: 'New family', email: 'direct-parent@midad.test',
+    password: 'TestingPassword2026!', role: 'parent', whatsappPhone: '+905001234567',
+  };
+  const denied = await app.inject({ method: 'POST', url: '/api/auth/register',
+    headers: { origin: 'https://attacker.example', 'x-midad-client': 'browser' }, payload,
+  });
+  assert.equal(denied.statusCode, 403);
+  assert.equal(await prisma.user.count({ where: { email: payload.email } }), 0);
+  const created = await app.inject({ method: 'POST', url: '/api/auth/register',
+    headers: { origin: 'http://localhost:3000', 'x-midad-client': 'browser' }, payload,
+  });
+  assert.equal(created.statusCode, 201, created.body);
+  assert.equal(created.json().data.token, undefined);
+  assert.equal(created.json().data.tokenVersion, undefined);
+  assert.match(String(created.headers['set-cookie']), /HttpOnly/);
+  const cookie = String(created.headers['set-cookie']).split(';')[0];
+  const me = await app.inject({ method: 'GET', url: '/api/auth/me', headers: { cookie } });
+  assert.equal(me.statusCode, 200, me.body);
+  assert.equal(me.json().data.email, payload.email);
+});
+
 test('public login and registration have tighter per-IP limits', async () => {
   for (let attempt = 0; attempt < 30; attempt++) {
     const response = await call('POST', '/api/auth/login', undefined, {
