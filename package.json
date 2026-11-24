@@ -16,6 +16,7 @@
     "preview:db": "node scripts/dev-db.mjs",
     "preview:seed": "node --env-file=.env.preview --import tsx scripts/seed-preview.ts",
     "staging:prepare": "node scripts/prepare-staging.mjs",
+    "staging:check": "node scripts/check-human-test.mjs",
     "preview:api": "node --env-file=.env.preview --import tsx apps/api/src/index.ts",
     "preview:web": "npm run dev -w @arabic-platform/web",
     "test:api": "node --env-file=.env.preview --import tsx --test tests/api.test.ts",
