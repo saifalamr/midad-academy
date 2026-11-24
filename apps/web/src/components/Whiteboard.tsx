@@ -130,7 +130,7 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
       top:        overlay.canvasY,
       fill:       overlay.color,
       fontSize:   40,
-      fontFamily: 'Tahoma, Arial, sans-serif',
+      fontFamily: wrapperRef.current ? getComputedStyle(wrapperRef.current).fontFamily : 'sans-serif',
       direction:  'rtl',
       textAlign:  'right',
     }));
@@ -367,12 +367,14 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
         erase(e); return;
       }
       if (toolRef.current === 'text') {
-        if (textOverlayRef.current || justCommittedRef.current) return;
+        if (textOverlayRef.current) { doCommit(); return; }
+        if (justCommittedRef.current) return;
         const css = util.transformPoint(p, canvas.viewportTransform);
         const box = wrapperRef.current?.getBoundingClientRect();
         const editor: TextOverlay = {
           canvasX: p.x, canvasY: p.y,
-          cssX: Math.max(0, Math.min(css.x, (box?.width ?? 300) - 170)), cssY: css.y,
+          cssX: Math.max(0, Math.min(css.x, (box?.width ?? 300) - 220)),
+          cssY: Math.max(38, Math.min(css.y, (box?.height ?? 200) - 105)),
           color: colorRef.current, fontSizePx: Math.max(16, Math.round(40 * canvas.getZoom())),
         };
         textOverlayRef.current = editor;
@@ -424,7 +426,7 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
       canvasRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId]);
+  }, [roomId, doCommit]);
 
   // ─── overlay (transparent background) toggle ────────────────────────────────
   useEffect(() => {
@@ -539,24 +541,26 @@ const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteb
             el.style.height = 'auto';
             el.style.height = `${el.scrollHeight}px`;
           }}
-          onBlur={doCommit}
           style={{
             position:   'absolute',
             left:       textOverlay.cssX,
             top:        textOverlay.cssY,
             color:      textOverlay.color,
             fontSize:   textOverlay.fontSizePx,
-            fontFamily: 'Tahoma, Arial, sans-serif',
+            fontFamily: 'var(--font-ar)',
             direction:  'rtl',
             textAlign:  'right',
             background: 'rgba(255,255,255,.95)',
-            border:     '1px dashed #1B3A6B',
+            border:     '2px solid #C9922A',
+            borderRadius: 8,
+            boxShadow: '0 8px 24px rgba(27,58,107,.16)',
             outline:    'none',
             resize:     'none',
-            padding:    0,
+            padding:    '5px 10px',
             margin:     0,
             lineHeight: 1.3,
-            minWidth:   140,
+            width:      'min(280px, 80%)',
+            minHeight:  46,
             overflow:   'hidden',
             zIndex:     20,
           }}
