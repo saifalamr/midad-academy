@@ -907,7 +907,7 @@ function ApplicationCard({
                     version: a.version,
                     action: decision,
                     response: d.get('response'),
-                    ...(decision === 'APPROVE'
+                    ...(decision === 'APPROVE' && a.quotedAmount > 0
                       ? {
                           paymentStatus: d.get('paymentStatus'),
                           paymentReference: d.get('paymentReference'),
