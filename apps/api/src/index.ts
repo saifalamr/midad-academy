@@ -31,6 +31,7 @@ import { writingRoutes } from './routes/writing';
 import { academyRoutes } from './routes/academy';
 import { adminRoutes } from './routes/admin';
 import { bootstrapAdmin } from './lib/bootstrap-admin';
+import { recoverStaging } from './lib/recover-staging';
 import { prepareReview } from './lib/prepare-review';
 import { readSessionCookie, validBrowserOrigin } from './lib/session-cookie';
 
@@ -134,10 +135,25 @@ export async function buildApp() {
 
   // Legacy administration actions are logged without request bodies or credentials.
   app.addHook('onResponse', async (request, reply) => {
-    if (request.user?.role !== 'ADMIN' || !request.url.startsWith('/api/admin/') || ['GET', 'HEAD', 'OPTIONS'].includes(request.method) || reply.statusCode >= 400) return;
+    if (
+      request.user?.role !== 'ADMIN' ||
+      !request.url.startsWith('/api/admin/') ||
+      ['GET', 'HEAD', 'OPTIONS'].includes(request.method) ||
+      reply.statusCode >= 400
+    )
+      return;
     try {
-      await prisma.auditEvent.create({ data: { actorId: request.user.id, action: `${request.method} ${request.routeOptions.url}`, targetId: request.url.split('?')[0], details: {} } });
-    } catch { app.log.error('Could not persist legacy administration audit event'); }
+      await prisma.auditEvent.create({
+        data: {
+          actorId: request.user.id,
+          action: `${request.method} ${request.routeOptions.url}`,
+          targetId: request.url.split('?')[0],
+          details: {},
+        },
+      });
+    } catch {
+      app.log.error('Could not persist legacy administration audit event');
+    }
   });
 
   // ── Routes ───────────────────────────────────────────────────────────────
@@ -169,6 +185,7 @@ export async function buildApp() {
 async function bootstrap() {
   validateConfig();
   await bootstrapAdmin(prisma);
+  await recoverStaging(prisma);
   const reviewSetup = await prepareReview(prisma);
   if (reviewSetup.status !== 'disabled')
     console.log('Preview review preparation:', JSON.stringify(reviewSetup));
