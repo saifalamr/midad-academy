@@ -1866,6 +1866,46 @@ export default function ClassroomPage() {
     },
     [handleLeave]
   );
+  // A provider disconnect event can be delayed or arrive with an unexpected
+  // reason. The API's committed session state is the fallback source of truth:
+  // unmounting LiveKitRoom also stops the student's camera and microphone.
+  useEffect(() => {
+    if (!token || exit || role === 'teacher') return;
+    const controller = new AbortController();
+    let checking = false;
+    const checkEnded = async () => {
+      if (checking) return;
+      checking = true;
+      try {
+        const response = await authFetch('/api/sessions/upcoming', {
+          signal: controller.signal,
+          cache: 'no-store',
+        });
+        if (!response.ok || controller.signal.aborted) return;
+        const { data } = await response.json();
+        if (
+          !controller.signal.aborted &&
+          Array.isArray(data) &&
+          !data.some((session: { courseId: string; status: string }) => session.courseId === roomId && session.status === 'LIVE')
+        ) setExit('ended');
+      } catch {
+        // A network error is not evidence that the teacher ended the class.
+      } finally {
+        checking = false;
+      }
+    };
+    const timer = window.setInterval(() => void checkEnded(), 4000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void checkEnded();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    void checkEnded();
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [token, exit, role, roomId]);
   const handleRoomError = useCallback(
     () => setError('تعذر الاتصال بالحصة. تحقق من الإنترنت وأعد الدخول.'),
     []
