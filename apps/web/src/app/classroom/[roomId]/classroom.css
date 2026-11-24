@@ -53,3 +53,22 @@
 .midad.classroom-v2 .room-controls{grid-row:5}
 @media(max-width:700px){.midad.room.classroom-v2{grid-template-rows:auto auto auto 78px minmax(0,1fr) auto}.midad.classroom-v2 .video-strip{grid-row:4}.midad.classroom-v2 .board-wrap{grid-row:5}.midad.classroom-v2 .room-controls{grid-row:6}}
 @media(max-height:550px) and (orientation:landscape){.midad.room.classroom-v2{grid-template-rows:auto auto auto minmax(0,1fr) auto}.midad.classroom-v2 .video-strip,.midad.classroom-v2 .board-wrap{grid-row:4}.midad.classroom-v2 .room-controls{grid-row:5}.midad.classroom-v2 .class-clock-phases{display:none}.midad.classroom-v2 .class-clock{padding:4px 12px}}
+
+/* Keep the board usable on laptop-height screens. The clock remains readable
+   while its phases scroll in one row instead of consuming drawing space. */
+@media (min-width:701px) {
+  .midad.classroom-v2 .class-clock{display:flex;align-items:center;gap:12px;padding:5px 14px;max-height:160px}
+  .midad.classroom-v2 .class-clock-head{flex:0 0 auto;gap:8px;flex-wrap:nowrap}
+  .midad.classroom-v2 .class-clock-phases{flex:1 1 auto;min-width:0;flex-wrap:nowrap;overflow-x:auto;margin:0}
+  .midad.classroom-v2 .class-clock-phases li{flex:0 0 auto;white-space:nowrap}
+  .midad.classroom-v2 .class-clock form,.midad.classroom-v2 .class-clock [role=alert]{flex-basis:100%}
+  .midad.classroom-v2 .board-wrap{gap:5px}
+  .midad.classroom-v2 .board-stage{gap:4px}
+  .midad.classroom-v2 .wb-toolbar{padding:4px}
+  .midad.classroom-v2 .wb-tool{height:42px;min-width:46px;gap:2px}
+  .midad.classroom-v2 .board-bar{min-height:38px;padding:3px 9px}
+  .midad.classroom-v2 .workspace-tabs button{min-height:32px;padding:4px 10px}
+  .midad.classroom-v2 .wb-colors{min-height:38px;max-height:42px;padding:4px 8px}
+  .midad.classroom-v2 .room-controls{min-height:62px;padding:5px 12px}
+  .midad.classroom-v2 .rc-btn,.midad.classroom-v2 .call-more summary{min-height:46px}
+}
