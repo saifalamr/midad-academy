@@ -12,6 +12,11 @@ const paths = {
   family:
     'M8 4a3 3 0 1 0 0 6 3 3 0 0 0 0-6 M17 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4 M2 21v-4a6 6 0 0 1 12 0v4 M14 13a5 5 0 0 1 8 4v4',
   edit: 'm4 16 12-12 4 4L8 20H4z M13 7l4 4',
+  eraser: 'M4 15 13 5a2 2 0 0 1 3 0l5 5a2 2 0 0 1 0 3l-7 7H8z M8 20h13',
+  cursor: 'M4 3v18l5-6 4 7 3-2-4-7 8-2z',
+  plus: 'M12 4v16 M4 12h16',
+  expand: 'M8 3H3v5 M16 3h5v5 M3 16v5h5 M21 16v5h-5',
+  trash: 'M4 7h16 M9 7V4h6v3 M6 7l1 14h10l1-14',
   file: 'M5 3h9l5 5v13H5z M14 3v6h5 M8 13h8 M8 17h6',
   mic: 'M9 6a3 3 0 0 1 6 0v6a3 3 0 0 1-6 0z M5 10v2a7 7 0 0 0 14 0v-2 M12 19v3 M8 22h8',
   video: 'M3 5h18v14H3z m7 4 6 3-6 3z',
