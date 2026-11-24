@@ -323,6 +323,23 @@ function ClassroomContent({
     ['teacher', 'student'].includes(getRole(t))
   ).length;
   const [classError, setClassError] = useState('');
+  const [endingClass, setEndingClass] = useState(false);
+  const finishClass = async () => {
+    if (endingClass || !window.confirm('إنهاء الحصة وقطع المكالمة عن جميع المشاركين؟')) return;
+    setEndingClass(true);
+    try {
+      const res = await authFetch('/api/sessions/end', {
+        method: 'POST',
+        body: JSON.stringify({ roomName: roomId }),
+      });
+      if (!res.ok) throw new Error('End failed');
+      onEnd();
+    } catch {
+      showPopup('تعذر إنهاء الحصة للجميع. أعد المحاولة.');
+    } finally {
+      setEndingClass(false);
+    }
+  };
   const [reconnecting, setReconnecting] = useState(false);
   const screenTracks = useTracks([Track.Source.ScreenShare]);
   const screenTrack = screenTracks.find((t) => getRole(t) === 'teacher');
@@ -886,25 +903,13 @@ function ClassroomContent({
           {isTeacher && (
             <button
               className="rt-leave btn btn-sm"
-              onClick={async () => {
-                if (!window.confirm('إنهاء الحصة لجميع المشاركين؟')) return;
-                const res = await authFetch('/api/sessions/end', {
-                  method: 'POST',
-                  body: JSON.stringify({ roomName: roomId }),
-                });
-                if (!res.ok) {
-                  showPopup('تعذر إنهاء الحصة. أعد المحاولة.');
-                  return;
-                }
-                onEnd();
-              }}
+              disabled={endingClass}
+              onClick={() => void finishClass()}
             >
-              إنهاء الحصة
+              {endingClass ? 'جارٍ إنهاء الحصة…' : 'إنهاء الحصة'}
             </button>
           )}
-          <button className="rt-leave btn btn-sm" onClick={onLeave}>
-            مغادرة
-          </button>
+          {!isTeacher && <button className="rt-leave btn btn-sm" onClick={onLeave}>مغادرة</button>}
         </div>
       </header>
 
@@ -1465,10 +1470,17 @@ function ClassroomContent({
           </>
         )}
 
-        <DisconnectButton onClick={onLeave} className="rc-btn rc-leave">
-          <CallIcon name="leave" />
-          <span>مغادرة</span>
-        </DisconnectButton>
+        {isTeacher ? (
+          <button type="button" disabled={endingClass} onClick={() => void finishClass()} className="rc-btn rc-leave">
+            <CallIcon name="leave" />
+            <span>{endingClass ? 'جارٍ الإنهاء…' : 'إنهاء الحصة للجميع'}</span>
+          </button>
+        ) : (
+          <DisconnectButton onClick={onLeave} className="rc-btn rc-leave">
+            <CallIcon name="leave" />
+            <span>مغادرة</span>
+          </DisconnectButton>
+        )}
       </div>
 
       {/* ── Floating emoji reactions ── */}
@@ -1768,6 +1780,8 @@ export default function ClassroomPage() {
   const [livekitUrl, setLivekitUrl] = useState('');
   const [choices, setChoices] = useState<LocalUserChoices | null>(null);
   const [error, setError] = useState('');
+  const [staleClass, setStaleClass] = useState(false);
+  const [recoveringClass, setRecoveringClass] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [exit, setExit] = useState<'left' | 'ended' | 'removed' | null>(null);
   useEffect(() => {
@@ -1807,9 +1821,16 @@ export default function ClassroomPage() {
         const json = await res.json();
         if (!active) return;
         if (!res.ok) {
+          const oldRoom = currentRole === 'teacher' && res.status === 409 &&
+            json.error === 'This class has ended; start a new scheduled session';
+          setStaleClass(oldRoom);
           setError(
             res.status === 409
-              ? 'الحصة غير مباشرة الآن. انتظر بدء المعلم للحصة ثم أعد المحاولة.'
+              ? currentRole === 'teacher'
+                ? oldRoom
+                  ? 'انقطع اتصال الحصة القديمة وبقيت مسجّلة مباشرة. أنهِ الجلسة العالقة، ثم حدّد حصة جديدة من الإدارة.'
+                  : 'لا توجد حصة مباشرة. حدّد موعدًا جديدًا من إدارة الأكاديمية ثم ابدأ الحصة من صفحة المعلم.'
+                : 'الحصة غير مباشرة الآن. انتظر بدء المعلم للحصة ثم أعد المحاولة.'
               : res.status === 503
                 ? 'الحصة غير متاحة مؤقتًا. أعد المحاولة لاحقًا أو تواصل مع الأكاديمية.'
                 : res.status === 403
@@ -1818,6 +1839,7 @@ export default function ClassroomPage() {
           );
           return;
         }
+        setStaleClass(false);
         setToken(json.data.token);
         setLivekitUrl(json.data.livekitUrl);
       })
@@ -1841,7 +1863,25 @@ export default function ClassroomPage() {
   function retryJoin() {
     setToken(null);
     setError('');
+    setStaleClass(false);
     setAttempt((value) => value + 1);
+  }
+
+  async function endStaleClass() {
+    if (recoveringClass) return;
+    setRecoveringClass(true);
+    try {
+      const response = await authFetch('/api/sessions/end', {
+        method: 'POST',
+        body: JSON.stringify({ roomName: roomId }),
+      });
+      if (!response.ok) throw new Error('Recovery failed');
+      setExit('ended');
+    } catch {
+      setError('تعذر إنهاء الجلسة العالقة. أعد المحاولة أو تواصل مع الإدارة.');
+    } finally {
+      setRecoveringClass(false);
+    }
   }
 
   const handleDisconnected = useCallback(
@@ -2000,6 +2040,11 @@ export default function ClassroomPage() {
           <button className="btn btn-gold btn-sm" onClick={retryJoin}>
             إعادة دخول الحصة
           </button>
+          {staleClass && role === 'teacher' && (
+            <button className="btn btn-outline btn-sm" disabled={recoveringClass} onClick={() => void endStaleClass()}>
+              {recoveringClass ? 'جارٍ إنهاء الجلسة…' : 'إنهاء الجلسة العالقة'}
+            </button>
+          )}
           <button className="btn btn-ghost btn-sm" onClick={goDashboard}>
             الرجوع للوحة التحكم
           </button>
