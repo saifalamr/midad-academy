@@ -10,7 +10,7 @@ import ClassWriting from '@/components/ClassWriting';
 import CameraVideo from '@/components/CameraVideo';
 import Link from 'next/link';
 import Icon, { type IconName } from '@/components/Icon';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   LiveKitRoom,
@@ -372,6 +372,15 @@ function ClassroomContent({
   const [manualName, setManualName] = useState('');
   const [htmlContent, setHtmlContent] = useState('');
   const [view, setView] = useState<'board' | 'content' | 'screen'>('board');
+  const [boardFocused, setBoardFocused] = useState(false);
+  const classroomRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement) setBoardFocused(false);
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, []);
   const [uploading, setUploading] = useState(false);
   const [sharing, setSharing] = useState(false);
   const shareInFlight = useRef(false);
@@ -734,6 +743,22 @@ function ClassroomContent({
   const inkInteractive = !isObserver && drawPermission && annotatable;
   const raisedSet = new Set(raisedHands.map((h) => h.identity));
   const showZoom = contentVisible && sharedDoc?.docType === 'image';
+  const boardTool = (value: Tool, label: string, icon: ReactNode) => (
+    <button
+      type="button"
+      className={`wb-tool ${tool === value ? 'on' : ''}`}
+      title={label}
+      aria-label={label}
+      aria-pressed={tool === value}
+      disabled={!inkInteractive}
+      onClick={(event) => {
+        setTool(value);
+        event.currentTarget.closest('details')?.removeAttribute('open');
+      }}
+    >
+      {icon}<span>{label}</span>
+    </button>
+  );
 
   // Pointer-events for the shared-content layer:
   //  • image → none (so the teacher draws on top via the ink layer)
@@ -751,7 +776,7 @@ function ClassroomContent({
           : 'auto';
 
   return (
-    <div className={`midad room classroom-v2${isObserver ? ' classroom-observer' : ''}`}>
+    <div ref={classroomRef} className={`midad room classroom-v2${isObserver ? ' classroom-observer' : ''}${boardFocused ? ' board-focused' : ''}`}>
       <RoomAudioRenderer />
 
       {/* ── Raised-hand notifications (teacher-only, fixed overlay) ── */}
@@ -929,160 +954,46 @@ function ClassroomContent({
 
       {/* ── Whiteboard area ── */}
       <div className="board-wrap">
-        {/* Drawing tools — left sidebar */}
+        {/* Keep daily tools visible; shapes and board management stay one tap away. */}
         {!isObserver && (
           <div className="wb-toolbar" role="toolbar" aria-label="أدوات السبورة">
-            <button
-              className={`wb-tool ${tool === 'pen' ? 'on' : ''}`}
-              title="قلم"
-              aria-pressed={tool === 'pen'}
-              aria-label="قلم"
-              disabled={!inkInteractive}
-              onClick={() => setTool('pen')}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path d="M12 19l7-7 3 3-7 7-4 1 1-4z" />
-                <path d="M18 13l-1.5-1.5" />
-                <path d="M3 21l5-1 9-9-4-4-9 9z" />
-              </svg>
-              <span>قلم</span>
-            </button>
-            <button
-              className={`wb-tool ${tool === 'highlighter' ? 'on' : ''}`}
-              title="تظليل"
-              aria-pressed={tool === 'highlighter'}
-              aria-label="تظليل"
-              disabled={!inkInteractive}
-              onClick={() => setTool('highlighter')}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path d="M9 11l-4 4v3h3l4-4" />
-                <path d="M13 7l4 4 4-4-4-4z" />
-                <path d="M12 8l4 4" />
-              </svg>
-              <span>تظليل</span>
-            </button>
-            <button
-              className={`wb-tool ${tool === 'eraser' ? 'on' : ''}`}
-              title="ممحاة"
-              aria-pressed={tool === 'eraser'}
-              aria-label="ممحاة"
-              disabled={!inkInteractive}
-              onClick={() => setTool('eraser')}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path d="M5 14l6-6 8 8-4 4H9z" />
-                <path d="M5 20h14" />
-              </svg>
-              <span>ممحاة</span>
-            </button>
-            <span className="wb-sep"></span>
-            <button
-              className={`wb-tool ${tool === 'text' ? 'on' : ''}`}
-              title="نص"
-              aria-pressed={tool === 'text'}
-              aria-label="نص"
-              disabled={!inkInteractive}
-              onClick={() => setTool('text')}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path d="M4 6V5h16v1M12 5v14M9 19h6" />
-              </svg>
-              <span>نص</span>
-            </button>
-            <button
-              className={`wb-tool ${tool === 'rectangle' ? 'on' : ''}`}
-              title="مستطيل"
-              aria-pressed={tool === 'rectangle'}
-              aria-label="مستطيل"
-              disabled={!inkInteractive}
-              onClick={() => setTool('rectangle')}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <rect x="4" y="6" width="16" height="12" rx="1.5" />
-              </svg>
-              <span>مستطيل</span>
-            </button>
-            <button
-              className={`wb-tool ${tool === 'circle' ? 'on' : ''}`}
-              title="دائرة"
-              aria-pressed={tool === 'circle'}
-              aria-label="دائرة"
-              disabled={!inkInteractive}
-              onClick={() => setTool('circle')}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <circle cx="12" cy="12" r="8" />
-              </svg>
-              <span>دائرة</span>
-            </button>
-            <button
-              className={`wb-tool ${tool === 'line' ? 'on' : ''}`}
-              title="خط"
-              aria-pressed={tool === 'line'}
-              aria-label="خط"
-              disabled={!inkInteractive}
-              onClick={() => setTool('line')}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path d="M5 19L19 5" />
-              </svg>
-              <span>خط</span>
-            </button>
-            <button
-              className={`wb-tool ${tool === 'select' ? 'on' : ''}`}
-              title="تحديد"
-              aria-pressed={tool === 'select'}
-              aria-label="تحديد"
-              disabled={!inkInteractive}
-              onClick={() => setTool('select')}
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                <path d="M4 4l7.07 16.97 2.51-7.39 7.39-2.51z" />
-              </svg>
-              <span>تحديد</span>
-            </button>
-            <span className="wb-sep"></span>
-            <button
-              disabled={!inkInteractive}
-              className="wb-tool"
-              title="تراجع"
-              aria-label="تراجع"
-              onClick={() => whiteboardRef.current?.undo()}
-            >
-              <Icon name="undo" />
-            </button>
-            <button
-              disabled={!inkInteractive}
-              className="wb-tool"
-              title="إعادة"
-              aria-label="إعادة"
-              onClick={() => whiteboardRef.current?.redo()}
-            >
-              <Icon name="redo" />
-            </button>
-            <button
-              className="wb-tool"
-              title="حفظ صورة السبورة"
-              aria-label="حفظ صورة السبورة"
-              onClick={() => whiteboardRef.current?.exportImage()}
-            >
-              <Icon name="download" />
-            </button>
-            <button
-              disabled={!inkInteractive}
-              className="wb-tool"
-              title="مسح السبورة"
-              aria-label="مسح السبورة"
-              onClick={() => {
-                if (window.confirm('مسح جميع الرسومات؟ يمكنك التراجع بعد المسح.'))
-                  whiteboardRef.current?.clear();
-              }}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />
-              </svg>
-            </button>
+            <div className="wb-tool-row">
+              {boardTool('pen', 'قلم', <Icon name="edit" />)}
+              {boardTool('eraser', 'ممحاة', <Icon name="eraser" />)}
+              {boardTool('text', 'نص', <span className="wb-text-icon" aria-hidden="true">T</span>)}
+              {boardTool('select', 'تحديد', <Icon name="cursor" />)}
+              <details className="board-tool-menu">
+                <summary className={['highlighter','rectangle','circle','line'].includes(tool) ? 'on' : ''} aria-label="أدوات إضافية">
+                  <Icon name="plus" /><span>أدوات</span>
+                </summary>
+                <div className="board-tool-popover" role="group" aria-label="أدوات الرسم الإضافية">
+                  {boardTool('highlighter', 'تظليل', <Icon name="edit" />)}
+                  {boardTool('rectangle', 'مستطيل', <span className="wb-shape-icon" aria-hidden="true">▭</span>)}
+                  {boardTool('circle', 'دائرة', <span className="wb-shape-icon" aria-hidden="true">○</span>)}
+                  {boardTool('line', 'خط', <span className="wb-shape-icon" aria-hidden="true">╱</span>)}
+                </div>
+              </details>
+              <span className="wb-sep" aria-hidden="true" />
+              <button type="button" disabled={!inkInteractive} className="wb-tool" title="تراجع" aria-label="تراجع" onClick={() => whiteboardRef.current?.undo()}>
+                <Icon name="undo" /><span>تراجع</span>
+              </button>
+              <details className="board-tool-menu">
+                <summary aria-label="خيارات السبورة"><Icon name="menu" /><span>خيارات</span></summary>
+                <div className="board-tool-popover" role="group" aria-label="خيارات السبورة">
+                  <button type="button" disabled={!inkInteractive} className="wb-tool" onClick={() => whiteboardRef.current?.redo()}>
+                    <Icon name="redo" /><span>إعادة</span>
+                  </button>
+                  <button type="button" className="wb-tool" onClick={() => whiteboardRef.current?.exportImage()}>
+                    <Icon name="download" /><span>حفظ صورة</span>
+                  </button>
+                  <button type="button" disabled={!inkInteractive} className="wb-tool" onClick={() => {
+                    if (window.confirm('مسح جميع الرسومات؟ يمكنك التراجع بعد المسح.')) whiteboardRef.current?.clear();
+                  }}>
+                    <Icon name="trash" /><span>مسح السبورة</span>
+                  </button>
+                </div>
+              </details>
+            </div>
           </div>
         )}
 
@@ -1107,6 +1018,23 @@ function ClassroomContent({
             </div>
 
             <div className="bb-right">
+              <button
+                type="button"
+                className="board-focus-toggle"
+                aria-pressed={boardFocused}
+                onClick={() => {
+                  if (boardFocused) {
+                    setBoardFocused(false);
+                    if (document.fullscreenElement === classroomRef.current) void document.exitFullscreen();
+                  } else {
+                    setBoardFocused(true);
+                    void classroomRef.current?.requestFullscreen?.().catch(() => {});
+                  }
+                }}
+              >
+                <Icon name={boardFocused ? 'close' : 'expand'} />
+                <span>{boardFocused ? 'عرض الحصة' : 'توسيع السبورة'}</span>
+              </button>
               {isTeacher && sharedDoc && (
                 <button
                   className="stop-content-share"
