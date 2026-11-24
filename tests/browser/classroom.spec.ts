@@ -380,9 +380,15 @@ test('teacher and student exchange real media, synchronized ink, permissions and
     student.frameLocator('iframe[title="درس متزامن"]').getByText('مرحباً')
   ).toBeVisible();
   for (const size of [
+    { width: 280, height: 653 },
+    { width: 320, height: 568 },
     { width: 390, height: 844 },
+    { width: 430, height: 932 },
+    { width: 768, height: 1024 },
     { width: 820, height: 1180 },
+    { width: 1024, height: 768 },
     { width: 1180, height: 820 },
+    { width: 1366, height: 768 },
     { width: 1440, height: 900 },
   ]) {
     await teacher.setViewportSize(size);
@@ -395,6 +401,11 @@ test('teacher and student exchange real media, synchronized ink, permissions and
       true
     );
     await expect(teacher.getByRole('button', { name: 'كتم الصوت', exact: true })).toBeVisible();
+    await teacher.getByRole('button', { name: 'توسيع السبورة' }).click();
+    const expanded = (await teacher.locator('.board-paper').boundingBox())!;
+    expect(expanded.height).toBeGreaterThan(box.height);
+    await expect(teacher.getByRole('button', { name: 'كتم الصوت', exact: true })).toBeVisible();
+    await teacher.getByRole('button', { name: 'عرض الحصة' }).click();
     await teacher.screenshot({ path: `test-results/classroom-${size.width}.png` });
     await teacher.getByRole('button', { name: 'المحتوى', exact: true }).click();
     await expect(
@@ -404,6 +415,10 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   await expectMovingVideo(teacher);
   await expectMovingVideo(student);
   await teacher.getByRole('button', { name: 'السبورة', exact: true }).click();
+  await teacher.locator('.board-tool-menu summary[aria-label="أدوات إضافية"]').click();
+  await teacher.getByRole('button', { name: 'دائرة', exact: true }).click();
+  await expect(teacher.getByRole('button', { name: 'دائرة', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await teacher.getByRole('button', { name: 'قلم', exact: true }).click();
   expect(await ink(teacher)).toBeGreaterThan(before + 100);
   await teacher.getByRole('button', { name: 'إضافة محتوى', exact: true }).click();
   await teacher.getByRole('button', { name: 'رفع ملف', exact: true }).click();
