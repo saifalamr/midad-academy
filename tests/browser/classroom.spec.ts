@@ -270,6 +270,7 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   };
   await expectMovingVideo(teacher);
   await expectMovingVideo(student);
+  await expect(teacher.getByRole('button', { name: 'مغادرة', exact: true })).toHaveCount(0);
   const template = await api('post', '/api/writing/library', teacherToken, {
     word: 'مطر',
     mode: 'SIMPLE',
@@ -440,7 +441,7 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   await expectMovingVideo(teacher);
   await expectMovingVideo(student);
   teacher.once('dialog', (dialog) => void dialog.accept());
-  await teacher.getByRole('button', { name: 'إنهاء الحصة', exact: true }).click();
+  await teacher.getByRole('button', { name: 'إنهاء الحصة للجميع', exact: true }).click();
   await expect(teacher.getByRole('heading', { name: 'انتهت الحصة', exact: true })).toBeVisible();
   await expect(student.getByRole('heading', { name: 'انتهت الحصة', exact: true })).toBeVisible();
   await expect(student.locator('video')).toHaveCount(0);
