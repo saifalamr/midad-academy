@@ -43,10 +43,34 @@ test('lobby media controls work before joining and release preview devices', asy
   await expect(page.getByRole('button', { name: /إيقاف الكاميرا/ })).toHaveAttribute('aria-pressed', 'true');
   await page.route('**/api/sessions/create', route => route.fulfill({ status: 409, contentType: 'application/json', body: '{}' }));
   await page.getByRole('button', { name: 'دخول الحصة', exact: true }).click();
-  await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText('الحصة غير مباشرة');
+  await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText('لا توجد حصة مباشرة');
   await page.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
   expect(await page.evaluate(() => (window as unknown as { previewTracks: MediaStreamTrack[] }).previewTracks.every(t => t.readyState === 'ended'))).toBeTruthy();
   await context.close();
+});
+
+test('teacher can close an orphaned live session instead of retrying a dead room', async ({ page, request }) => {
+  const login = await request.post('http://127.0.0.1:4000/api/auth/login', {
+    data: { email: 'teacher@preview.midad.test', password: 'MidadPreview2026!' },
+  });
+  const token = (await login.json()).data.token;
+  await page.addInitScript(value => localStorage.setItem('token', value), token);
+  await page.route('**/api/sessions/create', route => route.fulfill({
+    status: 409,
+    json: { error: 'This class has ended; start a new scheduled session' },
+  }));
+  let ended = 0;
+  await page.route('**/api/sessions/end', route => {
+    ended++;
+    return route.fulfill({ json: { message: 'Class ended' } });
+  });
+  await page.goto('/classroom/preview-arabic');
+  await page.getByRole('button', { name: 'دخول الحصة', exact: true }).click();
+  await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText('الجلسة العالقة');
+  await page.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
+  await page.getByRole('button', { name: 'إنهاء الجلسة العالقة' }).click();
+  await expect(page.getByRole('heading', { name: 'انتهت الحصة' })).toBeVisible();
+  expect(ended).toBe(1);
 });
 
 test('denied media permissions show recovery and still allow joining muted', async ({ page }) => {
