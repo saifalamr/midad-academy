@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "git": {
+    "deploymentEnabled": {
+      "backup/pre-deployed-baseline-20261125": false
+    }
+  }
+}
