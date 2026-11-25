@@ -64,6 +64,8 @@ test('parent registration, admin child account, monthly course, enrollment and s
       overview.data.teachers.find((t) => t.user.email === 'teacher@preview.midad.test').id
     );
   await courseForm.getByLabel('شهر الدورة', { exact: true }).fill('2028-01');
+  await courseForm.getByLabel('العمر من (سنوات)', { exact: true }).fill('6');
+  await courseForm.getByLabel('العمر إلى (سنوات)', { exact: true }).fill('9');
   await courseForm.getByLabel('السعر الشهري بالدولار', { exact: true }).fill('30');
   await courseForm.getByLabel('عدد المقاعد', { exact: true }).fill('1');
   await courseForm.getByRole('button', { name: 'إنشاء الدورة', exact: true }).click();
@@ -110,6 +112,7 @@ test('parent registration, admin child account, monthly course, enrollment and s
   await expect(student).toHaveURL(/student$/);
   await student.goto('/courses');
   await expect(student.getByText('Browser monthly course', { exact: true }).first()).toBeVisible();
+  await expect(student.getByText('الأعمار 6–9 سنوات')).toBeVisible();
   await expect(student.getByRole('button', { name: /Enroll/ })).toHaveCount(0);
   await student.goto('/admin');
   await expect(student).toHaveURL(/student$/);

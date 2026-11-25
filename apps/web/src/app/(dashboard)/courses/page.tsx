@@ -53,6 +53,9 @@ export default function CoursesPage() {
       active = false;
     };
   }, []);
+  const ageGroups = [...new Set(courses.map((course) => course.ageGroup))].sort(
+    (first, second) => Number(first.split(/[–-]/)[0]) - Number(second.split(/[–-]/)[0])
+  );
   const filtered = courses.filter(
     (c) =>
       (age === 'All' || c.ageGroup === age) &&
@@ -79,7 +82,7 @@ export default function CoursesPage() {
         />
       </label>
       <div className="age-filter" style={{ marginBottom: 24 }}>
-        {['All', '5–7', '8–10', '11–13', '14–15'].map((a) => (
+        {['All', ...ageGroups].map((a) => (
           <button key={a} className={`chip-f${age === a ? ' on' : ''}`} onClick={() => setAge(a)}>
             {a === 'All' ? 'كل الأعمار' : a}
           </button>
@@ -107,7 +110,7 @@ export default function CoursesPage() {
               </div>
               <div className="pad">
                 <span className="tag">
-                  {c.month || 'دورة سابقة'} · {c.ageGroup}
+                  {c.month || 'دورة سابقة'} · الأعمار {c.ageGroup} سنوات
                 </span>
                 <h3>{c.title}</h3>
                 <p>{c.description}</p>

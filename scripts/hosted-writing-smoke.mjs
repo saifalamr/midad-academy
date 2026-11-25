@@ -111,7 +111,7 @@ const course = await data('/api/admin/courses', {
   method: 'POST', token: admin,
   body: {
     title: `دورة اختبار الكتابة ${unique}`, description: 'دورة وهمية للتحقق من تقدم الكتابة لطفلين وعزل الأسر.',
-    teacherId, ageGroup: '8–10', month, timeZone: 'Europe/Istanbul', price: 0, maxStudents: 2,
+    teacherId, ageGroup: '6–9', month, timeZone: 'Europe/Istanbul', price: 0, maxStudents: 2,
   },
 }, 201);
 for (const student of [first, second])
@@ -172,6 +172,10 @@ try {
     await page.getByRole('button', { name: /مريم اختبار/ }).click();
     await page.getByText('تدريب مريم', { exact: true }).waitFor();
     assert.equal(await page.getByText('تدريب أحمد', { exact: true }).count(), 0);
+    await page.goto(new URL('/courses', web).href);
+    await page.getByRole('button', { name: '6–9', exact: true }).click();
+    await page.locator('article').filter({ hasText: course.title })
+      .getByText('الأعمار 6–9 سنوات').waitFor();
   } finally { await browser.close(); }
   console.log('Hosted writing results, child switching and cross-family isolation passed.');
 } finally {
