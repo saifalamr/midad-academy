@@ -104,6 +104,44 @@ async function studentCanSubmit(db: DB, actor: Actor, taskId: string) {
 }
 export async function writingRoutes(app: FastifyInstance) {
   app.addHook('preHandler', app.authenticate);
+  app.get('/parent-progress', async (request) => {
+    if (request.user.role !== 'PARENT') throw httpError(403, 'متابعة كتابة الأبناء لولي الأمر فقط');
+    const attempts = await prisma.writingAttempt.findMany({
+      where: {
+        student: { parent: { userId: request.user.id } },
+        task: { session: { status: 'COMPLETED' } },
+      },
+      select: {
+        studentId: true,
+        submittedAt: true,
+        verdict: true,
+        task: {
+          select: {
+            id: true,
+            title: true,
+            useAs: true,
+            session: {
+              select: { title: true, course: { select: { title: true } } },
+            },
+          },
+        },
+      },
+      orderBy: { submittedAt: 'desc' },
+      take: 100,
+    });
+    return {
+      data: attempts.map((attempt) => ({
+        studentId: attempt.studentId,
+        taskId: attempt.task.id,
+        title: attempt.task.title,
+        useAs: attempt.task.useAs,
+        sessionTitle: attempt.task.session.title,
+        courseTitle: attempt.task.session.course.title,
+        submittedAt: attempt.submittedAt,
+        verdict: attempt.verdict,
+      })),
+    };
+  });
   app.get<{ Params: { courseId: string } }>('/live/:courseId', async (request) => {
     const session = await prisma.classSession.findFirst({
       where: { courseId: request.params.courseId, status: 'LIVE' },
