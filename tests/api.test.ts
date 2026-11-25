@@ -3315,6 +3315,13 @@ test('writing library, immutable assignments and private submissions form one te
   const [a,b]=await Promise.all([call('POST',path+'/submit',childKey,{strokes:guides}),call('POST',path+'/submit',childKey,{strokes:[[...guides[0]].reverse()]})]);
   assert.equal(a.statusCode,200,a.body);assert.equal(b.statusCode,200,b.body);assert.equal(a.json().data.id,b.json().data.id);
   const attempt=a.json().data;assert.equal(attempt.verdict,'PENDING');
+  assert.equal((await call('GET','/api/writing/parent-progress',keys.parent)).json().data.length,0);
+  await prisma.classSession.update({where:{id:session.id},data:{status:'COMPLETED'}});
+  const parentProgress=await call('GET','/api/writing/parent-progress',keys.parent);
+  assert.equal(parentProgress.statusCode,200,parentProgress.body);
+  assert.deepEqual(parentProgress.json().data.map((p:any)=>[p.studentId,p.taskId,p.verdict,p.useAs]),[[childId,task.id,'PENDING','ACTIVITY']]);
+  assert.equal((await call('GET','/api/writing/parent-progress',keys.stranger)).json().data.length,0);
+  assert.equal((await call('GET','/api/writing/parent-progress',childKey)).statusCode,403);
   const reviewPath='/api/writing/attempts/'+attempt.id+'/review';
   const family=(await call('GET',path,keys.parent)).json().data;
   assert.equal(family.attempts.length,1);assert.equal(family.canSubmit,false);assert.equal(family.attempts[0].feedback,'');
@@ -3323,6 +3330,7 @@ test('writing library, immutable assignments and private submissions form one te
   assert.equal((await call('PATCH',reviewPath,'teacher',{version:1,verdict:'ACHIEVED',feedback:'محاولة جيدة'})).statusCode,404);
   const review=await call('PATCH',reviewPath,keys.teacher,{version:1,verdict:'ACHIEVED',feedback:'أحسنت؛ راجع موضع النقطة'});
   assert.equal(review.statusCode,200,review.body);
+  assert.equal((await call('GET','/api/writing/parent-progress',keys.parent)).json().data[0].verdict,'ACHIEVED');
   assert.equal((await call('PATCH',reviewPath,keys.teacher,{version:1,verdict:'PRACTICE',feedback:'تغيير قديم'})).statusCode,409);
   assert.equal((await call('DELETE',path,keys.teacher)).statusCode,409);
   await prisma.enrollment.updateMany({where:{courseId:course.id},data:{status:'CANCELLED'}});
@@ -3331,6 +3339,8 @@ test('writing library, immutable assignments and private submissions form one te
   assert.equal((await call('POST',path+'/submit',childKey,{strokes:guides})).statusCode,403);
   await prisma.studentProfile.update({where:{id:childId},data:{parentId:users.stranger.parentProfile.id}});
   assert.equal((await call('GET',path,keys.parent)).statusCode,404);
+  assert.equal((await call('GET','/api/writing/parent-progress',keys.parent)).json().data.length,0);
+  assert.equal((await call('GET','/api/writing/parent-progress',keys.stranger)).json().data[0].taskId,task.id);
   assert.equal((await call('GET',path,keys.stranger)).json().data.attempts.length,1);
 });
 
