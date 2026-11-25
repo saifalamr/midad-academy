@@ -36,6 +36,7 @@ enum ClassSessionStatus {
 enum ContentType {
   VIDEO
   PDF
+  IMAGE
   EXERCISE
 }
 

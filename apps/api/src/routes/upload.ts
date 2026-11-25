@@ -15,6 +15,8 @@ const ALLOWED_MIME_TYPES = new Set([
   'image/gif',
   'image/webp',
   'image/svg+xml',
+  'video/mp4',
+  'video/webm',
 ]);
 
 // Streams a buffer to Cloudinary and resolves with the upload response.
@@ -37,12 +39,11 @@ function uploadToCloudinary(buffer: Buffer): Promise<UploadApiResponse> {
 
 export async function uploadRoutes(app: FastifyInstance) {
   // ── POST /api/upload ───────────────────────────────────────────────────────
-  // Accepts a single multipart file (PDF or image), uploads it to Cloudinary,
-  // and returns its secure URL. Only teachers may upload.
+  // Course files enter the admin library before assignment to a scheduled class.
   app.post('/', { preHandler: [app.authenticate] }, async (request, reply) => {
     const { role } = request.user;
-    if (role !== 'TEACHER' && role !== 'ADMIN') {
-      return reply.status(403).send({ error: 'Only teachers can upload files' });
+    if (role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'رفع ملفات المنهج متاح لإدارة الأكاديمية فقط' });
     }
 
     if (
@@ -51,16 +52,16 @@ export async function uploadRoutes(app: FastifyInstance) {
       !config.CLOUDINARY_API_SECRET
     ) {
       request.log.error('Cloudinary credentials are not configured');
-      return reply.status(500).send({ error: 'File storage is not configured' });
+      return reply.status(503).send({ error: 'خدمة حفظ الملفات غير متاحة الآن' });
     }
 
     const file = await request.file();
     if (!file) {
-      return reply.status(400).send({ error: 'No file uploaded' });
+      return reply.status(400).send({ error: 'اختر ملفًا للرفع' });
     }
 
     if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
-      return reply.status(400).send({ error: `Unsupported file type: ${file.mimetype}` });
+      return reply.status(400).send({ error: 'اختر ملف PDF أو صورة أو فيديو MP4 أو WebM' });
     }
 
     let result: UploadApiResponse;
@@ -68,7 +69,7 @@ export async function uploadRoutes(app: FastifyInstance) {
       result = await uploadToCloudinary(await file.toBuffer());
     } catch (err) {
       request.log.error({ err }, 'Cloudinary upload failed');
-      return reply.status(502).send({ error: 'Failed to upload file' });
+      return reply.status(502).send({ error: 'تعذر رفع الملف الآن؛ أعد المحاولة' });
     }
 
     return reply.status(201).send({

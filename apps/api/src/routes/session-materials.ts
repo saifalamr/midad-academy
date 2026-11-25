@@ -22,7 +22,7 @@ export async function adminMaterialRoutes(app: FastifyInstance) {
     });
     if (!session) throw httpError(404, 'الحصة غير موجودة');
     const library = await prisma.courseContent.findMany({
-      where: { courseId: session.courseId, type: { in: ['PDF', 'VIDEO'] } },
+      where: { courseId: session.courseId, type: { in: ['PDF', 'VIDEO', 'IMAGE'] } },
       orderBy: [{ order: 'asc' }, { id: 'asc' }],
       select: { id: true, title: true, type: true, description: true },
     });
@@ -47,11 +47,11 @@ export async function adminMaterialRoutes(app: FastifyInstance) {
         where: {
           id: { in: body.contentIds },
           courseId: current.courseId,
-          type: { in: ['PDF', 'VIDEO'] },
+          type: { in: ['PDF', 'VIDEO', 'IMAGE'] },
         },
       });
       if (content.length !== body.contentIds.length)
-        throw httpError(400, 'اختر ملفات PDF أو فيديو من منهج هذه الدورة فقط');
+        throw httpError(400, 'اختر ملفات PDF أو صورًا أو فيديو من منهج هذه الدورة فقط');
       const byId = new Map(content.map((item) => [item.id, item]));
       await tx.sessionMaterial.deleteMany({ where: { sessionId: current.id } });
       await tx.sessionMaterial.createMany({

@@ -399,6 +399,12 @@ export async function sessionRoutes(app: FastifyInstance) {
             data: roster.map(({ studentId }) => ({ sessionId, studentId, version: 0 })),
             skipDuplicates: true,
           });
+          // Keep older shared materials in the library, but never carry an ad hoc
+          // document from a previous class into this session's admin plan.
+          await tx.classroomState.updateMany({
+            where: { courseId: current.courseId },
+            data: { sharedDoc: Prisma.DbNull, pdfPage: 1, revision: { increment: 1 } },
+          });
           return tx.classSession.update({
             where: { id: sessionId },
             data: { status: 'LIVE', liveKitRoomId, startedAt: new Date() },
@@ -506,23 +512,14 @@ export async function sessionRoutes(app: FastifyInstance) {
         .object({
           url: z.string().max(2000),
           name: z.string().min(1).max(200),
-          docType: z.enum(['pdf', 'image', 'youtube', 'video', 'html']),
-          htmlContent: z.string().max(32000).optional(),
+          docType: z.enum(['pdf', 'image', 'youtube', 'video']),
         })
         .superRefine((v, ctx) => {
-          if (v.docType !== 'html') {
-            try {
-              if (!['http:', 'https:'].includes(new URL(v.url).protocol)) throw new Error();
-            } catch {
-              ctx.addIssue({ code: 'custom', path: ['url'], message: 'Use an HTTP or HTTPS URL' });
-            }
+          try {
+            if (!['http:', 'https:'].includes(new URL(v.url).protocol)) throw new Error();
+          } catch {
+            ctx.addIssue({ code: 'custom', path: ['url'], message: 'اختر رابط مادة صالحًا' });
           }
-          if (v.docType === 'html' && !v.htmlContent?.trim())
-            ctx.addIssue({
-              code: 'custom',
-              path: ['htmlContent'],
-              message: 'Lesson HTML is required',
-            });
         });
       const body = z
         .object({
@@ -530,6 +527,23 @@ export async function sessionRoutes(app: FastifyInstance) {
           pdfPage: z.number().int().min(1).max(5000).optional(),
         })
         .parse(request.body);
+      const live = await prisma.classSession.findFirst({
+        where: { courseId, status: 'LIVE' },
+        select: { id: true, liveKitRoomId: true },
+      });
+      if (body.sharedDoc) {
+        if (!live) throw httpError(409, 'يمكن مشاركة مواد الحصة أثناء بثها فقط');
+        const assigned = await prisma.sessionMaterial.findFirst({
+          where: {
+            sessionId: live.id,
+            contentUrl: body.sharedDoc.url,
+            title: body.sharedDoc.name,
+          },
+          select: { id: true },
+        });
+        if (!assigned)
+          throw httpError(403, 'اختر مادة خصصتها الإدارة لهذه الحصة');
+      }
       const data = {
         ...(body.sharedDoc !== undefined
           ? { sharedDoc: body.sharedDoc === null ? Prisma.DbNull : body.sharedDoc }
@@ -546,7 +560,6 @@ export async function sessionRoutes(app: FastifyInstance) {
         },
         update: data,
       });
-      const live = await prisma.classSession.findFirst({ where: { courseId, status: 'LIVE' } });
       if (live?.liveKitRoomId && config.LIVEKIT_URL) {
         try {
           await new RoomServiceClient(

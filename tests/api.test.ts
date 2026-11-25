@@ -568,10 +568,32 @@ test(
 );
 
 test('shared material and drawing grants survive re-entry and only the course teacher can change them', async () => {
-  const path = `/api/sessions/state/${freeId}`;
+  const teacher = await prisma.teacherProfile.findUniqueOrThrow({ where: { userId: actors.teacher.id } });
+  const student = await prisma.studentProfile.findUniqueOrThrow({ where: { userId: actors.student.id } });
+  const course = await prisma.course.create({ data: {
+    title: 'مواد مخصصة', description: 'دورة تحقق مستقلة', teacherId: teacher.id,
+    ageGroup: '8–10', level: 'beginner', price: 0,
+    enrollments: { create: { studentId: student.id } },
+  } });
+  const path = `/api/sessions/state/${course.id}`;
+  const material = await prisma.courseContent.create({
+    data: {
+      courseId: course.id, title: 'درس', description: 'مادة الحصة المخصصة', type: 'PDF',
+      contentUrl: 'https://example.com/lesson.pdf', duration: 5, order: 99,
+    },
+  });
+  const planned = await prisma.classSession.create({
+    data: {
+      courseId: course.id, teacherId: course.teacherId, title: 'حصة المواد',
+      scheduledAt: new Date(), status: 'LIVE',
+      materials: { create: { contentId: material.id, order: 0, title: material.title,
+        type: material.type, contentUrl: material.contentUrl, description: material.description } },
+    },
+  });
   assert.equal((await call('GET', path, 'outsider')).statusCode, 401);
   assert.equal((await call('PATCH', path, 'student', { pdfPage: 2 })).statusCode, 403);
   assert.equal((await call('PATCH', path, 'otherTeacher', { pdfPage: 2 })).statusCode, 403);
+  assert.equal((await call('POST', '/api/upload', 'teacher')).statusCode, 403);
   assert.equal(
     (
       await call('PATCH', path, 'teacher', {
@@ -579,6 +601,12 @@ test('shared material and drawing grants survive re-entry and only the course te
       })
     ).statusCode,
     400
+  );
+  assert.equal(
+    (await call('PATCH', path, 'teacher', {
+      sharedDoc: { url: 'https://example.com/unassigned.pdf', name: 'درس آخر', docType: 'pdf' },
+    })).statusCode,
+    403
   );
   assert.equal(
     (
@@ -596,7 +624,7 @@ test('shared material and drawing grants survive re-entry and only the course te
   assert.equal(
     (
       await call('POST', '/api/sessions/drawing-permission', 'teacher', {
-        roomName: freeId,
+        roomName: course.id,
         studentId: actors.student.id,
         canDraw: true,
       })
@@ -607,7 +635,7 @@ test('shared material and drawing grants survive re-entry and only the course te
   assert.equal(
     (
       await call('POST', '/api/sessions/drawing-permission', 'teacher', {
-        roomName: freeId,
+        roomName: course.id,
         studentId: actors.student.id,
         canDraw: false,
       })
@@ -615,6 +643,7 @@ test('shared material and drawing grants survive re-entry and only the course te
     200
   );
   assert.equal((await call('GET', path, 'student')).json().data.canDraw, false);
+  await prisma.classSession.update({ where: { id: planned.id }, data: { status: 'COMPLETED' } });
 });
 
 test('a delayed room-finished webhook cannot close a later class in the same course', async () => {

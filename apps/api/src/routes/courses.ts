@@ -6,7 +6,7 @@ import { canAccessCourse } from '../lib/access';
 const createContentSchema = z.object({
   title: z.string().min(2, 'Title must be at least 2 characters'),
   description: z.string().min(1, 'Description is required'),
-  type: z.enum(['VIDEO', 'PDF', 'EXERCISE']),
+  type: z.enum(['VIDEO', 'PDF', 'IMAGE', 'EXERCISE']),
   contentUrl: z
     .string()
     .url()
