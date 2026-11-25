@@ -390,6 +390,21 @@ function ClassroomContent({
   const [htmlContent, setHtmlContent] = useState('');
   const [view, setView] = useState<'board' | 'content' | 'screen'>('board');
   const [boardFocused, setBoardFocused] = useState(false);
+  const [pipHidden, setPipHidden] = useState(false);
+  const [pipPosition, setPipPosition] = useState({ x: 12, y: 60 });
+  const pipDrag = useRef<{ pointerId: number; x: number; y: number; startX: number; startY: number } | null>(null);
+  const movePip = useCallback((x: number, y: number) => {
+    setPipPosition({
+      x: Math.max(8, Math.min(x, window.innerWidth - Math.min(220, window.innerWidth - 16) - 8)),
+      y: Math.max(8, Math.min(y, window.innerHeight - 190)),
+    });
+  }, []);
+  useEffect(() => {
+    if (!boardFocused) return;
+    const clampPip = () => movePip(pipPosition.x, pipPosition.y);
+    window.addEventListener('resize', clampPip);
+    return () => window.removeEventListener('resize', clampPip);
+  }, [boardFocused, movePip, pipPosition.x, pipPosition.y]);
   const classroomRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -917,7 +932,41 @@ function ClassroomContent({
       <ClassClock courseId={roomId} editable={isTeacher} />
       <ClassWriting courseId={roomId} />
       {/* ── Video strip ── */}
-      <div className="video-strip">
+      <div
+        className={`video-strip${boardFocused ? ' focus-call-pip' : ''}${boardFocused && pipHidden ? ' focus-call-hidden' : ''}`}
+        style={boardFocused ? { left: pipPosition.x, top: pipPosition.y } : undefined}
+        aria-label="مكالمة الطلاب"
+      >
+        {boardFocused && (
+          <div className="focus-call-head">
+            <div
+              className="focus-call-drag"
+              role="group"
+              tabIndex={0}
+              aria-label="حرّك مكالمة الطلاب بأسهم لوحة المفاتيح أو بالسحب"
+              onKeyDown={(event) => {
+                const delta = event.shiftKey ? 40 : 12;
+                const directions: Record<string, [number, number]> = {
+                  ArrowLeft: [-delta, 0], ArrowRight: [delta, 0], ArrowUp: [0, -delta], ArrowDown: [0, delta],
+                };
+                const direction = directions[event.key];
+                if (direction) { event.preventDefault(); movePip(pipPosition.x + direction[0], pipPosition.y + direction[1]); }
+              }}
+              onPointerDown={(event) => {
+                pipDrag.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, startX: pipPosition.x, startY: pipPosition.y };
+                event.currentTarget.setPointerCapture(event.pointerId);
+              }}
+              onPointerMove={(event) => {
+                const drag = pipDrag.current;
+                if (drag?.pointerId === event.pointerId)
+                  movePip(drag.startX + event.clientX - drag.x, drag.startY + event.clientY - drag.y);
+              }}
+              onPointerUp={() => { pipDrag.current = null; }}
+              onPointerCancel={() => { pipDrag.current = null; }}
+            >مكالمة الطلاب · اسحب للتحريك</div>
+            {isTeacher && <button type="button" onClick={() => setPipHidden(true)} aria-label="إخفاء مكالمة الطلاب">إخفاء</button>}
+          </div>
+        )}
         <div className="vtile vteacher">
           {teacherTrack ? (
             <CameraVideo trackRef={teacherTrack} />
@@ -1032,6 +1081,8 @@ function ClassroomContent({
                     setBoardFocused(false);
                     if (document.fullscreenElement === classroomRef.current) void document.exitFullscreen();
                   } else {
+                    setPipHidden(false);
+                    setPipPosition({ x: 12, y: 60 });
                     setBoardFocused(true);
                     void classroomRef.current?.requestFullscreen?.().catch(() => {});
                   }
@@ -1040,6 +1091,11 @@ function ClassroomContent({
                 <Icon name={boardFocused ? 'close' : 'expand'} />
                 <span>{boardFocused ? 'عرض الحصة' : 'توسيع السبورة'}</span>
               </button>
+              {boardFocused && pipHidden && isTeacher && (
+                <button type="button" className="board-focus-toggle" onClick={() => setPipHidden(false)}>
+                  إظهار مكالمة الطلاب
+                </button>
+              )}
               {isTeacher && sharedDoc && (
                 <button
                   className="stop-content-share"

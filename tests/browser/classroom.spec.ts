@@ -415,6 +415,17 @@ test('teacher and student exchange real media, synchronized ink, permissions and
     await teacher.getByRole('button', { name: 'توسيع السبورة' }).click();
     const expanded = (await teacher.locator('.board-paper').boundingBox())!;
     expect(expanded.height).toBeGreaterThan(box.height);
+    const pip = teacher.locator('.focus-call-pip');
+    await expect(pip).toBeVisible();
+    await expect(pip.locator('.vtile')).not.toHaveCount(0);
+    const start = (await pip.boundingBox())!;
+    await pip.locator('.focus-call-drag').focus();
+    await teacher.keyboard.press('ArrowRight');
+    expect((await pip.boundingBox())!.x).toBeGreaterThan(start.x);
+    await teacher.getByRole('button', { name: 'إخفاء مكالمة الطلاب' }).click();
+    await expect(pip).toBeHidden();
+    await teacher.getByRole('button', { name: 'إظهار مكالمة الطلاب' }).click();
+    await expect(pip).toBeVisible();
     await expect(teacher.getByRole('button', { name: 'كتم الصوت', exact: true })).toBeVisible();
     await teacher.getByRole('button', { name: 'عرض الحصة' }).click();
     await teacher.screenshot({ path: `test-results/classroom-${size.width}.png` });
