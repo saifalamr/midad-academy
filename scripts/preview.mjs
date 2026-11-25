@@ -6,8 +6,10 @@ const children = [];
 const run = (args, extra = {}) => { const child = spawn(process.execPath, args, { stdio: 'inherit', env: { ...process.env, ...extra } }); children.push(child); return child; };
 const finished = (child) => new Promise((resolve, reject) => { child.once('error', reject); child.once('exit', (code) => code === 0 ? resolve() : reject(new Error(`Process exited with ${code}`))); });
 const classroom = process.argv.includes('--classroom');
-if (process.argv.includes('--test') || classroom) process.env.NODE_ENV = 'test';
-if (classroom) {
+const hostedWriting = process.argv.includes('--hosted-writing');
+const realRoom = classroom || hostedWriting;
+if (process.argv.includes('--test') || realRoom) process.env.NODE_ENV = 'test';
+if (realRoom) {
   if (!process.env.LIVEKIT_SERVER_BINARY) throw new Error('Set LIVEKIT_SERVER_BINARY to a local LiveKit server binary');
   process.env.LIVEKIT_URL = 'ws://127.0.0.1:7880';
   process.env.LIVEKIT_API_KEY = 'preview-key';
@@ -24,7 +26,7 @@ const stop = () => stopping ??= (async () => {
 })();
 process.once('SIGTERM', () => { void stop(); }); process.once('SIGINT', () => { void stop(); });
 try {
-  if (classroom) {
+  if (realRoom) {
     const deadline = Date.now() + 10000;
     while (true) { try { if ((await fetch(process.env.LIVEKIT_URL.replace('ws:', 'http:'))).ok) break; } catch {} if (Date.now() > deadline) throw new Error('Local LiveKit could not start. Check host network permissions and server logs.'); await new Promise(r => setTimeout(r, 200)); }
   }
@@ -32,12 +34,13 @@ try {
   run(['--import', 'tsx', 'apps/api/src/index.ts'], { HOST: '127.0.0.1', NODE_ENV: 'test' });
   // A new isolated test database must also use the current generated UI. Next's
   // local runtime route cache can retain HTML/chunk references from older builds.
-  if (process.argv.includes('--test') || classroom) await rm('apps/web/.next/server/route-cache', { recursive: true, force: true });
-  run(['node_modules/next/dist/bin/next', (process.argv.includes('--test') || classroom) ? 'start' : 'dev', 'apps/web', '-H', '127.0.0.1', '-p', '3000', ...((process.argv.includes('--test') || classroom) ? [] : ['--webpack'])], { NODE_ENV: (process.argv.includes('--test') || classroom) ? 'production' : 'development', NEXT_PUBLIC_API_URL: 'http://127.0.0.1:4000' });
+  if (process.argv.includes('--test') || realRoom) await rm('apps/web/.next/server/route-cache', { recursive: true, force: true });
+  run(['node_modules/next/dist/bin/next', (process.argv.includes('--test') || realRoom) ? 'start' : 'dev', 'apps/web', '-H', '127.0.0.1', '-p', '3000', ...((process.argv.includes('--test') || realRoom) ? [] : ['--webpack'])], { NODE_ENV: (process.argv.includes('--test') || realRoom) ? 'production' : 'development', NEXT_PUBLIC_API_URL: 'http://127.0.0.1:4000' });
   for (const url of ['http://127.0.0.1:4000/api/ready', 'http://127.0.0.1:3000']) {
     const deadline = Date.now() + 60_000;
     while (true) { try { const res = await fetch(url); if (res.ok) break; } catch {} if (Date.now() > deadline) throw new Error(`Preview did not start: ${url}`); await new Promise((r) => setTimeout(r, 300)); }
   }
   console.log('Preview ready: http://127.0.0.1:3000 (local only)');
-  if (process.argv.includes('--test') || classroom) { const executablePath = await (await import('./chromium.mjs')).chromiumPath(); await finished(run(['node_modules/@playwright/test/cli.js', 'test', ...(classroom ? ['classroom.spec.ts'] : process.argv.filter((arg) => arg.endsWith('.spec.ts')))], { PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: executablePath })); await stop(); }
+  if (hostedWriting) { await finished(run(['scripts/hosted-writing-smoke.mjs'], { HOSTED_TEST_MODE: 'local', API_URL: 'http://127.0.0.1:4000', WEB_URL: 'http://127.0.0.1:3000' })); await stop(); }
+  else if (process.argv.includes('--test') || classroom) { const executablePath = await (await import('./chromium.mjs')).chromiumPath(); await finished(run(['node_modules/@playwright/test/cli.js', 'test', ...(classroom ? ['classroom.spec.ts'] : process.argv.filter((arg) => arg.endsWith('.spec.ts')))], { PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: executablePath })); await stop(); }
 } catch (error) { console.error(error.message); await stop(); process.exitCode = 1; }
