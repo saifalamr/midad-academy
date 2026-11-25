@@ -222,6 +222,39 @@ test('administration creates monthly courses and controls enrollment', async () 
   assert.equal((await enroll(freeId, 'student')).statusCode, 201);
 });
 
+test('administration accepts flexible course ages and keeps existing ranges', async () => {
+  const teacher = await prisma.teacherProfile.findUniqueOrThrow({
+    where: { userId: actors.teacher.id },
+  });
+  const body = {
+    title: 'Flexible ages',
+    description: 'Course with a custom age range',
+    teacherId: teacher.id,
+    ageGroup: '6-9',
+    month: new Date().toISOString().slice(0, 7),
+    price: 0,
+    maxStudents: 10,
+  };
+  const created = await call('POST', '/api/admin/courses', 'admin', body);
+  assert.equal(created.statusCode, 201, created.body);
+  const id = created.json().data.id;
+  assert.equal(created.json().data.ageGroup, '6–9');
+  assert.equal(
+    (await call('POST', '/api/admin/courses', 'admin', { ...body, ageGroup: '12–7' })).statusCode,
+    400
+  );
+  assert.equal(
+    (await call('POST', '/api/admin/courses', 'admin', { ...body, ageGroup: '3–16' })).statusCode,
+    400
+  );
+  assert.equal(
+    (await call('PATCH', `/api/admin/courses/${id}`, 'admin', { ageGroup: '6–11' })).statusCode,
+    200
+  );
+  assert.equal((await prisma.course.findUniqueOrThrow({ where: { id } })).ageGroup, '6–11');
+  assert.equal((await prisma.course.findUniqueOrThrow({ where: { id: freeId } })).ageGroup, '8–10');
+});
+
 test('course material and quiz ownership are enforced and written answers reach teacher review', async () => {
   const content = await call('POST', `/api/courses/${freeId}/lessons`, 'admin', {
     title: 'Arabic words',

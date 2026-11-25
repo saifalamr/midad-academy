@@ -14,7 +14,15 @@ const courseSchema = z.object({
   title: z.string().trim().min(2).max(200),
   description: z.string().trim().min(10).max(5000),
   teacherId: z.string().min(1),
-  ageGroup: z.enum(['5–7', '8–10', '11–13', '14–15']),
+  ageGroup: z
+    .string()
+    .trim()
+    .regex(/^(\d{1,2})[–-](\d{1,2})$/, 'حدّد عمر البداية والنهاية بالأرقام')
+    .refine((value) => {
+      const [first, last] = value.split(/[–-]/).map(Number);
+      return first >= 5 && last <= 15 && first <= last;
+    }, 'اختر عمرين بين 5 و15 سنة، مع وضع الأصغر أولًا')
+    .transform((value) => value.replace('-', '–')),
   month,
   timeZone: z
     .string()

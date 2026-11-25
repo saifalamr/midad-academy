@@ -71,7 +71,7 @@ export default function MonthlyCatalog() {
           {courses.map((c) => (
             <article key={c.id} className="card pad">
               <span className="tag">
-                {c.month} · الأعمار {c.ageGroup}
+                {c.month} · الأعمار {c.ageGroup} سنوات
               </span>
               <h3 style={{ fontSize: 21, margin: '10px 0' }}>{c.title}</h3>
               <p>{c.description}</p>

@@ -94,6 +94,7 @@ function Field({
   );
 }
 function CourseFields({ item, teachers }: { item?: Course; teachers: Teacher[] }) {
+  const [ageMin = 5, ageMax = 7] = item?.ageGroup.split(/[–-]/).map(Number) ?? [];
   return (
     <>
       <Field label="اسم الدورة" name="title" value={item?.title} />
@@ -135,19 +136,22 @@ function CourseFields({ item, teachers }: { item?: Course; teachers: Teacher[] }
           disabled={!!item && !item.month && item.classSessions.length > 0}
           value={item?.month ?? new Date().toISOString().slice(0, 7)}
         />
-        <label className="field">
-          الفئة العمرية
-          <select
-            aria-label="الفئة العمرية"
-            className="input"
-            name="ageGroup"
-            defaultValue={item?.ageGroup ?? '5–7'}
-          >
-            {['5–7', '8–10', '11–13', '14–15'].map((age) => (
-              <option key={age}>{age}</option>
-            ))}
-          </select>
-        </label>
+        <Field
+          label="العمر من (سنوات)"
+          name="ageMin"
+          type="number"
+          value={ageMin}
+          min={5}
+          max={15}
+        />
+        <Field
+          label="العمر إلى (سنوات)"
+          name="ageMax"
+          type="number"
+          value={ageMax}
+          min={5}
+          max={15}
+        />
         <Field
           label="السعر الشهري بالدولار"
           name="price"
@@ -239,7 +243,13 @@ export default function AdminPage() {
   }
   function courseBody(form: HTMLFormElement) {
     const v = values(form);
-    return { ...v, price: Number(v.price), maxStudents: Number(v.maxStudents) };
+    const { ageMin, ageMax, ...fields } = v;
+    return {
+      ...fields,
+      ageGroup: `${ageMin}–${ageMax}`,
+      price: Number(v.price),
+      maxStudents: Number(v.maxStudents),
+    };
   }
   const course = data.courses.find((c) => c.id === selected);
 
