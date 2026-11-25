@@ -34,6 +34,14 @@ interface Room {
 const rooms = new Map<string, Room>();
 const loading = new Map<string, Promise<Room>>();
 const permissions = new Map<string, Set<string>>();
+const parentObservers = new Map<string, Map<string, Set<WebSocket>>>();
+export function revokeParentObserver(courseId: string, parentUserId?: string) {
+  const byParent = parentObservers.get(courseId);
+  if (!byParent) return;
+  const ids = parentUserId ? [parentUserId] : [...byParent.keys()];
+  for (const id of ids)
+    for (const conn of byParent.get(id) ?? []) conn.close(1008, 'Child left the classroom');
+}
 export function setDrawingPermission(courseId: string, userId: string, allowed: boolean) {
   const grants = permissions.get(courseId) ?? new Set<string>();
   if (allowed) grants.add(userId);
@@ -310,6 +318,19 @@ export function startWhiteboardWebSocketServer(server: Server, app: FastifyInsta
       )
         throw new Error('Forbidden');
       wss.handleUpgrade(req, socket, head, (conn) => {
+        if (actor.role === 'PARENT') {
+          const courseId = roomName.replace(/^whiteboard-/, '');
+          const byParent = parentObservers.get(courseId) ?? new Map<string, Set<WebSocket>>();
+          const sockets = byParent.get(actor.id) ?? new Set<WebSocket>();
+          sockets.add(conn);
+          byParent.set(actor.id, sockets);
+          parentObservers.set(courseId, byParent);
+          conn.on('close', () => {
+            sockets.delete(conn);
+            if (!sockets.size) byParent.delete(actor.id);
+            if (!byParent.size) parentObservers.delete(courseId);
+          });
+        }
         void setupConnection(conn, req, actor).catch(() =>
           conn.close(1011, 'Unable to load whiteboard')
         );
@@ -337,6 +358,7 @@ export function startWhiteboardWebSocketServer(server: Server, app: FastifyInsta
       }
       rooms.clear();
       permissions.clear();
+      parentObservers.clear();
       await new Promise<void>((resolve) => wss.close(() => resolve()));
     },
   };
