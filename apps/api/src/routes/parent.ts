@@ -33,7 +33,8 @@ function computeStreak(events: { createdAt: Date }[]): number {
 export async function parentRoutes(app: FastifyInstance) {
   // ── GET /api/parent/overview ──────────────────────────────────────────────
   // Returns each child's profile, XP, streak, per-course progress, and recent
-  // session attendance for the authenticated parent.
+  // course lesson status for the authenticated parent. Attendance is not
+  // tracked per student in the current data model.
   app.get('/overview', { preHandler: [app.authenticate] }, async (request, reply) => {
     const { id: userId, role } = request.user;
 
@@ -105,7 +106,7 @@ export async function parentRoutes(app: FastifyInstance) {
           courseTitle: l.courseTitle,
           lessonTitle: l.title,
           scheduledAt: l.scheduledAt,
-          attended: l.status === 'COMPLETED',
+          completed: l.status === 'COMPLETED',
         }));
 
       return {
@@ -145,10 +146,6 @@ export async function parentRoutes(app: FastifyInstance) {
       where: { email: { equals: childEmail, mode: 'insensitive' }, role: 'STUDENT' },
       include: { studentProfile: true },
     });
-
-    // TODO: temporary debug logging — remove once linking is verified.
-    console.log('[link-child] childEmail:', childEmail);
-    console.log('[link-child] found user:', childUser?.email, childUser?.role, 'studentProfile:', childUser?.studentProfile?.id);
 
     if (!childUser) {
       return reply.status(404).send({ error: 'No student found with that email' });

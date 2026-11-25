@@ -856,25 +856,27 @@ export default function ClassroomPage() {
   useEffect(() => {
     const appToken = localStorage.getItem('token');
 
-    console.log('[Classroom] localStorage token:', appToken ? `${appToken.slice(0, 30)}…` : 'NULL — not found');
-    console.log('[Classroom] roomId:', roomId);
-
     if (!appToken) {
-      console.log('[Classroom] No token — redirecting to /login');
       router.push('/login');
       return;
     }
 
+    let userRole: string;
     try {
       const payload = JSON.parse(atob(appToken.split('.')[1]));
-      setRole(payload.role?.toLowerCase() ?? null);
+      userRole = payload.role?.toLowerCase() ?? '';
+      setRole(userRole);
     } catch {
-      setRole(null);
+      setError('Please log in again to join the classroom');
+      return;
     }
 
-    console.log('[Classroom] Sending POST /api/sessions/create');
+    if (userRole !== 'teacher' && userRole !== 'student') {
+      setError('This account cannot join a classroom');
+      return;
+    }
 
-    fetch(`${API_URL}/api/sessions/create`, {
+    fetch(`${API_URL}/api/sessions/${userRole === 'teacher' ? 'create' : 'join'}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -884,7 +886,6 @@ export default function ClassroomPage() {
     })
       .then(async (res) => {
         const json = await res.json();
-        console.log('[Classroom] API response →', res.status, json);
         if (!res.ok) { setError(json.error || 'Could not join room'); return; }
         setToken(json.data.token);
       })

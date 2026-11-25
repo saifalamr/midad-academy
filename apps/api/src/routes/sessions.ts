@@ -34,6 +34,15 @@ export async function sessionRoutes(app: FastifyInstance) {
     const { id: userId, role } = request.user;
     const { roomName } = createSessionSchema.parse(request.body);
 
+    if (role !== 'TEACHER') {
+      return reply.status(403).send({ error: 'Only teachers can start a classroom' });
+    }
+    const teacherProfile = await prisma.teacherProfile.findUnique({ where: { userId } });
+    const course = await prisma.course.findUnique({ where: { id: roomName } });
+    if (!teacherProfile || !course || course.teacherId !== teacherProfile.id) {
+      return reply.status(404).send({ error: 'Course not found' });
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { name: true },
@@ -95,7 +104,7 @@ export async function sessionRoutes(app: FastifyInstance) {
     const enrollment = await prisma.enrollment.findUnique({
       where: { courseId_studentId: { courseId: roomName, studentId: studentProfile.id } },
     });
-    if (!enrollment) {
+    if (!enrollment || enrollment.status !== 'ACTIVE') {
       return reply.status(403).send({ error: 'You are not enrolled in this course' });
     }
 

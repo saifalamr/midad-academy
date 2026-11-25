@@ -151,10 +151,10 @@ export default function TeacherDashboard() {
     setCancellingId(sessionId);
     try {
       const res = await authFetch(`/api/sessions/${sessionId}/cancel`, { method: 'PATCH', body: '{}' });
-      if (!res.ok) return;
+      if (!res.ok) { setScheduleError('Could not cancel the session'); return; }
       setSessions((prev) => prev.filter((s) => s.id !== sessionId));
     } catch {
-      // ignore
+      setScheduleError('Could not connect to server');
     } finally {
       setCancellingId(null);
     }
@@ -164,10 +164,10 @@ export default function TeacherDashboard() {
     setStartingId(session.id);
     try {
       const res = await authFetch(`/api/sessions/${session.id}/start`, { method: 'PATCH', body: '{}' });
-      if (!res.ok) return;
+      if (!res.ok) { setScheduleError('Could not start the session'); return; }
       router.push(`/classroom/${session.courseId}`);
     } catch {
-      // ignore
+      setScheduleError('Could not connect to server');
     } finally {
       setStartingId(null);
     }
@@ -229,7 +229,7 @@ export default function TeacherDashboard() {
             <p className="dh-hi">Welcome back, <b>{userName}</b> <span className="ar dh-ar">أهلاً</span></p>
             <h1 className="dh-title">Your teaching, at a glance</h1>
           </div>
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <Link href="/teacher/review-answers" className="btn btn-outline btn-lg">
               📝 Review Answers
             </Link>
@@ -318,6 +318,7 @@ export default function TeacherDashboard() {
           <div className="dash-col">
             <div className="card pad">
               <div className="col-head sm"><h3>Upcoming Sessions <span className="ar muted">الجلسات القادمة</span></h3></div>
+              {scheduleError && <div className="auth-error" role="alert">{scheduleError}</div>}
               {sessions.length === 0 ? (
                 <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No classes scheduled yet.</p>
               ) : (
@@ -362,16 +363,16 @@ export default function TeacherDashboard() {
 
             <div className="card pad">
               <div className="col-head sm"><h3>Up next today</h3></div>
-              {courses.length === 0 ? (
+              {sessions.filter((s) => new Date(s.scheduledAt).toDateString() === new Date().toDateString()).length === 0 ? (
                 <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No sessions scheduled yet.</p>
               ) : (
                 <ul className="agenda">
-                  {courses.slice(0, 3).map((course, i) => (
-                    <li key={course.id} className={i === 2 ? 'dim' : ''}>
-                      <span className="ag-time">—</span>
+                  {sessions.filter((s) => new Date(s.scheduledAt).toDateString() === new Date().toDateString()).slice(0, 3).map((session) => (
+                    <li key={session.id}>
+                      <span className="ag-time">{new Date(session.scheduledAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</span>
                       <div>
-                        <b className="ar">{course.title}</b>
-                        <span>{course._count.enrollments} student{course._count.enrollments !== 1 ? 's' : ''}</span>
+                        <b className="ar">{session.title}</b>
+                        <span>{session.course.title}</span>
                       </div>
                     </li>
                   ))}
@@ -381,18 +382,7 @@ export default function TeacherDashboard() {
 
             <div className="card pad">
               <div className="col-head sm"><h3>Recent activity</h3></div>
-              {courses.length === 0 ? (
-                <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No activity yet.</p>
-              ) : (
-                <ul className="feed">
-                  {courses.slice(0, 3).map((course) => (
-                    <li key={course.id}>
-                      <span className="fd-dot ok"></span>
-                      <div>New enrolment in <b>{course.title}</b></div>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>Activity history is not available yet.</p>
             </div>
           </div>
 
@@ -419,8 +409,8 @@ export default function TeacherDashboard() {
               </div>
 
               <div className="field">
-                <label htmlFor="c-desc">Description <span className="muted" style={{ fontSize: 12 }}>(optional)</span></label>
-                <textarea id="c-desc" className="input" rows={3}
+                <label htmlFor="c-desc">Description <span className="muted" style={{ fontSize: 12 }}>(at least 10 characters)</span></label>
+                <textarea id="c-desc" className="input" rows={3} required minLength={10}
                   placeholder="What will students learn in this class?"
                   value={description} onChange={(e) => setDescription(e.target.value)}
                   style={{ height: 78, padding: '12px 16px' }} />

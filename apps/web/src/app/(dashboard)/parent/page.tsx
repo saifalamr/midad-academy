@@ -13,7 +13,7 @@ type Session = {
   courseTitle: string;
   lessonTitle: string;
   scheduledAt: string;
-  attended: boolean;
+  completed: boolean;
 };
 
 type CourseProgress = {
@@ -75,6 +75,7 @@ export default function ParentDashboard() {
   const [childEmail, setChildEmail] = useState('');
   const [linkError, setLinkError] = useState('');
   const [linkLoading, setLinkLoading] = useState(false);
+  const [unlinkError, setUnlinkError] = useState('');
 
   useEffect(() => {
     const payload = getTokenPayload();
@@ -143,9 +144,9 @@ export default function ParentDashboard() {
         {/* ── Stats row ── */}
         <div className="stat-row">
           <div className="stat card"><div className="st-ic st-navy">👨‍👩‍👧</div><div><b>{loading ? '—' : children.length}</b><span>Children enrolled</span></div></div>
-          <div className="stat card"><div className="st-ic st-fire">🗓️</div><div><b>{loading ? '—' : totalEnrolled}</b><span>Active classes</span></div></div>
+          <div className="stat card"><div className="st-ic st-fire">🗓️</div><div><b>{loading ? '—' : totalEnrolled}</b><span>Course enrollments</span></div></div>
           <div className="stat card"><div className="st-ic st-gold">⭐</div><div><b>{loading ? '—' : familyXP}</b><span>Family XP</span></div></div>
-          <div className="stat card"><div className="st-ic st-green">✓</div><div><b>{loading ? '—' : totalCompleted}</b><span>Lessons done</span></div></div>
+          <div className="stat card"><div className="st-ic st-green">✓</div><div><b>{loading ? '—' : totalCompleted}</b><span>Course lessons completed</span></div></div>
         </div>
 
         {loading ? (
@@ -159,6 +160,7 @@ export default function ParentDashboard() {
           </div>
         ) : (
           <>
+            {unlinkError && <div className="auth-error" role="alert">{unlinkError}</div>}
             {/* ── Children grid ── */}
             <div className="col-head" style={{ marginTop: 8 }}>
               <h2>My Children <span className="ar muted">أبنائي</span></h2>
@@ -184,13 +186,23 @@ export default function ParentDashboard() {
                         style={{ fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}
                         onClick={async () => {
                           if (!window.confirm('Unlink this child?')) return;
-                          const token = localStorage.getItem('token');
-                          await fetch(`${API_URL}/api/parent/unlink-child`, {
-                            method: 'DELETE',
-                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                            body: JSON.stringify({ childEmail: child.email }),
-                          });
-                          window.location.reload();
+                          setUnlinkError('');
+                          try {
+                            const token = localStorage.getItem('token');
+                            const res = await fetch(`${API_URL}/api/parent/unlink-child`, {
+                              method: 'DELETE',
+                              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                              body: JSON.stringify({ childEmail: child.email }),
+                            });
+                            if (!res.ok) {
+                              const data = await res.json();
+                              setUnlinkError(data.error || 'Could not unlink child');
+                              return;
+                            }
+                            setOverview((prev) => prev ? { children: prev.children.filter((c) => c.id !== child.id) } : prev);
+                          } catch {
+                            setUnlinkError('Could not connect to server');
+                          }
                         }}
                       >
                         Unlink
@@ -204,12 +216,12 @@ export default function ParentDashboard() {
 
                     <div className="ch-stats">
                       <div><b>{child.courseProgress.length}</b><span>Courses</span></div>
-                      <div><b>{child.lessonsCompleted}</b><span>Lessons done</span></div>
+                      <div><b>{child.lessonsCompleted}</b><span>Course lessons completed</span></div>
                       <div><b>{child.streak}</b><span>Day streak</span></div>
                     </div>
 
                     <div style={{ marginTop: 12 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-2)', marginBottom: 6 }}>Lesson Progress</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-2)', marginBottom: 6 }}>Course lesson status</div>
                       {child.courseProgress.length === 0 ? (
                         <p style={{ fontSize: 12, color: 'var(--ink-3)' }}>No courses yet.</p>
                       ) : (
@@ -227,7 +239,7 @@ export default function ParentDashboard() {
 
                     <div className="ch-next">
                       <span className="nx-dot"></span>
-                      <b>Progress:</b> {child.lessonsCompleted} of {child.totalLessons} lessons
+                      <b>Course status:</b> {child.lessonsCompleted} of {child.totalLessons} lessons completed
                     </div>
                   </div>
                 );
@@ -239,7 +251,7 @@ export default function ParentDashboard() {
               <div className="dash-col">
               <div className="card pad">
                 <div className="col-head sm">
-                  <h3>Attendance timeline <span className="ar muted">سجلّ الحضور</span></h3>
+                  <h3>Course lesson timeline <span className="ar muted">سجلّ الدروس</span></h3>
                 </div>
                 {allSessions.length === 0 ? (
                   <p style={{ fontSize: 14, color: 'var(--ink-3)' }}>No sessions yet.</p>
@@ -249,12 +261,12 @@ export default function ParentDashboard() {
                       const date = new Date(s.scheduledAt);
                       return (
                         <li key={s.id}>
-                          <span className={`tl-dot ${s.attended ? 'ok' : 'miss'}`}></span>
+                          <span className={`tl-dot ${s.completed ? 'ok' : 'miss'}`}></span>
                           <div className="tl-body">
                             <div className="tl-row">
                               <b>{s.lessonTitle}</b>
-                              <span className={`tl-tag ${s.attended ? 'ok' : 'miss'}`}>
-                                {s.attended ? 'Attended' : 'Missed'}
+                              <span className={`tl-tag ${s.completed ? 'ok' : 'miss'}`}>
+                                {s.completed ? 'Completed' : 'Not completed'}
                               </span>
                             </div>
                             <span className="tl-sub">
@@ -292,14 +304,14 @@ export default function ParentDashboard() {
 
               <div className="dash-col">
                 <div className="card pad report-card">
-                  <div className="col-head sm"><h3>This week</h3></div>
+                  <div className="col-head sm"><h3>Overall course progress</h3></div>
                   <div className="rep-big">
                     <b>{totalCompleted}</b>
-                    <span>lessons attended</span>
+                    <span>course lessons completed</span>
                   </div>
                   <div className="rep-rows">
                     <div className="rep-row"><span>Total XP earned</span><b>{familyXP}</b></div>
-                    <div className="rep-row"><span>Lessons done</span><b>{totalCompleted} / {children.reduce((s, c) => s + c.totalLessons, 0)}</b></div>
+                    <div className="rep-row"><span>Course lessons completed</span><b>{totalCompleted} / {children.reduce((s, c) => s + c.totalLessons, 0)}</b></div>
                     <div className="rep-row"><span>Active children</span><b>{children.length}</b></div>
                   </div>
                   <p className="rep-note">Keep supporting your children&apos;s learning! 🌟</p>
@@ -309,7 +321,7 @@ export default function ParentDashboard() {
                   <div className="col-head sm"><h3>Plan</h3></div>
                   <div className="pay-row">
                     <div><b>Scholar plan</b><span>Manage your subscription</span></div>
-                    <Link href="/courses" className="link-gold">Manage</Link>
+                    <span className="muted" title="Coming soon">Coming soon</span>
                   </div>
                 </div>
               </div>
@@ -341,6 +353,7 @@ export default function ParentDashboard() {
                 <button className="btn btn-gold" disabled={linkLoading}
                   onClick={async () => {
                     setLinkError('');
+                    if (!childEmail.trim()) { setLinkError('Enter your child\'s email address'); return; }
                     setLinkLoading(true);
                     try {
                       const token = localStorage.getItem('token');
