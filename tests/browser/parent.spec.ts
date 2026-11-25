@@ -72,6 +72,21 @@ test('parent switches children, retries errors and sees scoped attendance and ex
     ],
   };
   let count = 0;
+  const writingRequests: string[] = [];
+  await page.route('**/api/writing/parent-progress*', (route) => {
+    const studentId = new URL(route.request().url()).searchParams.get('studentId') ?? '';
+    writingRequests.push(studentId);
+    return route.fulfill({ json: { data: [{
+      studentId,
+      taskId: `task-${studentId}`,
+      title: studentId === 'child-a' ? 'كتابة أحمد' : 'كتابة مريم',
+      useAs: 'ACTIVITY',
+      sessionTitle: 'حصة الكتابة',
+      courseTitle: course.title,
+      submittedAt: '2026-10-01T10:00:00Z',
+      verdict: 'PENDING',
+    }] } });
+  });
   await page.route('**/api/parent/overview', (route) =>
     route.fulfill(
       ++count === 1
@@ -102,6 +117,8 @@ test('parent switches children, retries errors and sees scoped attendance and ex
   await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText('تعذر تحميل');
   await page.getByRole('button', { name: 'إعادة المحاولة', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'دورات أحمد' })).toBeVisible();
+  await expect(page.getByText('كتابة أحمد', { exact: true })).toBeVisible();
+  expect(writingRequests).toContain('child-a');
   await expect(page.getByRole('link', { name: 'مشاهدة الحصة', exact: true })).toHaveAttribute('href', '/classroom/family-course');
   await expect(page.getByText('الحرف القادم', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('لم تُسلّم', { exact: true })).toBeVisible();
@@ -122,6 +139,9 @@ test('parent switches children, retries errors and sees scoped attendance and ex
   }
   await page.getByRole('button', { name: /مريم/ }).click();
   await expect(page.getByRole('heading', { name: 'دورات مريم' })).toBeVisible();
+  await expect(page.getByText('كتابة مريم', { exact: true })).toBeVisible();
+  await expect(page.getByText('كتابة أحمد', { exact: true })).toHaveCount(0);
+  expect(writingRequests).toContain('child-b');
   await expect(page.getByRole('link', { name: 'مشاهدة الحصة', exact: true })).toHaveCount(0);
   await expect(page.getByText('تمرين مصحح', { exact: true })).toHaveCount(0);
   await expect(page.getByText('اختر دورة لطفلك وأرسل طلب التسجيل؛ ستظهر حالته هنا.')).toBeVisible();
