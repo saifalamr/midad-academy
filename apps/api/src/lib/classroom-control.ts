@@ -19,6 +19,36 @@ export function roomService() {
     { requestTimeout: 8 }
   );
 }
+// LiveKit events are the source of truth for who is in the call. A previously
+// issued token cannot keep a parent connected after their last child leaves.
+export async function removeParentsWithoutChild(courseId: string, roomName: string, departedIdentity?: string, joinedIdentity?: string) {
+  const service = roomService();
+  const participants = await service.listParticipants(roomName);
+  const identities = [...new Set([
+    ...participants.map((person) => person.identity),
+    ...(joinedIdentity ? [joinedIdentity] : []),
+  ])].filter((id) => id !== departedIdentity);
+  const parentUsers = await prisma.user.findMany({
+    where: { id: { in: identities }, role: 'PARENT' },
+    select: { id: true },
+  });
+  const children = await prisma.studentProfile.findMany({
+    where: {
+      userId: { in: identities },
+      parentId: { not: null },
+      enrollments: { some: { courseId, status: 'ACTIVE' } },
+    },
+    select: { parent: { select: { userId: true } } },
+  });
+  const allowed = new Set(children.map((child) => child.parent?.userId));
+  const removed: string[] = [];
+  for (const parent of parentUsers)
+    if (!allowed.has(parent.id)) {
+      await service.removeParticipant(roomName, parent.id);
+      removed.push(parent.id);
+    }
+  return removed;
+}
 export function providerTime(value: unknown, fallback?: Date): Date | null {
   const seconds = Number(value);
   return Number.isFinite(seconds) && seconds > 0 && seconds < Date.now() / 1000 + 120

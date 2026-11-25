@@ -6,6 +6,7 @@ import {
   recordPresence,
   providerTime,
   applySpeakingState,
+  removeParentsWithoutChild,
 } from '../lib/classroom-control';
 import { classClockRoutes } from './class-clock';
 import { teacherMaterialRoutes } from './session-materials';
@@ -13,10 +14,10 @@ import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { config } from '../config';
-import { canAccessCourse, canObserveCourse, canReadClassroom, httpError } from '../lib/access';
+import { canAccessCourse, canObserveCourse, canReadClassroom, httpError, parentHasChildInRoom } from '../lib/access';
 import { lockCourse } from '../lib/enrollment';
 import { completeClassroom } from '../lib/classroom';
-import { setDrawingPermission } from '../ws-server';
+import { setDrawingPermission, revokeParentObserver } from '../ws-server';
 
 const createSessionSchema = z.object({
   roomName: z.string().min(1, 'Room name is required'),
@@ -182,6 +183,12 @@ export async function sessionRoutes(app: FastifyInstance) {
     );
     if (!(await service.listRooms([live.liveKitRoomId])).length)
       return reply.status(409).send({ error: 'This class has ended' });
+    if (request.user.role === 'PARENT') {
+      const participants = await service.listParticipants(live.liveKitRoomId);
+      if (!(await parentHasChildInRoom(
+        request.user.id, roomName, participants.map((participant) => participant.identity)
+      ))) return reply.status(403).send({ error: 'يمكنك مشاهدة الحصة أثناء مشاركة طفلك فيها فقط' });
+    }
     const user = await prisma.user.findUniqueOrThrow({
       where: { id: request.user.id },
       select: { name: true },
@@ -189,7 +196,7 @@ export async function sessionRoutes(app: FastifyInstance) {
     const at = new AccessToken(config.LIVEKIT_API_KEY, config.LIVEKIT_API_SECRET, {
       identity: request.user.id,
       name: user.name,
-      ttl: '15m',
+      ttl: request.user.role === 'PARENT' ? '1m' : '15m',
       metadata: JSON.stringify({ role: request.user.role.toLowerCase() }),
     });
     at.addGrant({
@@ -450,6 +457,7 @@ export async function sessionRoutes(app: FastifyInstance) {
       },
       { timeout: 20_000, maxWait: 20_000 }
     );
+    revokeParentObserver(roomName);
     return { message: 'Class ended' };
   });
   app.post('/drawing-permission', { preHandler: [app.authenticate] }, async (request, reply) => {
@@ -626,17 +634,30 @@ export async function sessionRoutes(app: FastifyInstance) {
               );
             }
           }
+          if (session.status === 'LIVE') {
+            if (event.event === 'participant_left')
+              revokeParentObserver(session.courseId, event.participant.identity);
+            const removed = await removeParentsWithoutChild(
+              session.courseId,
+              roomName,
+              event.event === 'participant_left' ? event.participant.identity : undefined,
+              event.event === 'participant_joined' ? event.participant.identity : undefined
+            );
+            for (const parentId of removed) revokeParentObserver(session.courseId, parentId);
+          }
         }
       }
       if (event.event === 'room_finished') {
         const session = await prisma.classSession.findFirst({
           where: { liveKitRoomId: roomName, status: 'LIVE' },
         });
-        if (session)
+        if (session) {
           await prisma.$transaction(async (tx) => {
             await lockCourse(tx, session.courseId);
             await completeClassroom(tx, session.courseId, [session.id]);
           });
+          revokeParentObserver(session.courseId);
+        }
       }
       return { received: true };
     });

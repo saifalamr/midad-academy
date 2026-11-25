@@ -156,6 +156,12 @@ test('teacher and student exchange real media, synchronized ink, permissions and
     }
   };
   await enter(teacher);
+  const parentToken = await login('parent@preview.midad.test');
+  const earlyParent = await request.post('http://127.0.0.1:4000/api/sessions/observe', {
+    headers: { Authorization: `Bearer ${parentToken}` },
+    data: { roomName: 'preview-arabic' },
+  });
+  expect(earlyParent.status()).toBe(403);
   await enter(student);
   await teacher.getByRole('button', { name: 'تشغيل الكاميرا' }).click();
   await student.getByRole('button', { name: 'تشغيل الكاميرا' }).click();

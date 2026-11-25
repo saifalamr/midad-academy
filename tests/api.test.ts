@@ -1939,7 +1939,17 @@ test('family overview scopes children, upcoming classes and latest exercise grad
   assert.equal(catalog.timeZone, 'Africa/Cairo');
 });
 
-test('parents receive subscribe-only live tokens and cannot observe unrelated or inactive enrollment', async () => {
+test('parents observe only while their own child participates, then lose media and whiteboard access', async (t) => {
+  const listParticipants = RoomServiceClient.prototype.listParticipants;
+  const removeParticipant = RoomServiceClient.prototype.removeParticipant;
+  let present: string[] = [];
+  const evicted: string[] = [];
+  RoomServiceClient.prototype.listParticipants = async () => present.map((identity) => ({ identity }) as any);
+  RoomServiceClient.prototype.removeParticipant = async (_room, identity) => { evicted.push(identity); };
+  t.after(() => {
+    RoomServiceClient.prototype.listParticipants = listParticipants;
+    RoomServiceClient.prototype.removeParticipant = removeParticipant;
+  });
   const courseId = (
     await createCourse({
       title: 'Observer security',
@@ -1955,22 +1965,32 @@ test('parents receive subscribe-only live tokens and cannot observe unrelated or
     where: { userId: actors.student.id },
     data: { parentId: parent.id },
   });
+  const otherParent = await prisma.parentProfile.findUniqueOrThrow({ where: { userId: actors.otherParent.id } });
+  const outsider = await prisma.studentProfile.findUniqueOrThrow({ where: { userId: actors.outsider.id } });
+  t.after(async () => {
+    await prisma.studentProfile.update({ where: { id: outsider.id }, data: { parentId: outsider.parentId } });
+  });
+  await prisma.studentProfile.update({ where: { userId: actors.outsider.id }, data: { parentId: otherParent.id } });
+  assert.equal((await enroll(courseId, 'outsider')).statusCode, 201);
   const session = await fixtureSession(courseId, 'Watch only');
   assert.equal(
     (await call('POST', '/api/sessions/observe', 'parent', { roomName: courseId })).statusCode,
     409
   );
   await call('PATCH', `/api/sessions/${session.id}/start`, 'teacher');
+  assert.equal((await call('POST', '/api/sessions/observe', 'parent', { roomName: courseId })).statusCode, 403);
+  present = [actors.outsider.id];
+  assert.equal((await call('POST', '/api/sessions/observe', 'parent', { roomName: courseId })).statusCode, 403);
+  assert.equal((await call('POST', '/api/sessions/observe', 'otherParent', { roomName: courseId })).statusCode, 200);
+  assert.equal((await call('GET', `/api/sessions/state/${courseId}`, 'otherParent')).statusCode, 200);
+  present = [actors.student.id, actors.parent.id];
   const res = await call('POST', '/api/sessions/observe', 'parent', { roomName: courseId });
   assert.equal(res.statusCode, 200);
   assert.equal(
     (await call('POST', '/api/sessions/observe', 'otherParent', { roomName: courseId })).statusCode,
     403
   );
-  assert.equal(
-    (await call('GET', `/api/sessions/state/${courseId}`, 'otherParent')).statusCode,
-    403
-  );
+  assert.equal((await call('GET', `/api/sessions/state/${courseId}`, 'otherParent')).statusCode, 403);
   const claims = JSON.parse(
     Buffer.from(res.json().data.token.split('.')[1], 'base64url').toString()
   );
@@ -2073,8 +2093,19 @@ test('parents receive subscribe-only live tokens and cannot observe unrelated or
   assert.equal(received.getMap('drawing').get('teacherEdit'), true);
   assert.equal(received.getMap('drawing').get('parentEdit'), undefined);
   assert.equal(received.getMap('drawing').get('adminEdit'), undefined);
+  const viewerClosed = once(viewer, 'close');
+  const removed = await (await import('../apps/api/src/lib/classroom-control')).removeParentsWithoutChild(
+    courseId, `class-${session.id}`, actors.student.id
+  );
+  for (const id of removed) (await import('../apps/api/src/ws-server')).revokeParentObserver(courseId, id);
+  await viewerClosed;
+  assert.deepEqual(removed, [actors.parent.id]);
+  assert.deepEqual(evicted, [actors.parent.id]);
+  present = [actors.parent.id];
+  assert.equal((await call('POST', '/api/sessions/observe', 'parent', { roomName: courseId })).statusCode, 403);
+  assert.equal((await call('GET', `/api/sessions/state/${courseId}`, 'parent')).statusCode, 403);
   await Promise.all(
-    [viewer, hiddenViewer, writer].map(async (ws) => {
+    [hiddenViewer, writer].map(async (ws) => {
       const closed = once(ws, 'close');
       ws.close();
       await closed;
