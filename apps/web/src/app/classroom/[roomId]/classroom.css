@@ -120,7 +120,22 @@
 /* Focus mode keeps call controls available, but gives the canvas the room. */
 .midad.room.classroom-v2.board-focused{height:100dvh;min-height:0;overflow:hidden;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto}
 .midad.classroom-v2.board-focused .room-top{min-height:44px;padding-block:5px}
-.midad.classroom-v2.board-focused .class-clock,.midad.classroom-v2.board-focused .class-writing-entry,.midad.classroom-v2.board-focused .video-strip{display:none}
+.midad.classroom-v2.board-focused .class-clock,.midad.classroom-v2.board-focused .class-writing-entry{display:none}
+.midad.classroom-v2.board-focused .video-strip.focus-call-pip{
+  position:fixed;z-index:60;display:flex;flex-direction:row;flex-wrap:wrap;align-content:flex-start;
+  width:min(220px, calc(100vw - 16px));height:180px;min-height:0;padding:4px;gap:4px;
+  overflow:auto;background:#fffdf8;border:1px solid #d9c495;border-radius:12px;
+  box-shadow:0 10px 30px #142d5150;
+}
+.midad.classroom-v2.board-focused .video-strip.focus-call-hidden{display:none}
+.midad.classroom-v2 .focus-call-head{display:flex;align-items:center;gap:4px;width:100%;min-width:0}
+.midad.classroom-v2 .focus-call-drag{flex:1;min-width:0;cursor:grab;touch-action:none;user-select:none;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:5px}
+.midad.classroom-v2 .focus-call-drag:focus-visible{outline:3px solid #c9922a;outline-offset:-3px}
+.midad.classroom-v2 .focus-call-head button{min-height:36px;border:1px solid #d9c495;border-radius:7px;background:#fff;color:#1b3a6b}
+.midad.classroom-v2.board-focused .focus-call-pip .vtile,.midad.classroom-v2.board-focused .focus-call-pip .vteacher{
+  width:calc(50% - 2px);min-width:0;height:64px;min-height:64px;flex:none;
+}
+.midad.classroom-v2.board-focused .focus-call-pip .vlabel{font-size:10px;padding:2px 4px}
 .midad.classroom-v2.board-focused .board-wrap{grid-column:1;grid-row:2;padding-inline:12px;min-height:0}
 .midad.classroom-v2.board-focused .room-controls{grid-column:1;grid-row:3;position:static}
 @media (max-width:700px){.midad.classroom-v2.board-focused .board-wrap{padding-inline:8px}}
