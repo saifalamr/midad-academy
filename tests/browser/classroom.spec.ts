@@ -350,6 +350,7 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   await expect.poll(() => ink(student)).toBeGreaterThan(20);
   await teacher.getByRole('button', { name: 'تراجع', exact: true }).click();
   await expect.poll(() => ink(student)).toBe(0);
+  await teacher.locator('.board-tool-menu summary[aria-label="خيارات السبورة"]').click();
   await teacher.getByRole('button', { name: 'إعادة', exact: true }).click();
   await expect.poll(() => ink(student)).toBeGreaterThan(20);
   const me = await request.get('http://127.0.0.1:4000/api/auth/me', {
