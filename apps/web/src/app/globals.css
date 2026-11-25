@@ -955,7 +955,7 @@ img[src*="midad-logo-transparent.png"]{clip-path:polygon(0 0,100% 0,100% 80%,70%
 .academy-loading{min-height:100dvh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 15% 20%,#e8eef5 0,transparent 34%),radial-gradient(circle at 85% 80%,#f7e9cb 0,transparent 33%),var(--cream);text-align:center;overflow:hidden}
 .academy-loading-card{position:relative;width:min(100%,390px);padding:38px 32px 34px;border:1px solid #e4e8ef;border-radius:24px;background:#fff;box-shadow:0 24px 70px #1b3a6b13}
 .academy-loading-mark{position:relative;width:136px;height:136px;margin:0 auto 20px;display:grid;place-items:center}
-.academy-loading-mark img{object-fit:contain;position:relative;z-index:1}
+.academy-loading-mark img{object-fit:contain;position:relative;z-index:1;transform:translate(15%,6%)}
 .academy-loading-orbit{position:absolute;inset:0;border:3px solid #e5ebf3;border-top-color:var(--gold);border-right-color:var(--navy);border-radius:50%;animation:academy-orbit 2.4s linear infinite}
 .academy-loading h1{font-size:clamp(21px,5vw,27px);line-height:1.5;margin:0 0 6px}
 .academy-loading p{color:var(--ink-3);font-size:14px;margin:0 0 24px}
