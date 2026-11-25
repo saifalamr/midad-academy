@@ -67,16 +67,19 @@ test('teacher sees persistent phases, validates the time distribution and uses t
   const clock = page.getByRole('region', { name: 'مؤقت مراحل الحصة' });
   await expect(clock.locator('.class-clock-head strong')).toHaveText('شرح الدرس الحالي');
   await clock.getByRole('button', { name: 'تعديل تقسيم الوقت' }).click();
+  await expect(clock.getByText('توزيع 40 دقيقة على مراحل الحصة')).toBeVisible();
   await clock.getByLabel('مراجعة الدرس السابق').fill('5');
+  await expect(clock.getByRole('status')).toContainText('المتبقي: 3 د');
   await expect(clock.getByRole('button', { name: 'حفظ التقسيم' })).toBeDisabled();
   await clock.getByLabel('شرح الدرس الحالي').fill('23');
+  await expect(clock.getByRole('status')).toContainText('جاهز للحفظ');
   await clock.getByRole('button', { name: 'حفظ التقسيم' }).click();
   await expect(clock.locator('li[aria-current="step"]')).toContainText('شرح الدرس الحالي');
   await page.evaluate(() => (window as any).clockTest.remount());
   await expect(clock.locator('.class-clock-head strong')).toHaveText('شرح الدرس الحالي');
   await clock.getByRole('button', { name: 'تعديل تقسيم الوقت' }).click();
   await expect(clock.getByLabel('مراجعة الدرس السابق')).toHaveValue('5');
-  for (const width of [320, 820, 1440]) {
+  for (const width of [280, 320, 820, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)
