@@ -82,7 +82,7 @@ export default function ClassClock({
         body: JSON.stringify({ version: draftVersion, minutes: draft }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error);
+      if (!res.ok) throw new Error(res.status === 409 ? 'تغيّر تقسيم الوقت في صفحة أخرى. حدّث البيانات ثم حاول مجددًا.' : 'تعذر حفظ تقسيم الوقت. حاول مجددًا.');
       setClock(json.data);
       setEditing(false);
     } catch (e) {
@@ -91,6 +91,15 @@ export default function ClassClock({
       setBusy(false);
     }
   }
+  const total = draft.reduce((a, b) => a + b, 0);
+  const valid = draft.length === 4 && draft.every((value) => Number.isInteger(value) && value >= 1 && value <= 240) && total === clock?.durationMinutes;
+  const totalHint = valid
+    ? 'جاهز للحفظ'
+    : draft.some((value) => !Number.isInteger(value) || value < 1 || value > 240)
+      ? 'أدخل عدد دقائق صحيحًا لكل مرحلة'
+      : total < (clock?.durationMinutes ?? 0)
+        ? `المتبقي: ${(clock?.durationMinutes ?? 0) - total} د`
+        : `الزيادة: ${total - (clock?.durationMinutes ?? 0)} د`;
   const phase = clock?.startedAt ? phaseAt(clock.startedAt, clock.minutes, now + offset) : null;
   const format = (seconds: number) =>
     `${Math.floor(seconds / 60)
@@ -120,7 +129,7 @@ export default function ClassClock({
               setEditing((v) => !v);
             }}
           >
-            تعديل تقسيم الوقت
+            {editing ? 'إغلاق تعديل الوقت' : 'تعديل تقسيم الوقت'}
           </button>
         )}
       </div>
@@ -152,15 +161,15 @@ export default function ClassClock({
           }}
         >
           <fieldset disabled={busy}>
-            <legend>
-              توزيع {clock.durationMinutes} دقيقة — المؤقت يبدأ من بداية الحصة ولا يُعاد عند التعديل
-            </legend>
+            <legend>توزيع {clock.durationMinutes} دقيقة على مراحل الحصة</legend>
+            <p id="class-clock-help">رتّب وقت المراجعة والشرح والتفاعل والواجب. يجب أن يساوي المجموع مدة الحصة. يستمر المؤقت من وقت بداية الحصة بعد الحفظ.</p>
             <div className="class-clock-inputs">
               {classPhases.map((title, index) => (
                 <label key={title}>
-                  {title}
+                  <span>{index + 1}. {title}</span>
                   <input
                     type="number"
+                    aria-describedby="class-clock-help"
                     required
                     min={1}
                     max={240}
@@ -174,18 +183,13 @@ export default function ClassClock({
                 </label>
               ))}
             </div>
-            <p>
-              المجموع: {draft.reduce((a, b) => a + b, 0)} / {clock.durationMinutes} دقيقة
+            <p className="class-clock-total" role="status" aria-live="polite">
+              المجموع: {total} من {clock.durationMinutes} دقيقة — {totalHint}
             </p>
-            <button
-              type="submit"
-              disabled={draft.reduce((a, b) => a + b, 0) !== clock.durationMinutes}
-            >
-              حفظ التقسيم
-            </button>{' '}
-            <button type="button" onClick={() => setEditing(false)}>
-              إلغاء
-            </button>
+            <div className="class-clock-actions">
+              <button type="submit" disabled={!valid}>{busy ? 'جارٍ الحفظ…' : 'حفظ التقسيم'}</button>
+              <button type="button" onClick={() => { setEditing(false); setError(''); }}>إلغاء التعديل</button>
+            </div>
           </fieldset>
         </form>
       )}

@@ -338,7 +338,9 @@ test('teacher and student exchange real media, synchronized ink, permissions and
       return count;
     });
   const placeShape = async (page: Page, title: string, offset: number) => {
-    await page.getByTitle(title, { exact: true }).click();
+    const tool = page.getByTitle(title, { exact: true });
+    if (!(await tool.isVisible())) await page.getByLabel('أدوات إضافية', { exact: true }).click();
+    await tool.click();
     const canvas = page.locator('canvas.upper-canvas');
     const box = (await canvas.boundingBox())!;
     await page.mouse.click(box.x + box.width * offset, box.y + box.height * 0.5);
@@ -425,6 +427,8 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   await expectMovingVideo(student);
   await teacher.getByRole('button', { name: 'السبورة', exact: true }).click();
   await teacher.locator('.board-tool-menu summary[aria-label="أدوات إضافية"]').click();
+  if (!(await teacher.getByRole('button', { name: 'دائرة', exact: true }).isVisible()))
+    await teacher.getByLabel('أدوات إضافية', { exact: true }).click();
   await teacher.getByRole('button', { name: 'دائرة', exact: true }).click();
   await expect(teacher.getByRole('button', { name: 'دائرة', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await teacher.getByRole('button', { name: 'قلم', exact: true }).click();

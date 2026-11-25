@@ -24,7 +24,7 @@
   color: #1f3b65;
   padding: 8px 12px;
   cursor: pointer;
-  min-height: 36px;
+  min-height: 44px;
 }
 .class-clock button:disabled {
   opacity: 0.5;
@@ -73,6 +73,21 @@
   border: 1px solid #d9c495;
   padding: 8px;
   border-radius: 6px;
+  min-height: 44px;
+}
+.class-clock-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.class-clock-actions button[type='submit'] {
+  background: #1f3b65;
+  color: #fff;
+  border-color: #1f3b65;
+}
+.class-clock-total {
+  margin: 10px 0;
+  font-weight: 700;
 }
 .class-clock [role='alert'] {
   font-size: 13px;
