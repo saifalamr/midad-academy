@@ -201,7 +201,7 @@ export default function SessionPlan({
                       <span className="plan-number">{index + 1}</span>
                       <div className="plan-copy">
                         <b>{item.title}</b>
-                        <small>{item.type === 'PDF' ? 'ملف PDF' : 'فيديو'}</small>
+                        <small>{item.type === 'PDF' ? 'ملف PDF' : item.type === 'IMAGE' ? 'صورة' : 'فيديو'}</small>
                         {item.description && <p>{item.description}</p>}
                         {!editable &&
                           'contentUrl' in item &&
@@ -262,7 +262,7 @@ export default function SessionPlan({
             {canEdit && (
               <section className="card pad" aria-label="مواد منهج الدورة">
                 <h2>منهج الدورة</h2>
-                <p>اختر حتى ٥٠ مادة. رفع الملفات والفيديوهات من إدارة المنهج.</p>
+                <p>اختر حتى ٥٠ مادة. رفع الملفات والصور والفيديو من إدارة المنهج.</p>
                 <Link
                   className="btn btn-outline btn-sm"
                   href={`/courses/${session.courseId}/content`}
@@ -274,7 +274,7 @@ export default function SessionPlan({
                   إدارة المنهج والمواد
                 </Link>
                 {!library.length && (
-                  <p>أضف ملفات PDF أو فيديو إلى منهج الدورة أولًا، ثم أعد تحميل هذه الصفحة.</p>
+                  <p>أضف ملفات PDF أو صورًا أو فيديو إلى منهج الدورة أولًا، ثم أعد تحميل هذه الصفحة.</p>
                 )}
                 <ul className="plan-list">
                   {library.map((item) => (
@@ -282,7 +282,7 @@ export default function SessionPlan({
                       <Icon name={item.type === 'PDF' ? 'file' : 'video'} />
                       <div className="plan-copy">
                         <b>{item.title}</b>
-                        <small>{item.type === 'PDF' ? 'PDF' : 'فيديو'}</small>
+                        <small>{item.type === 'PDF' ? 'PDF' : item.type === 'IMAGE' ? 'صورة' : 'فيديو'}</small>
                       </div>
                       <button
                         className="btn btn-outline btn-sm"

@@ -9,7 +9,7 @@ type Lesson = {
   id: string;
   title: string;
   description: string;
-  type: 'VIDEO' | 'PDF' | 'EXERCISE';
+  type: 'VIDEO' | 'PDF' | 'IMAGE' | 'EXERCISE';
   contentUrl: string;
   duration: number;
   quiz: { id: string } | null;
@@ -20,7 +20,7 @@ type LearningState = {
   note: string;
   updatedAt: string;
 };
-const icons = { VIDEO: 'video', PDF: 'file', EXERCISE: 'edit' } as const;
+const icons = { VIDEO: 'video', PDF: 'file', IMAGE: 'file', EXERCISE: 'edit' } as const;
 
 async function request(path: string, options: RequestInit = {}) {
   const token = localStorage.getItem('token') ?? sessionStorage.getItem('token');

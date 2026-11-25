@@ -35,6 +35,15 @@ test('teacher and student exchange real media, synchronized ink, permissions and
     scheduledAt: new Date(Date.now() + 60000).toISOString(),
     durationMinutes: 50,
   });
+  const material = await api('post', '/api/courses/preview-arabic/lessons', adminToken, {
+    title: 'درس متزامن', description: 'صورة مخصصة لهذه الحصة', type: 'IMAGE',
+    contentUrl: 'http://127.0.0.1:3000/midad-mark.png', duration: 5,
+  });
+  const assigned = await request.put(
+    `http://127.0.0.1:4000/api/admin/sessions/${scheduled.data.id}/materials`,
+    { headers: { Authorization: `Bearer ${adminToken}` }, data: { version: 0, contentIds: [material.data.id] } }
+  );
+  expect(assigned.ok(), await assigned.text()).toBeTruthy();
   await api('patch', `/api/sessions/${scheduled.data.id}/start`, teacherToken, {});
   const teacherContext = await browser.newContext({
     viewport: { width: 1280, height: 900 },
@@ -362,10 +371,9 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   await expect.poll(() => ink(teacher)).toBeGreaterThan(before + 100);
   await api('patch', '/api/sessions/state/preview-arabic', teacherToken, {
     sharedDoc: {
-      url: '',
+      url: 'http://127.0.0.1:3000/midad-mark.png',
       name: 'درس متزامن',
-      docType: 'html',
-      htmlContent: '<h1 dir="rtl">مرحباً</h1>',
+      docType: 'image',
     },
     pdfPage: 1,
   });
@@ -378,7 +386,7 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   await student.getByRole('button', { name: 'تشغيل الصوت', exact: true }).click();
   await expect(student.getByText('درس متزامن', { exact: true })).toBeVisible();
   await expect(
-    student.frameLocator('iframe[title="درس متزامن"]').getByText('مرحباً')
+    student.locator('img[alt="درس متزامن"]')
   ).toBeVisible();
   for (const size of [
     { width: 280, height: 653 },
@@ -410,7 +418,7 @@ test('teacher and student exchange real media, synchronized ink, permissions and
     await teacher.screenshot({ path: `test-results/classroom-${size.width}.png` });
     await teacher.getByRole('button', { name: 'المحتوى', exact: true }).click();
     await expect(
-      teacher.frameLocator('iframe[title="درس متزامن"]').getByText('مرحباً')
+      teacher.locator('img[alt="درس متزامن"]')
     ).toBeVisible();
   }
   await expectMovingVideo(teacher);
@@ -421,19 +429,12 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   await expect(teacher.getByRole('button', { name: 'دائرة', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await teacher.getByRole('button', { name: 'قلم', exact: true }).click();
   expect(await ink(teacher)).toBeGreaterThan(before + 100);
-  await teacher.getByRole('button', { name: 'إضافة محتوى', exact: true }).click();
-  await teacher.getByRole('button', { name: 'رفع ملف', exact: true }).click();
-  await teacher.locator('#class-file').setInputFiles({
-    name: 'نشاط.html',
-    mimeType: 'text/html',
-    buffer: Buffer.from('<h1>نشاط جديد</h1>'),
-  });
-  await expect(
-    teacher.frameLocator('iframe[title="نشاط.html"]').getByText('نشاط جديد')
-  ).toBeVisible();
-  await expect(
-    student.frameLocator('iframe[title="نشاط.html"]').getByText('نشاط جديد')
-  ).toBeVisible();
+  await teacher.getByRole('button', { name: 'إيقاف المشاركة', exact: true }).click();
+  await teacher.locator('.bb-chip').filter({ hasText: 'مواد الحصة' }).click();
+  await expect(teacher.getByRole('button', { name: 'رفع ملف', exact: true })).toHaveCount(0);
+  await teacher.locator('.share-list').getByRole('button', { name: 'درس متزامن' }).click();
+  await expect(teacher.locator('img[alt="درس متزامن"]')).toBeVisible();
+  await expect(student.locator('img[alt="درس متزامن"]')).toBeVisible();
   await expect(teacher.getByRole('button', { name: 'إيقاف المشاركة', exact: true })).toBeVisible();
   await teacher.getByRole('button', { name: 'إيقاف المشاركة', exact: true }).click();
   await expect(student.getByRole('button', { name: 'المحتوى', exact: true })).toHaveCount(0);

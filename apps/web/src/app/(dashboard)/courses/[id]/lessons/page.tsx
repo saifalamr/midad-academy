@@ -8,7 +8,7 @@ import Link from 'next/link';
 import LearningWorkspace from '@/components/LearningWorkspace';
 import { API_URL } from '@/lib/config';
 
-type ContentType = 'VIDEO' | 'PDF' | 'EXERCISE';
+type ContentType = 'VIDEO' | 'PDF' | 'IMAGE' | 'EXERCISE';
 
 type QuizSummary = {
   id: string;

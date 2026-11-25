@@ -1085,14 +1085,14 @@ function ClassroomContent({
               {isTeacher && (
                 <button
                   className="bb-chip"
-                  title="إضافة محتوى"
+                  title="مواد الحصة"
                   disabled={contentBusy}
                   onClick={openShareModal}
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
                     <path d="M12 16V4M7 9l5-5 5 5M5 20h14" />
                   </svg>
-                  إضافة محتوى
+                  مواد الحصة
                 </button>
               )}
             </div>
@@ -1274,7 +1274,7 @@ function ClassroomContent({
                 })}
                 <button
                   className="dock-add"
-                  title="إضافة محتوى"
+                  title="مواد الحصة"
                   disabled={contentBusy}
                   onClick={openShareModal}
                 >
@@ -1506,7 +1506,7 @@ function ClassroomContent({
           >
             <div className="modal-head">
               <div>
-                <h3 id="share-modal-title">إضافة محتوى للحصة</h3>
+                <h3 id="share-modal-title">مواد هذه الحصة</h3>
               </div>
               <button
                 className="modal-x"
@@ -1525,10 +1525,6 @@ function ClassroomContent({
               {(
                 [
                   ['plan', 'خطة الحصة'],
-                  ['content', 'منهج الدورة'],
-                  ['file', 'رفع ملف'],
-                  ['url', 'رابط / يوتيوب'],
-                  ['html', 'HTML'],
                 ] as const
               ).map(([key, label]) => (
                 <button
@@ -1569,7 +1565,7 @@ function ClassroomContent({
                   ) : (shareTab === 'plan' ? sessionContent : courseContent).length === 0 ? (
                     <p style={{ fontSize: 13, color: 'var(--ink-3)' }}>
                       {shareTab === 'plan'
-                        ? 'الإدارة لم تخصص مواد لهذه الحصة بعد. يمكنك مراجعة تبويب منهج الدورة.'
+                        ? 'لم تخصص الإدارة مواد لهذه الحصة بعد. اطلب إضافتها قبل استخدامها.'
                         : 'لا توجد ملفات في الدورة بعد.'}
                     </p>
                   ) : (

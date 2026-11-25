@@ -101,7 +101,7 @@ test('parent registration, admin child account, monthly course, enrollment and s
   await page.getByRole('link', { name: 'إدارة المنهج والمواد', exact: false }).click();
   await expect(page).toHaveURL(/\/content$/);
   await expect(
-    page.getByRole('heading', { name: 'Manage Course Content', exact: true })
+    page.getByRole('heading', { name: 'إدارة المنهج والمواد', exact: true })
   ).toBeVisible();
   const ctx = await browser.newContext();
   const student = await ctx.newPage();

@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { API_URL } from '@/lib/config';
 
-type ContentType = 'VIDEO' | 'PDF' | 'EXERCISE';
+type ContentType = 'VIDEO' | 'PDF' | 'IMAGE' | 'EXERCISE';
 
 type QuizSummary = {
   id: string;
@@ -68,7 +68,7 @@ function buildQuestionPayload(q: DraftQuestion): Record<string, unknown> {
   return payload;
 }
 
-const TYPE_ICON = { VIDEO: 'video', PDF: 'file', EXERCISE: 'edit' } as const;
+const TYPE_ICON = { VIDEO: 'video', PDF: 'file', IMAGE: 'file', EXERCISE: 'edit' } as const;
 
 function authFetch(path: string, options: RequestInit = {}) {
   const token =
@@ -196,20 +196,20 @@ export default function CourseContentPage() {
       });
       const json = await res.json();
       if (!res.ok) {
-        setUploadError(json.error || 'Failed to upload file');
+        setUploadError(json.error || 'تعذر رفع الملف. أعد المحاولة.');
         return;
       }
 
       // Pre-fill the Add Lesson modal with the uploaded file's URL.
       setTitle('');
       setDescription('');
-      setType(file.type === 'application/pdf' ? 'PDF' : 'EXERCISE');
+      setType(file.type === 'application/pdf' ? 'PDF' : file.type.startsWith('image/') ? 'IMAGE' : 'VIDEO');
       setContentUrl(json.data.url);
       setDuration('');
       setFormError('');
       setShowModal(true);
     } catch {
-      setUploadError('Could not connect to server');
+      setUploadError('تعذر الاتصال بخدمة الملفات. أعد المحاولة.');
     } finally {
       setUploading(false);
     }
@@ -490,19 +490,19 @@ export default function CourseContentPage() {
           onClick={() => router.push('/admin')}
           style={{ marginBottom: 16 }}
         >
-          <Icon name="left" /> Back to dashboard
+          <Icon name="left" /> العودة إلى الإدارة
         </button>
 
         <div className="page-head" style={{ marginBottom: 24 }}>
           <div>
-            <h1 className="dh-title">Manage Course Content</h1>
-            <p className="dh-hi">Add, reorder, and remove lessons for this course.</p>
+            <h1 className="dh-title">إدارة المنهج والمواد</h1>
+            <p className="dh-hi">أضف الملفات والوسائط هنا، ثم خصصها للحصة من خطة موادها.</p>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <input
               ref={fileInputRef}
               type="file"
-              accept="application/pdf,image/*"
+              accept="application/pdf,image/jpeg,image/png,image/gif,image/webp,image/svg+xml,video/mp4,video/webm"
               style={{ display: 'none' }}
               onChange={handleFileSelected}
             />
@@ -515,7 +515,7 @@ export default function CourseContentPage() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
                 <path d="M12 16V4M6 10l6-6 6 6M4 20h16" />
               </svg>
-              {uploading ? 'Uploading…' : 'Upload File'}
+              {uploading ? 'جارٍ الرفع…' : 'رفع ملف أو وسيط'}
             </button>
             <button
               className="btn btn-gold btn-lg"
@@ -700,6 +700,7 @@ export default function CourseContentPage() {
                   >
                     <option value="VIDEO">Video</option>
                     <option value="PDF">PDF</option>
+                    <option value="IMAGE">صورة</option>
                     <option value="EXERCISE">Exercise</option>
                   </select>
                 </div>
