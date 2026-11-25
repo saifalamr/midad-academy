@@ -55,3 +55,23 @@ jobs:
           API_URL: https://midad-test-api.onrender.com
           WEB_URL: https://midad-academy-preview.vercel.app
           EXPECTED_COMMIT: ${{ github.sha }}
+  hosted-writing:
+    needs: hosted-smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Verify hosted writing progress for two children and family isolation
+        run: node scripts/hosted-writing-smoke.mjs
+        env:
+          HOSTED_TEST_MODE: staging
+          API_URL: https://midad-test-api.onrender.com
+          WEB_URL: https://midad-academy-preview.vercel.app
+          EXPECTED_COMMIT: ${{ github.sha }}
+          TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
+          TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
