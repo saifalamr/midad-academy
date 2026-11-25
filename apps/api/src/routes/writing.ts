@@ -106,8 +106,10 @@ export async function writingRoutes(app: FastifyInstance) {
   app.addHook('preHandler', app.authenticate);
   app.get('/parent-progress', async (request) => {
     if (request.user.role !== 'PARENT') throw httpError(403, 'متابعة كتابة الأبناء لولي الأمر فقط');
+    const { studentId } = z.object({ studentId: z.string().cuid().optional() }).parse(request.query);
     const attempts = await prisma.writingAttempt.findMany({
       where: {
+        ...(studentId ? { studentId } : {}),
         student: { parent: { userId: request.user.id } },
         task: { session: { status: 'COMPLETED' } },
       },

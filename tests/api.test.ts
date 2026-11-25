@@ -3320,6 +3320,9 @@ test('writing library, immutable assignments and private submissions form one te
   const parentProgress=await call('GET','/api/writing/parent-progress',keys.parent);
   assert.equal(parentProgress.statusCode,200,parentProgress.body);
   assert.deepEqual(parentProgress.json().data.map((p:any)=>[p.studentId,p.taskId,p.verdict,p.useAs]),[[childId,task.id,'PENDING','ACTIVITY']]);
+  assert.equal((await call('GET',`/api/writing/parent-progress?studentId=${childId}`,keys.parent)).json().data[0].taskId,task.id);
+  assert.equal((await call('GET',`/api/writing/parent-progress?studentId=${childId}`,keys.stranger)).json().data.length,0);
+  assert.equal((await call('GET','/api/writing/parent-progress?studentId=not-an-id',keys.parent)).statusCode,400);
   assert.equal((await call('GET','/api/writing/parent-progress',keys.stranger)).json().data.length,0);
   assert.equal((await call('GET','/api/writing/parent-progress',childKey)).statusCode,403);
   const reviewPath='/api/writing/attempts/'+attempt.id+'/review';
@@ -3340,8 +3343,41 @@ test('writing library, immutable assignments and private submissions form one te
   await prisma.studentProfile.update({where:{id:childId},data:{parentId:users.stranger.parentProfile.id}});
   assert.equal((await call('GET',path,keys.parent)).statusCode,404);
   assert.equal((await call('GET','/api/writing/parent-progress',keys.parent)).json().data.length,0);
+  assert.equal((await call('GET',`/api/writing/parent-progress?studentId=${childId}`,keys.parent)).json().data.length,0);
   assert.equal((await call('GET','/api/writing/parent-progress',keys.stranger)).json().data[0].taskId,task.id);
+  assert.equal((await call('GET',`/api/writing/parent-progress?studentId=${childId}`,keys.stranger)).json().data[0].taskId,task.id);
   assert.equal((await call('GET',path,keys.stranger)).json().data.attempts.length,1);
+});
+
+test('parent writing progress limits each child separately and protects both siblings', async () => {
+  const {keys,users,course,childId}=await operationsFixture(2);
+  const sibling=(await call('POST','/api/academy/children',keys.parent,{name:'طفل كتابة ثان',age:8})).json().data.id;
+  const session=await prisma.classSession.create({data:{courseId:course.id,teacherId:users.teacher.teacherProfile.id,title:'كتابة الأشقاء',scheduledAt:new Date(),status:'COMPLETED'}});
+  const attempts=[
+    ...Array.from({length:101},(_,index)=>({studentId:childId,index,submittedAt:new Date(Date.UTC(2026,0,2,0,0,index))})),
+    ...Array.from({length:2},(_,index)=>({studentId:sibling,index,submittedAt:new Date(Date.UTC(2026,0,1,0,0,index))})),
+  ].map((item)=>({...item,taskId:randomUUID()}));
+  await prisma.writingTask.createMany({data:attempts.map(({taskId})=>({id:taskId,sessionId:session.id,title:'تدريب الكتابة',word:'بَاب',fontSize:140,mode:'SIMPLE',guides:[],useAs:'ACTIVITY'}))});
+  await prisma.writingAttempt.createMany({data:attempts.map(({taskId,studentId,submittedAt})=>({taskId,studentId,submittedAt,strokes:[]}))});
+
+  const progress=async (role:string,studentId?:string)=>{
+    const query=studentId?`?studentId=${studentId}`:'';
+    const response=await call('GET',`/api/writing/parent-progress${query}`,role);
+    assert.equal(response.statusCode,200,response.body);
+    return response.json().data;
+  };
+  const unfiltered=await progress(keys.parent);
+  assert.equal(unfiltered.length,100);
+  assert.ok(unfiltered.every((item:any)=>item.studentId===childId));
+  const first=await progress(keys.parent,childId);
+  assert.equal(first.length,100);
+  assert.ok(first.every((item:any)=>item.studentId===childId));
+  const second=await progress(keys.parent,sibling);
+  assert.equal(second.length,2);
+  assert.deepEqual(new Set(second.map((item:any)=>item.taskId)),new Set(attempts.filter((item)=>item.studentId===sibling).map((item)=>item.taskId)));
+  assert.ok(second.every((item:any)=>item.studentId===sibling));
+  assert.deepEqual(await progress(keys.stranger,childId),[]);
+  assert.deepEqual(await progress(keys.stranger,sibling),[]);
 });
 
 test('writing homework opens only after class end and preserves separate siblings and manual assessment', async () => {

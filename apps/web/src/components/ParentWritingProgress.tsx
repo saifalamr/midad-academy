@@ -24,12 +24,13 @@ export default function ParentWritingProgress({ studentId, studentName }: { stud
     let active = true;
     setLoading(true);
     setError('');
-    academyApi<WritingProgress[]>('/writing/parent-progress')
+    setItems([]);
+    academyApi<WritingProgress[]>(`/writing/parent-progress?studentId=${encodeURIComponent(studentId)}`)
       .then((data) => { if (active) setItems(data); })
       .catch(() => { if (active) setError('تعذر تحميل تدريبات الكتابة.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [retry]);
+  }, [studentId, retry]);
   const own = items.filter((item) => item.studentId === studentId);
   return (
     <section className="card pad" aria-label={`تدريبات الكتابة للطفل ${studentName}`}>
