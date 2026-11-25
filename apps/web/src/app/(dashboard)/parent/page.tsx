@@ -9,6 +9,7 @@ import { academyContactUrl, sessionDate } from '@/lib/academy-contact';
 import './parent.css';
 import { performanceLabels, homeworkLabels, type Report } from '@/lib/session-reports';
 import { academyApi, statusLabels, type Application } from '@/lib/academy-workflow';
+import ParentWritingProgress from '@/components/ParentWritingProgress';
 
 type Session = {
   id: string;
@@ -407,6 +408,7 @@ export default function ParentDashboard() {
               </ul>
             )}
           </section>
+          <ParentWritingProgress studentId={child.id} studentName={child.name} />
           <section className="card pad family-reports" aria-label="تقارير المعلم">
             <h2>تقارير المعلم عن {child.name}</h2>
             <p className="muted">تقييم المعلم بعد كل حصة. تظهر هنا التقارير المعتمدة فقط.</p>
