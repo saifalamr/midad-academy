@@ -251,6 +251,11 @@ test('teacher creates a custom guided word, pupil draws a recoverable draft, ret
     await pupil.getByRole('button', { name: 'حسنًا', exact: true }).click();
     await expect(pupil.getByText('حُفظت المحاولة وسُلّمت للمعلم.', { exact: true })).toBeVisible();
     expect(await prisma.writingAttempt.count({ where: { taskId: task.id } })).toBe(1);
+    const activitySubmission = await request.post('http://127.0.0.1:4000/api/writing/tasks/' + embeddedTask.id + '/submit', {
+      headers: { Authorization: 'Bearer ' + (await login('student@preview.midad.test')) },
+      data: { strokes: [guides[0]] },
+    });
+    expect(activitySubmission.ok()).toBeTruthy();
     await page.goto('/writing/' + task.id);
     await page
       .getByRole('combobox', { name: 'تقييم Preview Student', exact: true })
@@ -268,6 +273,12 @@ test('teacher creates a custom guided word, pupil draws a recoverable draft, ret
       await login('parent@preview.midad.test')
     );
     const family = await familyContext.newPage();
+    await family.goto('/parent');
+    const writingProgress = family.getByRole('region', { name: 'تدريبات الكتابة للطفل Preview Student' });
+    await expect(writingProgress.getByText('كتابة في نافذة الحصة', { exact: true })).toBeVisible();
+    await expect(writingProgress.getByText('بانتظار مراجعة المعلم', { exact: true })).toBeVisible();
+    await writingProgress.getByRole('link', { name: 'عرض كتابة الطفل' }).first().click();
+    await expect(family).toHaveURL(new RegExp('/writing/' + embeddedTask.id + '$'));
     await family.goto('/writing/' + task.id);
     await expect(family.getByRole('heading', { name: 'أتقن التمرين', exact: true })).toBeVisible();
     await expect(
