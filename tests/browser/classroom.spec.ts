@@ -300,7 +300,7 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   await student.getByRole('button', { name: 'نتدرّب على الكتابة', exact: true }).click();
   const writing = student.frameLocator('iframe[title="تمارين كتابة الحصة"]');
   try {
-    await writing.getByRole('link', { name: 'فتح تمرين الكتابة', exact: true }).click();
+    await writing.getByRole('link', { name: 'ابدأ الكتابة', exact: true }).click();
   } catch (error) {
     console.error('Writing activity list:', await writing.locator('body').innerText().catch(() => 'Frame unavailable'));
     throw error;
