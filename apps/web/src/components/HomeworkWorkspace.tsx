@@ -13,6 +13,7 @@ import {
   type Submission,
 } from '@/lib/homework';
 import './homework.css';
+import MatchingAnswer from './MatchingAnswer';
 const kind = { MCQ: 'اختيارات', TRUE_FALSE: 'صح أو خطأ', MATCHING: 'توصيل', AUDIO: 'تسجيل صوتي' };
 export default function HomeworkWorkspace({ sessionId }: { sessionId: string }) {
   const { user } = useAuth();
@@ -250,33 +251,77 @@ function HomeworkEditor({ data, sessionId }: { data: HomeworkData; sessionId: st
                 <small>التسجيل يصححه المعلم يدويًا بعد الاستماع.</small>
               </label>
             ) : q.type === 'MATCHING' ? (
-              <label className="field">
-                الأزواج الصحيحة — كل زوج بسطر، مثل: ألف = أ
-                <textarea
-                  className="input"
-                  rows={4}
-                  value={
-                    matchingText[q.id] ??
-                    q.pairs?.map((p) => `${p.left} = ${p.right}`).join('\n') ??
-                    ''
-                  }
-                  onChange={(e) => {
-                    setMatchingText((old) => ({ ...old, [q.id]: e.target.value }));
-                    change(q.id, {
-                      pairs: e.target.value.split('\n').map((line) => {
-                        const at = line.indexOf('=');
-                        return {
-                          left: (at < 0 ? line : line.slice(0, at)).trim(),
-                          right: (at < 0 ? '' : line.slice(at + 1)).trim(),
-                        };
-                      }),
-                    });
-                  }}
-                />
-                <small>
-                  من زوجين إلى ٨ أزواج، بدون تكرار. الطالب يشوف قائمة إجابات بترتيب مختلف.
-                </small>
-              </label>
+              <div>
+                <label className="field">
+                  الأزواج الصحيحة — كل زوج بسطر، مثل: أ = أسد
+                  <textarea
+                    className="input"
+                    rows={4}
+                    value={
+                      matchingText[q.id] ??
+                      q.pairs?.map((p) => `${p.left} = ${p.right}`).join('\n') ??
+                      ''
+                    }
+                    onChange={(e) => {
+                      setMatchingText((old) => ({ ...old, [q.id]: e.target.value }));
+                      change(q.id, {
+                        pairs: e.target.value.split('\n').map((line, index) => {
+                          const at = line.indexOf('=');
+                          const left = (at < 0 ? line : line.slice(0, at)).trim();
+                          const right = (at < 0 ? '' : line.slice(at + 1)).trim();
+                          return {
+                            left,
+                            right,
+                            ...(q.pairs?.[index]?.right === right && q.pairs[index].rightImageUrl
+                              ? { rightImageUrl: q.pairs[index].rightImageUrl }
+                              : {}),
+                          };
+                        }),
+                      });
+                    }}
+                  />
+                  <small>
+                    من زوجين إلى ٨ أزواج، بدون تكرار. يمكن ربط المقابل بصورة من مواد هذه الحصة.
+                  </small>
+                </label>
+                {q.pairs?.map(
+                  (pair, index) =>
+                    pair.right && (
+                      <label className="field" key={index}>
+                        صورة «{pair.right}» (اختيارية)
+                        <select
+                          className="input"
+                          value={pair.rightImageUrl ?? ''}
+                          onChange={(e) =>
+                            change(q.id, {
+                              pairs: q.pairs!.map((item, i) =>
+                                i === index
+                                  ? { ...item, rightImageUrl: e.target.value || undefined }
+                                  : item
+                              ),
+                            })
+                          }
+                        >
+                          <option value="">نص فقط</option>
+                          {data.session.materials?.map((material) => (
+                            <option key={material.contentUrl} value={material.contentUrl}>
+                              {material.title}
+                            </option>
+                          ))}
+                        </select>
+                        {pair.rightImageUrl && (
+                          // Images are selected from this lesson's admin-assigned materials.
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            className="matching-preview"
+                            src={pair.rightImageUrl}
+                            alt={`معاينة صورة ${pair.right}`}
+                          />
+                        )}
+                      </label>
+                    )
+                )}
+              </div>
             ) : (
               <label className="field">
                 الإجابة الصحيحة
@@ -452,36 +497,14 @@ function HomeworkSolver({
                   }
                 />
               ) : q.type === 'MATCHING' ? (
-                q.left!.map((label, i) => (
-                  <label key={i} className="field">
-                    {label}
-                    <select
-                      className="input"
-                      required
-                      disabled={!!submission}
-                      aria-label={`${q.text}: ${label}`}
-                      value={
-                        Array.isArray(answers[q.id]) ? ((answers[q.id] as string[])[i] ?? '') : ''
-                      }
-                      onChange={(e) =>
-                        setAnswers((old) => {
-                          const values = Array.isArray(old[q.id])
-                            ? [...(old[q.id] as string[])]
-                            : Array(q.left!.length).fill('');
-                          values[i] = e.target.value;
-                          return { ...old, [q.id]: values };
-                        })
-                      }
-                    >
-                      <option value="">اختر المقابل</option>
-                      {q.options!.map((v) => (
-                        <option key={v} value={v}>
-                          {v}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                ))
+                <MatchingAnswer
+                  left={q.left!}
+                  options={q.options!}
+                  images={q.optionImages}
+                  value={Array.isArray(answers[q.id]) ? (answers[q.id] as string[]) : []}
+                  disabled={!!submission}
+                  onChange={(value) => setAnswers((old) => ({ ...old, [q.id]: value }))}
+                />
               ) : (
                 q.options!.map((v) => (
                   <label key={v} className="homework-choice">

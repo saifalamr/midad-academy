@@ -42,13 +42,39 @@ test('admin prepares homework, pupil recovers a draft and retries one submission
       scheduledAt: new Date('2099-02-05T10:00:00Z'),
     },
   });
+  const lionImage = 'https://res.cloudinary.com/demo/image/upload/sample.jpg';
+  const image = await prisma.courseContent.create({
+    data: {
+      courseId: course.id,
+      title: 'صورة الأسد',
+      description: 'صورة تمرين التوصيل',
+      order: 0,
+      type: 'IMAGE',
+      contentUrl: lionImage,
+      duration: 0,
+    },
+  });
+  await prisma.sessionMaterial.create({
+    data: {
+      sessionId: session.id,
+      contentId: image.id,
+      order: 0,
+      title: image.title,
+      type: 'IMAGE',
+      contentUrl: lionImage,
+      description: image.description,
+    },
+  });
   const contexts = [];
   const as = async (email: string) => {
     const res = await request.post('http://127.0.0.1:4000/api/auth/login', {
       data: { email, password: 'MidadPreview2026!' },
     });
     expect(res.ok()).toBeTruthy();
-    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      hasTouch: email === 'student@preview.midad.test',
+    });
     contexts.push(context);
     await context.addInitScript(
       (token) => localStorage.setItem('token', token),
@@ -80,7 +106,8 @@ test('admin prepares homework, pupil recovers a draft and retries one submission
     const third = editor.getByRole('article', { name: 'سؤال 3', exact: true });
     await third.getByLabel('نوع السؤال').selectOption('MATCHING');
     await third.getByLabel('نص السؤال').fill('صل الحروف');
-    await third.getByLabel('الأزواج الصحيحة').fill('ألف = أ\nباء = ب');
+    await third.getByLabel('الأزواج الصحيحة').fill('أ = أسد\nب = بطة');
+    await third.getByLabel('صورة «أسد»').selectOption(lionImage);
     await editor.getByRole('button', { name: 'إضافة سؤال', exact: true }).click();
     const fourth = editor.getByRole('article', { name: 'سؤال 4', exact: true });
     await fourth.getByLabel('نوع السؤال').selectOption('AUDIO');
@@ -89,7 +116,8 @@ test('admin prepares homework, pupil recovers a draft and retries one submission
     await editor.getByRole('button', { name: 'حفظ الواجب', exact: true }).click();
     await expect(editor.getByRole('status')).toContainText('حُفظ');
     await page.reload();
-    await expect(third.getByLabel('الأزواج الصحيحة')).toHaveValue('ألف = أ\nباء = ب');
+    await expect(third.getByLabel('الأزواج الصحيحة')).toHaveValue('أ = أسد\nب = بطة');
+    await expect(third.getByLabel('صورة «أسد»')).toHaveValue(lionImage);
     for (const width of [320, 820, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       expect(
@@ -108,8 +136,12 @@ test('admin prepares homework, pupil recovers a draft and retries one submission
     await pupil.reload();
     await expect(solver.getByRole('radio', { name: 'ألف', exact: true })).toBeChecked();
     await solver.getByRole('radio', { name: 'صح', exact: true }).check();
-    await solver.getByLabel('صل الحروف: ألف', { exact: true }).selectOption('أ');
-    await solver.getByLabel('صل الحروف: باء', { exact: true }).selectOption('ب');
+    await solver.getByRole('button', { name: 'أ', exact: true }).tap();
+    await solver.getByRole('button', { name: 'وصل بـ أسد' }).tap();
+    await solver.getByRole('button', { name: 'ب', exact: true }).focus();
+    await solver.getByRole('button', { name: 'ب', exact: true }).press('Enter');
+    await solver.getByRole('button', { name: 'وصل بـ بطة' }).press('Enter');
+    await expect(solver.getByRole('img', { name: 'أسد' })).toBeVisible();
     await pupil.addInitScript(() => {
       navigator.mediaDevices.getUserMedia = async () => {
         throw Error('لا توجد صلاحية للميكروفون');
@@ -118,14 +150,12 @@ test('admin prepares homework, pupil recovers a draft and retries one submission
     await pupil.reload();
     await solver.getByRole('button', { name: 'بدء التسجيل', exact: true }).click();
     await expect(pupil.getByRole('alertdialog').getByRole('alert')).toContainText('صلاحية');
-  await pupil.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
-    await solver
-      .getByLabel('رفع ملف صوتي')
-      .setInputFiles({
-        name: 'answer.wav',
-        mimeType: 'audio/wav',
-        buffer: Buffer.from('test audio'),
-      });
+    await pupil.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
+    await solver.getByLabel('رفع ملف صوتي').setInputFiles({
+      name: 'answer.wav',
+      mimeType: 'audio/wav',
+      buffer: Buffer.from('test audio'),
+    });
     await expect(solver.getByRole('button', { name: 'تسليم الواجب', exact: true })).toBeDisabled();
     const audioQuestion = (
       await prisma.sessionHomework.findUniqueOrThrow({ where: { sessionId: session.id } })
@@ -158,7 +188,7 @@ test('admin prepares homework, pupil recovers a draft and retries one submission
     });
     await solver.getByRole('button', { name: 'تسليم الواجب', exact: true }).click();
     await expect(pupil.getByRole('alertdialog').getByRole('alert')).toBeVisible();
-  await pupil.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
+    await pupil.getByRole('alertdialog').getByRole('button', { name: 'إغلاق التنبيه' }).click();
     await expect(solver.getByRole('radio', { name: 'ألف', exact: true })).toBeChecked();
     await pupil.unroute(submitPath);
     await solver.getByRole('button', { name: 'تسليم الواجب', exact: true }).click();

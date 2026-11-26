@@ -122,6 +122,26 @@ const session = await data(`/api/admin/courses/${course.id}/sessions`, {
   method: 'POST', token: admin,
   body: { title: 'حصة اختبار الكتابة', scheduledAt: scheduledAt.toISOString(), durationMinutes: 30 },
 }, 201);
+const matchingImage = 'https://midad-academy-preview.vercel.app/midad-logo-transparent.png';
+const imageMaterial = await data(`/api/courses/${course.id}/lessons`, {
+  method: 'POST', token: admin,
+  body: { title: 'صورة مداد للاختبار', description: 'صورة تمرين التوصيل', type: 'IMAGE', contentUrl: matchingImage, duration: 0 },
+}, 201);
+await data(`/api/admin/sessions/${session.id}/materials`, {
+  method: 'PUT', token: admin, body: { version: 0, contentIds: [imageMaterial.id] },
+});
+const matchingId = randomUUID();
+const choiceId = randomUUID();
+await data(`/api/homework/${session.id}`, {
+  method: 'PUT', token: admin, body: {
+    title: 'واجب التوصيل للاختبار', version: 0, questions: [
+      { id: matchingId, text: 'صل الشعار بكلمته', type: 'MATCHING', points: 2,
+        pairs: [{ left: 'مداد', right: 'الشعار', rightImageUrl: matchingImage }, { left: 'أ', right: 'أسد' }] },
+      { id: choiceId, text: 'اختر حرف الألف', type: 'MCQ', points: 1,
+        options: ['أ', 'ب'], correctAnswer: 'أ' },
+    ],
+  },
+});
 const tasks = [];
 for (const [word, title] of [['باب', 'تدريب أحمد'], ['دار', 'تدريب مريم']]) {
   const template = await data('/api/writing/library', {
@@ -155,6 +175,11 @@ try {
   }
   assert.equal((await request(`/api/writing/sessions/${session.id}`, { token: otherFamily.token })).status, 404,
     'Another family can open the writing exercise list.');
+  const matchingHomework = await data(`/api/homework/${session.id}`, { token: first.token });
+  assert.equal(matchingHomework.homework.questions[0].optionImages['الشعار'], matchingImage);
+  assert.ok(!JSON.stringify(matchingHomework).includes('rightImageUrl'), 'The correct pairs leaked to the child.');
+  assert.equal((await request(`/api/homework/${session.id}`, { token: otherFamily.token })).status, 403,
+    'Another family can open the child’s homework.');
 
   const reason = `استفسار عن خطة الحصة ${unique}`;
   const serviceRequest = await data('/api/academy/requests', {
@@ -200,6 +225,26 @@ try {
     const availableTask = studentPage.locator('article').filter({ hasText: tasks[1].title });
     await availableTask.getByText('لم تسلّم محاولة بعد').waitFor();
     await availableTask.getByRole('link', { name: 'ابدأ الكتابة' }).waitFor();
+    await studentPage.goto(new URL(`/student/homework/${session.id}`, web).href);
+    const matching = studentPage.getByRole('region', { name: 'حل واجب الحصة' });
+    await matching.getByRole('button', { name: 'مداد', exact: true }).click();
+    await matching.getByRole('button', { name: 'وصل بـ الشعار' }).click();
+    await matching.getByRole('button', { name: 'أ', exact: true }).press('Enter');
+    await matching.getByRole('button', { name: 'وصل بـ أسد' }).press('Enter');
+    await matching.getByRole('radio', { name: 'أ', exact: true }).check();
+    await matching.getByRole('button', { name: 'تسليم الواجب' }).click();
+    await matching.getByText('تم تسليم الواجب. بانتظار مراجعة المعلم.').waitFor();
+    const reviewed = await data(`/api/homework/${session.id}`, { token: teacher });
+    const submission = reviewed.submissions.find((item) => item.studentId === first.id);
+    assert.ok(submission, 'The teacher cannot see the submitted matching homework.');
+    assert.equal(submission.grades[matchingId], 2);
+    await data(`/api/homework/submissions/${submission.id}/grade`, {
+      method: 'PUT', token: teacher,
+      body: { version: submission.version, grades: submission.grades, feedback: 'أحسنت في التوصيل', publish: true, reviewedAudio: [] },
+    });
+    const familyHomework = await data('/api/homework', { token: family.token });
+    assert.ok(familyHomework.some((item) => item.id === submission.id && item.status === 'GRADED'));
+    assert.ok(!(await data('/api/homework', { token: otherFamily.token })).some((item) => item.id === submission.id));
     await page.goto(new URL('/academy', web).href);
     await page.getByRole('link', { name: /الإشعارات، .* غير مقروءة/ }).click();
     await page.getByRole('heading', { name: 'رد الإدارة على طلبك' }).first().waitFor();
@@ -220,7 +265,7 @@ try {
     await adminConversation.locator('.is-received').getByText(reason).waitFor();
     await adminConversation.locator('.is-sent').getByText(response).waitFor();
   } finally { await browser.close(); }
-  console.log('Hosted child writing steps, family isolation, request conversation and unread notices passed.');
+  console.log('Hosted child writing, image matching homework, family isolation, conversation and notices passed.');
 } finally {
   if (started && !ended) {
     try { await data('/api/sessions/end', { method: 'POST', token: teacher, body: { roomName: course.id } }); }

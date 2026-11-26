@@ -7,8 +7,9 @@ export type HomeworkQuestion = {
   maxSeconds?: number;
   options?: string[];
   correctAnswer?: string;
-  pairs?: { left: string; right: string }[];
+  pairs?: { left: string; right: string; rightImageUrl?: string }[];
   left?: string[];
+  optionImages?: Record<string, string>;
 };
 export type HomeworkAnswer = string | string[];
 export type Submission = {
@@ -23,7 +24,13 @@ export type Submission = {
   submittedAt: string;
 };
 export type HomeworkData = {
-  session: { id: string; title: string; status: string; course: { title: string } };
+  session: {
+    id: string;
+    title: string;
+    status: string;
+    course: { title: string };
+    materials?: { title: string; contentUrl: string }[];
+  };
   homework: { title: string; questions: HomeworkQuestion[]; version: number } | null;
   submission?: Submission | null;
   submissions?: Submission[];

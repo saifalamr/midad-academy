@@ -2451,6 +2451,10 @@ test('class homework freezes before start, hides answer keys, saves once and pub
     },
   ];
   const body = { title: 'Letters homework', version: 0, questions };
+  const imageUrl = 'https://res.cloudinary.com/demo/image/upload/sample.jpg';
+  const picturedBody = { ...body, questions: questions.map((q, index) => index === 2
+    ? { ...q, pairs: [{ left: 'Alif', right: 'أ', rightImageUrl: imageUrl }, { left: 'Ba', right: 'ب' }] }
+    : q) };
   assert.equal((await call('GET', path)).statusCode, 401);
   assert.equal((await call('PUT', path, 'teacher', body)).statusCode, 403);
   assert.equal(
@@ -2462,7 +2466,16 @@ test('class homework freezes before start, hides answer keys, saves once and pub
     ).statusCode,
     400
   );
-  assert.equal((await call('PUT', path, 'admin', body)).statusCode, 200);
+  assert.equal((await call('PUT', path, 'admin', picturedBody)).statusCode, 400);
+  const image = await prisma.courseContent.create({ data: {
+    courseId, title: 'Lion picture', description: 'Matching image', order: 0,
+    type: 'IMAGE', contentUrl: imageUrl, duration: 0,
+  } });
+  await prisma.sessionMaterial.create({ data: {
+    sessionId: session.id, contentId: image.id, order: 0, title: image.title,
+    type: 'IMAGE', contentUrl: imageUrl, description: image.description,
+  } });
+  assert.equal((await call('PUT', path, 'admin', picturedBody)).statusCode, 200);
   assert.equal((await call('PUT', path, 'admin', body)).statusCode, 409);
   assert.equal((await call('GET', path, 'student')).statusCode, 409);
   assert.equal((await call('GET', path, 'outsider')).statusCode, 403);
@@ -2478,6 +2491,7 @@ test('class homework freezes before start, hides answer keys, saves once and pub
   assert.equal(assignment.statusCode, 200, assignment.body);
   assert.ok(!assignment.body.includes('correctAnswer'));
   assert.ok(!assignment.body.includes('pairs'));
+  assert.equal(assignment.json().data.homework.questions[2].optionImages['أ'], imageUrl);
   assert.ok(!assignment.json().data.session.homework);
   assert.ok(
     (await call('GET', '/api/homework', 'parent'))
