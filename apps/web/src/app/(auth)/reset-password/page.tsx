@@ -16,11 +16,11 @@ export default function ResetPassword() {
     if (resetToken) window.history.replaceState(window.history.state, '', window.location.pathname);
   }, []);
   return (
-    <main className="midad wrap" style={{ maxWidth: 520, padding: '80px 24px' }}>
+    <main className="midad wrap" dir="rtl" style={{ maxWidth: 520, padding: '80px 24px' }}>
       <Link href="/login">
-        <Icon name="left" /> Log in
+        <Icon name="left" /> العودة إلى تسجيل الدخول
       </Link>
-      <h1 className="sec-h2">Choose a new password</h1>
+      <h1 className="sec-h2">اختيار كلمة مرور جديدة</h1>
       <form
         className="card pad"
         onSubmit={async (e) => {
@@ -32,22 +32,27 @@ export default function ResetPassword() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ token, password }),
             });
-            const data = await res.json();
-            setMessage(data.message ?? data.error);
+            setMessage(res.ok
+              ? 'تم تحديث كلمة المرور. يمكنك تسجيل الدخول الآن.'
+              : res.status === 400
+                ? 'رابط الاستعادة غير صالح أو انتهت صلاحيته. اطلب رابطًا جديدًا.'
+                : res.status === 429
+                  ? 'تكررت المحاولات. انتظر قليلًا ثم أعد المحاولة.'
+                  : 'تعذر تحديث كلمة المرور الآن. أعد المحاولة بعد قليل.');
             if (res.ok) {
               setDone(true);
               localStorage.removeItem('token');
               sessionStorage.removeItem('token');
             }
           } catch {
-            setMessage('Could not connect. Please try again.');
+            setMessage('تعذر الاتصال. تحقق من اتصالك ثم أعد المحاولة.');
           } finally {
             setBusy(false);
           }
         }}
       >
         <label className="field">
-          New password
+          كلمة المرور الجديدة
           <input
             className="input"
             type="password"
@@ -60,12 +65,12 @@ export default function ResetPassword() {
           />
         </label>
         <button className="btn btn-gold" disabled={busy || done || !token}>
-          Update password
+          تحديث كلمة المرور
         </button>
         {message && <PopupNotice title="رسالة الحساب">{message}</PopupNotice>}
         {done && (
           <Link href="/login">
-            Log in with your new password <Icon name="right" />
+            تسجيل الدخول بكلمة المرور الجديدة <Icon name="right" />
           </Link>
         )}
       </form>

@@ -16,7 +16,27 @@ test('password recovery removes its one-time token from the address and referrer
   expect(response?.headers()['referrer-policy']).toBe('no-referrer');
   expect(response?.headers()['cache-control']).toContain('no-store');
   await expect(page).toHaveURL(/\/reset-password$/);
-  await expect(page.getByRole('button', { name: 'Update password' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'تحديث كلمة المرور' })).toBeEnabled();
+});
+
+test('password recovery shows Arabic guidance without exposing server errors', async ({ page }) => {
+  await page.route('**/api/auth/forgot-password', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ message: 'Internal response' }) })
+  );
+  await page.goto('/forgot-password');
+  await page.getByLabel('البريد الإلكتروني لحسابك').fill('family@example.test');
+  await page.getByRole('button', { name: 'إرسال رابط الاستعادة' }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('إذا كان البريد مسجلًا');
+  await expect(page.getByRole('alertdialog')).not.toContainText('Internal response');
+
+  await page.route('**/api/auth/reset-password', (route) =>
+    route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: 'Internal token error' }) })
+  );
+  await page.goto(`/reset-password?token=${'a'.repeat(64)}`);
+  await page.getByLabel('كلمة المرور الجديدة').fill('NewPassword2026!');
+  await page.getByRole('button', { name: 'تحديث كلمة المرور' }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('رابط الاستعادة غير صالح');
+  await expect(page.getByRole('alertdialog')).not.toContainText('Internal token error');
 });
 
 test('login keeps the session secret in an HttpOnly cookie and blocks cross-site writes', async ({ page }) => {
@@ -76,16 +96,17 @@ test('validation and login failures use dismissible popups; retry remains availa
   await page.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();
   await expect(page.getByRole('alertdialog')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'راجع البيانات' })).toBeVisible();
+  await expect(page.getByRole('alertdialog')).toContainText(/أدخل (البريد الإلكتروني أو اسم المستخدم|كلمة المرور)/);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('alertdialog')).not.toBeVisible();
   await page.locator('#email').fill('missing@preview.midad.test');
   await page.locator('#password').fill('IncorrectPassword2026');
   await page.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();
-  await expect(page.getByRole('alertdialog')).toContainText('Invalid credentials');
+  await expect(page.getByRole('alertdialog')).toContainText('بيانات الدخول غير صحيحة');
   await page.getByRole('button', { name: 'حسنًا' }).click();
   await expect(page.locator('#email')).toHaveValue('missing@preview.midad.test');
   await page.getByRole('button', { name: 'عرض التنبيه' }).click();
-  await expect(page.getByRole('alertdialog')).toContainText('Invalid credentials');
+  await expect(page.getByRole('alertdialog')).toContainText('بيانات الدخول غير صحيحة');
   await page.keyboard.press('Escape');
   let failed = true;
   await page.route('**/api/courses/catalog', (route) =>
