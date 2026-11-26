@@ -113,7 +113,8 @@
   .midad.classroom-v2 .board-wrap{overflow-x:clip}
   .midad.classroom-v2 .board-bar,.midad.classroom-v2 .bb-right,.midad.classroom-v2 .wb-colors{min-width:0;max-width:100%}
   .midad.classroom-v2 .bb-chip{width:44px;min-width:44px;min-height:44px;padding:8px;font-size:0}
-  .midad.classroom-v2 .wb-colors{box-sizing:border-box;contain:inline-size;overflow-x:auto}
+  .midad.classroom-v2 .wb-colors{box-sizing:border-box;flex-wrap:wrap;max-height:none;overflow:visible}
+  .midad.classroom-v2 .tool-size{flex:1 1 100%;min-width:0}
 }
 /* Short phones and foldable cover screens get a scrollable room and a usable
    writing surface instead of shrinking the board to a narrow strip. */
@@ -123,7 +124,7 @@
   .midad.classroom-v2 .room-controls{position:sticky;bottom:0;z-index:15}
 }
 @media (max-width:380px) and (max-height:720px) and (orientation:portrait){
-  .midad.room.classroom-v2{grid-template-rows:auto auto auto 68px minmax(470px,1fr) auto}
+  .midad.room.classroom-v2{grid-template-rows:auto auto auto 68px minmax(510px,1fr) auto}
 }
 /* Focus mode keeps call controls available, but gives the canvas the room. */
 .midad.room.classroom-v2.board-focused{height:100dvh;min-height:0;overflow:hidden;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto}
