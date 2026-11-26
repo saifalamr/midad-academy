@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
   const logout = useCallback(async () => {
-    if (!(await confirm('هل تريد تسجيل الخروج من حسابك؟'))) return false;
+    if (!(await confirm('هل تريد تسجيل الخروج من حسابك؟', { title: 'تأكيد تسجيل الخروج', confirmLabel: 'تسجيل الخروج' }))) return false;
     try {
       const res = await fetch(`${API_URL}/api/auth/logout`, { method: 'POST' });
       if (!res.ok) throw new Error('Could not end the session');

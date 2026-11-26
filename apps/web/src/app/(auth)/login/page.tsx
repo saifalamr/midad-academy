@@ -31,7 +31,13 @@ export default function LoginPage() {
       const json = await res.json();
 
       if (!res.ok) {
-        setError(json.error || 'تعذر تسجيل الدخول');
+        setError(
+          res.status === 401 || res.status === 403
+            ? 'بيانات الدخول غير صحيحة. تحقق من البريد الإلكتروني أو اسم المستخدم وكلمة المرور.'
+            : res.status === 429
+              ? 'تكررت المحاولات. انتظر قليلًا ثم أعد المحاولة.'
+              : 'تعذر تسجيل الدخول الآن. أعد المحاولة بعد قليل.'
+        );
         return;
       }
 
