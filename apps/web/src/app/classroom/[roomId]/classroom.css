@@ -110,6 +110,10 @@
   .midad.classroom-v2 .wb-tool,.midad.classroom-v2 .board-tool-menu summary{width:44px;min-width:44px;height:44px}
   .midad.classroom-v2 .wb-sep{margin:0 1px}
   .midad.classroom-v2 .board-tool-popover .wb-tool{width:100%}
+  .midad.classroom-v2 .board-wrap{overflow-x:clip}
+  .midad.classroom-v2 .board-bar,.midad.classroom-v2 .bb-right,.midad.classroom-v2 .wb-colors{min-width:0;max-width:100%}
+  .midad.classroom-v2 .bb-chip{width:44px;min-width:44px;min-height:44px;padding:8px;font-size:0}
+  .midad.classroom-v2 .wb-colors{box-sizing:border-box;contain:inline-size;overflow-x:auto}
 }
 /* Short phones and foldable cover screens get a scrollable room and a usable
    writing surface instead of shrinking the board to a narrow strip. */
