@@ -76,16 +76,17 @@ test('validation and login failures use dismissible popups; retry remains availa
   await page.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();
   await expect(page.getByRole('alertdialog')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'راجع البيانات' })).toBeVisible();
+  await expect(page.getByRole('alertdialog')).toContainText(/أدخل (البريد الإلكتروني أو اسم المستخدم|كلمة المرور)/);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('alertdialog')).not.toBeVisible();
   await page.locator('#email').fill('missing@preview.midad.test');
   await page.locator('#password').fill('IncorrectPassword2026');
   await page.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();
-  await expect(page.getByRole('alertdialog')).toContainText('Invalid credentials');
+  await expect(page.getByRole('alertdialog')).toContainText('بيانات الدخول غير صحيحة');
   await page.getByRole('button', { name: 'حسنًا' }).click();
   await expect(page.locator('#email')).toHaveValue('missing@preview.midad.test');
   await page.getByRole('button', { name: 'عرض التنبيه' }).click();
-  await expect(page.getByRole('alertdialog')).toContainText('Invalid credentials');
+  await expect(page.getByRole('alertdialog')).toContainText('بيانات الدخول غير صحيحة');
   await page.keyboard.press('Escape');
   let failed = true;
   await page.route('**/api/courses/catalog', (route) =>

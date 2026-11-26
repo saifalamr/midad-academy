@@ -13,13 +13,28 @@ import {
 import { usePathname } from 'next/navigation';
 import Icon from './Icon';
 
-type Entry = { id: string; content: ReactNode; title: string; confirm?: (answer: boolean) => void };
+type ConfirmOptions = { title?: string; confirmLabel?: string; cancelLabel?: string };
+type Entry = { id: string; content: ReactNode; title: string; confirm?: (answer: boolean) => void } & ConfirmOptions;
 type Feedback = {
   notice: (id: string, content: ReactNode, title?: string) => void;
   remove: (id: string) => void;
-  confirm: (message: string) => Promise<boolean>;
+  confirm: (message: string, options?: ConfirmOptions) => Promise<boolean>;
 };
 const Context = createContext<Feedback | null>(null);
+function arabicValidationMessage(
+  field: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
+  label: string
+) {
+  const validity = field.validity;
+  if (validity.valueMissing) return `${field instanceof HTMLSelectElement ? 'اختر' : 'أدخل'} ${label}`;
+  if (validity.typeMismatch) return `أدخل ${label} بصيغة صحيحة`;
+  if (validity.tooShort) return `اكتب ${label} من ${field.getAttribute('minlength')} أحرف على الأقل`;
+  if (validity.tooLong) return `اختصر ${label} إلى ${field.getAttribute('maxlength')} حرفًا أو أقل`;
+  if (validity.patternMismatch) return `تحقق من صيغة ${label}`;
+  if (validity.rangeUnderflow) return `أدخل ${label} بقيمة لا تقل عن ${field.getAttribute('min')}`;
+  if (validity.rangeOverflow) return `أدخل ${label} بقيمة لا تزيد على ${field.getAttribute('max')}`;
+  return `راجع قيمة ${label} ثم حاول مرة أخرى`;
+}
 export function FeedbackProvider({ children }: { children: ReactNode }) {
   const [queue, setQueue] = useState<Entry[]>([]);
   const queueRef = useRef(queue);
@@ -36,12 +51,14 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
   }, []);
   const remove = useCallback((id: string) => setQueue((q) => q.filter((e) => e.id !== id)), []);
   const confirm = useCallback(
-    (message: string) =>
+    (message: string, options: ConfirmOptions = {}) =>
       new Promise<boolean>((resolve) => {
         setQueue((q) => [
           {
             id: 'confirm-' + Date.now(),
-            title: 'تأكيد تسجيل الخروج',
+            title: options.title ?? 'تأكيد الإجراء',
+            confirmLabel: options.confirmLabel ?? 'تأكيد',
+            cancelLabel: options.cancelLabel ?? 'إلغاء',
             content: message,
             confirm: resolve,
           },
@@ -85,9 +102,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
         field.labels?.[0]?.textContent?.trim() || field.getAttribute('aria-label') || 'هذا الحقل';
       notice(
         'form-validation',
-        <p>
-          {label}: {field.validationMessage}
-        </p>,
+        <p>{arabicValidationMessage(field, label)}</p>,
         'راجع البيانات'
       );
     };
@@ -127,7 +142,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
           <>
             <div className="feedback-heading">
               <span className="feedback-symbol">
-                <Icon name={current.confirm ? 'logout' : 'warning'} size={22} />
+                <Icon name={current.confirmLabel === 'تسجيل الخروج' ? 'logout' : 'warning'} size={22} />
               </span>
               <h2 id="feedback-title">{current.title}</h2>
               <button
@@ -149,10 +164,10 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
               {current.confirm ? (
                 <>
                   <button ref={cancel} className="btn btn-outline" onClick={() => finish(false)}>
-                    إلغاء
+                    {current.cancelLabel}
                   </button>
                   <button className="btn btn-gold" onClick={() => finish(true)}>
-                    تسجيل الخروج
+                    {current.confirmLabel}
                   </button>
                 </>
               ) : (
