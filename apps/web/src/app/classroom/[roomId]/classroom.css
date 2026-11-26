@@ -115,6 +115,7 @@
   .midad.classroom-v2 .bb-chip{width:44px;min-width:44px;min-height:44px;padding:8px;font-size:0}
   .midad.classroom-v2 .wb-colors{box-sizing:border-box;flex-wrap:wrap;max-height:none;overflow:visible}
   .midad.classroom-v2 .tool-size{flex:1 1 100%;min-width:0}
+  .midad.classroom-v2 .rc-btn>span:last-child{min-width:0;white-space:normal;overflow-wrap:anywhere;text-align:center}
 }
 /* Short phones and foldable cover screens get a scrollable room and a usable
    writing surface instead of shrinking the board to a narrow strip. */

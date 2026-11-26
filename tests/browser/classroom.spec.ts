@@ -431,7 +431,7 @@ test('teacher and student exchange real media, synchronized ink, permissions and
             .join(' < ');
         }),
     }));
-    expect(horizontalOverflow.page, `horizontal overflow at ${size.width}px: ${horizontalOverflow.outside.join(', ')}`).toBeLessThanOrEqual(horizontalOverflow.viewport);
+    expect.soft(horizontalOverflow.page, `horizontal overflow at ${size.width}px: ${horizontalOverflow.outside.join(', ')}`).toBeLessThanOrEqual(horizontalOverflow.viewport);
     await expect(teacher.getByRole('button', { name: 'كتم الصوت', exact: true })).toBeVisible();
     await teacher.getByRole('button', { name: 'توسيع السبورة' }).click();
     const expanded = (await teacher.locator('.board-paper').boundingBox())!;
