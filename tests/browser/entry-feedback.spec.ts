@@ -60,12 +60,15 @@ test('login keeps the session secret in an HttpOnly cookie and blocks cross-site
   expect(denied.status()).toBe(403);
 });
 
-test('compact home exposes working entry links on phone, tablet and desktop', async ({ page }) => {
+test('public home explains the lesson and exposes working entry links across widths', async ({ page }) => {
   await page.goto('/');
-  for (const width of [320, 390, 820, 1440]) {
+  await expect(page.getByRole('heading', { name: /مساحة يتعلّم فيها طفلك/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'يحضر حصة مباشرة' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'تتابع أنت الرحلة' })).toBeVisible();
+  for (const width of [280, 320, 390, 430, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await expect(
-      page.locator('.welcome-actions').getByRole('link', { name: 'تسجيل الدخول' })
+      page.locator('.welcome-actions').getByRole('link', { name: 'استعرض الدورات' })
     ).toBeVisible();
     await expect(
       page.locator('.welcome-actions').getByRole('link', { name: 'إنشاء حساب ولي أمر' })
@@ -79,7 +82,7 @@ test('compact home exposes working entry links on phone, tablet and desktop', as
     expect(links.every((href) => href && href !== '#')).toBe(true);
     await page.screenshot({ path: `test-results/compact-home-${width}.png`, fullPage: true });
   }
-  await page.locator('.welcome-courses').click();
+  await page.locator('.welcome-actions').getByRole('link', { name: 'استعرض الدورات' }).click();
   await expect(page).toHaveURL(/#monthly-courses$/);
   await page.locator('.welcome-actions').getByRole('link', { name: 'إنشاء حساب ولي أمر' }).click();
   await expect(page).toHaveURL(/\/register$/);

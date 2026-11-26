@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { API_URL } from '@/lib/config';
 import { courseInquiryUrl, sessionDate } from '@/lib/academy-contact';
-import Icon from './Icon';
 import { PopupNotice } from './FeedbackProvider';
 type Course = {
   id: string;
@@ -48,7 +47,9 @@ export default function MonthlyCatalog() {
     <section className="wrap sec" id="monthly-courses" dir="rtl">
       <span className="eyebrow">الدورات الشهرية</span>
       <h2 className="sec-h2">اختر رحلة طفلك القادمة</h2>
-      <p className="sec-sub">اختر الدورة وأرسل طلبًا لطفلك داخل حسابك. تؤكد الإدارة التسجيل بعد المراجعة.</p>
+      <p className="sec-sub">
+        اختر الدورة وأرسل طلبًا لطفلك داخل حسابك. تؤكد الإدارة التسجيل بعد المراجعة.
+      </p>
       {state === 'loading' ? (
         <p role="status">جارٍ عرض الدورات…</p>
       ) : state === 'error' ? (
@@ -61,20 +62,14 @@ export default function MonthlyCatalog() {
       ) : !courses.length ? (
         <p>سيتم الإعلان عن الدورات الشهرية هنا قريبًا.</p>
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,290px),1fr))',
-            gap: 20,
-          }}
-        >
+        <div className="catalog-grid">
           {courses.map((c) => (
-            <article key={c.id} className="card pad">
+            <article key={c.id} className="card pad catalog-card">
               <span className="tag">
                 {c.month} · الأعمار {c.ageGroup} سنوات
               </span>
-              <h3 style={{ fontSize: 21, margin: '10px 0' }}>{c.title}</h3>
-              <p>{c.description}</p>
+              <h3 dir="auto">{c.title}</h3>
+              <p dir="auto">{c.description}</p>
               <p>
                 {c.teacherName} · {c.availableSeats} مقاعد متاحة
               </p>
@@ -105,10 +100,14 @@ export default function MonthlyCatalog() {
                 <Link className="btn btn-gold" href={`/academy?course=${encodeURIComponent(c.id)}`}>
                   {c.availableSeats > 0 ? 'سجّل طفلك' : 'مكتملة — الانضمام لقائمة الانتظار'}
                 </Link>
-                <a className="btn btn-outline" href={courseInquiryUrl(c)} target="_blank" rel="noopener noreferrer">استفسار عبر واتساب</a>
-                <Link className="btn btn-outline" href="/register">
-                  <Icon name="family" /> إنشاء حساب ولي الأمر
-                </Link>
+                <a
+                  className="catalog-question"
+                  href={courseInquiryUrl(c)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  استفسار عن الدورة
+                </a>
               </div>
             </article>
           ))}
