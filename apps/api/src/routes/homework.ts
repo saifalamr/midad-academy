@@ -20,6 +20,7 @@ const questionDefinition = z
         z.object({
           left: z.string().trim().min(1).max(300),
           right: z.string().trim().min(1).max(300),
+          rightImageUrl: z.string().url().startsWith('https://').max(2048).optional(),
         })
       )
       .min(2)
@@ -74,7 +75,13 @@ function questionsForStudent(questions: Question[]) {
     points: q.points,
     ...(q.type === 'AUDIO' ? { maxSeconds: q.maxSeconds ?? 60 } : {}),
     ...(q.type === 'MATCHING'
-      ? { left: q.pairs!.map((p) => p.left), options: q.pairs!.map((p) => p.right).sort() }
+      ? {
+          left: q.pairs!.map((p) => p.left),
+          options: q.pairs!.map((p) => p.right).sort(),
+          optionImages: Object.fromEntries(
+            q.pairs!.filter((p) => p.rightImageUrl).map((p) => [p.right, p.rightImageUrl])
+          ),
+        }
       : { options: q.type === 'TRUE_FALSE' ? ['true', 'false'] : q.options }),
   }));
 }
@@ -146,7 +153,11 @@ function publicSubmission(s: HomeworkSubmission | null) {
     ...(s.publishedAt ? { grades: s.grades, feedback: s.feedback } : {}),
   };
 }
-const include = { homework: true, course: { select: { title: true, timeZone: true } } } as const;
+const include = {
+  homework: true,
+  course: { select: { title: true, timeZone: true } },
+  materials: { where: { type: 'IMAGE' as const }, select: { title: true, contentUrl: true } },
+} as const;
 export async function homeworkRoutes(app: FastifyInstance) {
   app.addHook('preHandler', app.authenticate);
   app.get('/', async (request) => {
@@ -359,6 +370,22 @@ export async function homeworkRoutes(app: FastifyInstance) {
         throw httpError(409, 'جهز الواجب قبل بداية الحصة؛ بعدها يُحفظ في السجل');
       if ((session.homework?.version ?? 0) !== body.version)
         throw httpError(409, 'الواجب تغير في صفحة أخرى. أعد تحميله');
+      const imageUrls = new Set(
+        (
+          await tx.sessionMaterial.findMany({
+            where: { sessionId: session.id, type: 'IMAGE' },
+            select: { contentUrl: true },
+          })
+        ).map((material) => material.contentUrl)
+      );
+      if (
+        body.questions.some(
+          (q) =>
+            q.type === 'MATCHING' &&
+            q.pairs?.some((pair) => pair.rightImageUrl && !imageUrls.has(pair.rightImageUrl))
+        )
+      )
+        throw httpError(400, 'اختر صور التوصيل من المواد المخصصة لهذه الحصة');
       return tx.sessionHomework.upsert({
         where: { sessionId: session.id },
         create: { sessionId: session.id, title: body.title, questions: body.questions },
