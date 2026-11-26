@@ -131,6 +131,7 @@
 .midad.room.classroom-v2.board-focused{height:100dvh;min-height:0;overflow:hidden;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto}
 .midad.classroom-v2.board-focused .room-top{min-height:44px;padding-block:5px}
 .midad.classroom-v2.board-focused .class-clock,.midad.classroom-v2.board-focused .class-writing-entry{display:none}
+.midad.classroom-v2.board-focused .board-bar{position:relative;z-index:61}
 .midad.classroom-v2.board-focused .video-strip.focus-call-pip{
   position:fixed;z-index:60;display:flex;flex-direction:row;flex-wrap:wrap;align-content:flex-start;
   width:min(220px, calc(100vw - 16px));height:180px;min-height:0;padding:4px;gap:4px;
