@@ -153,6 +153,8 @@ try {
     const stranger = await data(`/api/writing/parent-progress?studentId=${student.id}`, { token: otherFamily.token });
     assert.deepEqual(stranger, [], 'Another family can read a child’s writing progress.');
   }
+  assert.equal((await request(`/api/writing/sessions/${session.id}`, { token: otherFamily.token })).status, 404,
+    'Another family can open the writing exercise list.');
 
   const reason = `استفسار عن خطة الحصة ${unique}`;
   const serviceRequest = await data('/api/academy/requests', {
@@ -189,6 +191,15 @@ try {
     await page.getByRole('button', { name: '6–9', exact: true }).click();
     await page.locator('article').filter({ hasText: course.title })
       .getByText('الأعمار 6–9 سنوات').waitFor();
+    const studentPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await studentPage.addInitScript((token) => localStorage.setItem('token', token), first.token);
+    await studentPage.goto(new URL(`/sessions/${session.id}/writing`, web).href);
+    const completedTask = studentPage.locator('article').filter({ hasText: tasks[0].title });
+    await completedTask.getByText('سلّمت محاولتك · بانتظار مراجعة المعلم').waitFor();
+    await completedTask.getByRole('link', { name: 'عرض محاولتك والتقييم' }).waitFor();
+    const availableTask = studentPage.locator('article').filter({ hasText: tasks[1].title });
+    await availableTask.getByText('لم تسلّم محاولة بعد').waitFor();
+    await availableTask.getByRole('link', { name: 'ابدأ الكتابة' }).waitFor();
     await page.goto(new URL('/academy', web).href);
     await page.getByRole('link', { name: /الإشعارات، .* غير مقروءة/ }).click();
     await page.getByRole('heading', { name: 'رد الإدارة على طلبك' }).first().waitFor();
@@ -209,7 +220,7 @@ try {
     await adminConversation.locator('.is-received').getByText(reason).waitFor();
     await adminConversation.locator('.is-sent').getByText(response).waitFor();
   } finally { await browser.close(); }
-  console.log('Hosted writing, family isolation, request conversation and unread notices passed.');
+  console.log('Hosted child writing steps, family isolation, request conversation and unread notices passed.');
 } finally {
   if (started && !ended) {
     try { await data('/api/sessions/end', { method: 'POST', token: teacher, body: { roomName: course.id } }); }
