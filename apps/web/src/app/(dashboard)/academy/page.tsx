@@ -66,6 +66,11 @@ export default function AcademyPage() {
   const intentLoaded = useRef(false);
   const loadedFor = useRef<string | null>(null);
   useEffect(() => {
+    const openNotices = () => setTab('notices');
+    window.addEventListener('midad-open-notices', openNotices);
+    return () => window.removeEventListener('midad-open-notices', openNotices);
+  }, []);
+  useEffect(() => {
     if (!user) return;
     // Apply the incoming course intent once, before loading; late responses must
     // not replace a tab the parent has already selected or is editing.
@@ -79,6 +84,8 @@ export default function AcademyPage() {
         setTab('apply');
       } else if (parent && new URLSearchParams(location.search).get('view') === 'applications') {
         setTab('applications');
+      } else if (new URLSearchParams(location.search).get('view') === 'notices') {
+        setTab('notices');
       }
     }
     let active = true;
@@ -138,6 +145,7 @@ export default function AcademyPage() {
     try {
       await work();
       setRevision((x) => x + 1);
+      window.dispatchEvent(new Event('midad-notices-changed'));
       showPopup(success);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'تعذر الحفظ');
@@ -660,8 +668,19 @@ export default function AcademyPage() {
                     {r.session ? ` — ${r.session.title}` : ''}
                   </p>
                   <b>{labels[r.status]}</b>
-                  <p>{r.reason}</p>
-                  {r.response && <p>رد الإدارة: {r.response}</p>}
+                  <div className="flow-conversation" role="group" aria-label={`محادثة ${labels[r.kind]}`}>
+                    <div className={`flow-message ${parent ? 'is-sent' : 'is-received'}`}>
+                      <small>ولي الأمر · {localTime(r.createdAt)}</small>
+                      <p>{r.reason}</p>
+                    </div>
+                    {r.response && (
+                      <div className={`flow-message ${admin ? 'is-sent' : 'is-received'}`}>
+                        <small>إدارة الأكاديمية · {localTime(r.updatedAt)}</small>
+                        <p>{r.response}</p>
+                      </div>
+                    )}
+                    {!r.response && <small className="flow-awaiting">بانتظار رد الإدارة</small>}
+                  </div>
                   {r.kind === 'REFUND' && (
                     <small>
                       الرد على الطلب لا يعني تنفيذ التحويل. تأكيد الاسترجاع المالي يظهر في سجل

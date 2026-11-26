@@ -18,6 +18,12 @@
   margin: 10px 0;
   line-height: 1.8;
 }
+.flow-conversation{display:flex;flex-direction:column;gap:10px;margin:16px 0;padding:12px;background:#f7f5ef;border:1px solid var(--line);border-radius:14px}
+.flow-message{max-width:min(88%,560px);padding:10px 14px;border-radius:12px;background:#fff;border:1px solid #dce3ed;overflow-wrap:anywhere}
+.flow-message.is-sent{align-self:flex-end;background:#e9f0fa;border-color:#c9d9ef}
+.flow-message.is-received{align-self:flex-start}
+.flow-message small,.flow-awaiting{color:#5b6d84;font-size:12px}
+.flow-message p{margin:4px 0 0}
 .flow-head {
   display: flex;
   align-items: center;

@@ -818,6 +818,9 @@
 /* The source logo has a stray fold outside the artwork at its lower right. */
 img[src*="midad-logo-transparent.png"]{clip-path:polygon(0 0,100% 0,100% 80%,70% 80%,70% 100%,0 100%)}
 .workspace-brand{min-width:0;flex-shrink:0}.workspace-brand b{white-space:nowrap}.workspace-account{flex-shrink:0}
+.workspace-notices{position:relative;display:grid;place-items:center;width:44px;height:44px;flex:0 0 44px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--ink)}
+.workspace-notices:hover{background:#f7f3e9}.workspace-notices:focus-visible{outline:3px solid #c9922a;outline-offset:2px}.workspace-notices svg{width:22px;height:22px}
+.workspace-notice-count{position:absolute;inset-block-start:-5px;inset-inline-start:-5px;min-width:20px;height:20px;padding:0 4px;display:grid;place-items:center;border-radius:10px;background:#b94139;color:#fff;font-size:11px;font-weight:700}
 .workspace-content .dash-hero>div:first-child{min-width:0;max-width:100%}
 @media(max-width:1000px){.midad .dh-level{flex-basis:auto;width:100%}}
 @media(max-width:700px){.workspace-topbar{position:relative;height:auto;min-height:60px;padding-block:8px;flex-wrap:wrap}.workspace-nav{position:relative;top:auto}.workspace-content .col-head{gap:12px;flex-wrap:wrap}.workspace-content .col-head h2{min-width:0;line-height:1.4}.workspace-content .lvl-row{gap:8px;flex-wrap:wrap}.workspace-content .lvl-note{line-height:1.6}}

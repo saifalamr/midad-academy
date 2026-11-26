@@ -154,6 +154,19 @@ try {
     assert.deepEqual(stranger, [], 'Another family can read a child’s writing progress.');
   }
 
+  const reason = `استفسار عن خطة الحصة ${unique}`;
+  const serviceRequest = await data('/api/academy/requests', {
+    method: 'POST', token: family.token,
+    body: { studentId: first.id, courseId: course.id, kind: 'SUPPORT', reason },
+  }, 201);
+  const response = 'وصلنا سؤالك، وسنراجع الخطة مع المعلم.';
+  await data(`/api/academy/requests/${serviceRequest.id}`, {
+    method: 'PATCH', token: admin,
+    body: { version: serviceRequest.version, status: 'RESOLVED', response },
+  });
+  const familyNotices = await data('/api/academy/notices', { token: family.token });
+  assert.ok(familyNotices.some((notice) => notice.title === 'رد الإدارة على طلبك' && !notice.readAt));
+
   const executablePath = await chromiumPath();
   const browser = await playwrightChromium.launch({
     headless: true, executablePath,
@@ -176,8 +189,27 @@ try {
     await page.getByRole('button', { name: '6–9', exact: true }).click();
     await page.locator('article').filter({ hasText: course.title })
       .getByText('الأعمار 6–9 سنوات').waitFor();
+    await page.goto(new URL('/academy', web).href);
+    await page.getByRole('link', { name: /الإشعارات، .* غير مقروءة/ }).click();
+    await page.getByRole('heading', { name: 'رد الإدارة على طلبك' }).first().waitFor();
+    await page.getByRole('button', { name: 'الغياب والتعويض والمساعدة' }).click();
+    const conversation = page.getByRole('group', { name: 'محادثة طلب مساعدة' }).filter({ hasText: reason });
+    await conversation.locator('.is-sent').getByText(reason).waitFor();
+    await conversation.locator('.is-received').getByText(response).waitFor();
+
+    const adminPage = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    await adminPage.goto(new URL('/login', web).href);
+    await adminPage.getByLabel('البريد الإلكتروني أو اسم المستخدم').fill(process.env.TEST_ADMIN_EMAIL);
+    await adminPage.getByLabel('كلمة المرور', { exact: true }).fill(process.env.TEST_ADMIN_PASSWORD);
+    await adminPage.getByRole('button', { name: 'تسجيل الدخول', exact: true }).click();
+    await adminPage.waitForURL((url) => url.pathname === '/admin');
+    await adminPage.goto(new URL('/academy', web).href);
+    await adminPage.getByRole('button', { name: 'الغياب والتعويض والمساعدة' }).click();
+    const adminConversation = adminPage.getByRole('group', { name: 'محادثة طلب مساعدة' }).filter({ hasText: reason });
+    await adminConversation.locator('.is-received').getByText(reason).waitFor();
+    await adminConversation.locator('.is-sent').getByText(response).waitFor();
   } finally { await browser.close(); }
-  console.log('Hosted writing results, child switching and cross-family isolation passed.');
+  console.log('Hosted writing, family isolation, request conversation and unread notices passed.');
 } finally {
   if (started && !ended) {
     try { await data('/api/sessions/end', { method: 'POST', token: teacher, body: { roomName: course.id } }); }
