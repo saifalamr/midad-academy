@@ -463,7 +463,7 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   if (!(await teacher.getByRole('button', { name: 'دائرة', exact: true }).isVisible()))
     await teacher.getByLabel('أدوات إضافية', { exact: true }).click();
   await teacher.getByRole('button', { name: 'دائرة', exact: true }).click();
-  await expect(teacher.getByRole('button', { name: 'دائرة', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(teacher.locator('.board-tool-menu summary[aria-label="أدوات إضافية"]')).toHaveClass(/on/);
   await teacher.getByRole('button', { name: 'قلم', exact: true }).click();
   expect(await ink(teacher)).toBeGreaterThan(before + 100);
   await teacher.getByRole('button', { name: 'إيقاف المشاركة', exact: true }).click();
