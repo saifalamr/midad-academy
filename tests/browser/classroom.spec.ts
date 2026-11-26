@@ -436,6 +436,7 @@ test('teacher and student exchange real media, synchronized ink, permissions and
     await teacher.getByRole('button', { name: 'توسيع السبورة' }).click();
     const expanded = (await teacher.locator('.board-paper').boundingBox())!;
     expect(expanded.height).toBeGreaterThan(box.height);
+    expect.soft(await teacher.evaluate(() => document.documentElement.scrollWidth), `focused horizontal overflow at ${size.width}px`).toBeLessThanOrEqual(size.width);
     const pip = teacher.locator('.focus-call-pip');
     await expect(pip).toBeVisible();
     await expect(pip.locator('.vtile')).not.toHaveCount(0);
