@@ -359,6 +359,7 @@ test('teacher and student exchange real media, synchronized ink, permissions and
   await teacher.locator('.board-tool-menu summary[aria-label="خيارات السبورة"]').click();
   await teacher.getByRole('button', { name: 'إعادة', exact: true }).click();
   await expect.poll(() => ink(student)).toBeGreaterThan(20);
+  await expect(teacher.locator('.board-tool-menu').filter({ has: teacher.locator('summary[aria-label="خيارات السبورة"]') })).not.toHaveAttribute('open');
   const me = await request.get('http://127.0.0.1:4000/api/auth/me', {
     headers: { Authorization: `Bearer ${studentToken}` },
   });
@@ -415,9 +416,15 @@ test('teacher and student exchange real media, synchronized ink, permissions and
     const box = (await teacher.locator('.board-paper').boundingBox())!;
     expect(box.width).toBeGreaterThan(250);
     expect(box.height).toBeGreaterThan(180);
-    expect(await teacher.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-      true
-    );
+    const horizontalOverflow = await teacher.evaluate(() => ({
+      viewport: innerWidth,
+      page: document.documentElement.scrollWidth,
+      outside: [...document.querySelectorAll<HTMLElement>('body *')]
+        .filter((element) => element.getBoundingClientRect().right > innerWidth + 1)
+        .slice(0, 8)
+        .map((element) => `${element.tagName.toLowerCase()}.${String(element.className).slice(0, 50)}`),
+    }));
+    expect(horizontalOverflow.page, `horizontal overflow at ${size.width}px: ${horizontalOverflow.outside.join(', ')}`).toBeLessThanOrEqual(horizontalOverflow.viewport);
     await expect(teacher.getByRole('button', { name: 'كتم الصوت', exact: true })).toBeVisible();
     await teacher.getByRole('button', { name: 'توسيع السبورة' }).click();
     const expanded = (await teacher.locator('.board-paper').boundingBox())!;

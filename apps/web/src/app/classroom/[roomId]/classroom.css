@@ -106,7 +106,8 @@
   .midad.classroom-v2 .board-tool-popover .wb-tool span{display:inline}
 }
 @media (max-width:380px){
-  .midad.classroom-v2 .wb-tool,.midad.classroom-v2 .board-tool-menu summary{width:34px;min-width:34px}
+  .midad.classroom-v2 .wb-tool-row{flex-wrap:wrap;gap:3px;white-space:normal}
+  .midad.classroom-v2 .wb-tool,.midad.classroom-v2 .board-tool-menu summary{width:44px;min-width:44px;height:44px}
   .midad.classroom-v2 .wb-sep{margin:0 1px}
   .midad.classroom-v2 .board-tool-popover .wb-tool{width:100%}
 }

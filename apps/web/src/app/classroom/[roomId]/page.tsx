@@ -1034,10 +1034,16 @@ function ClassroomContent({
               <details className="board-tool-menu">
                 <summary aria-label="خيارات السبورة"><Icon name="menu" /><span>خيارات</span></summary>
                 <div className="board-tool-popover" role="group" aria-label="خيارات السبورة">
-                  <button type="button" disabled={!inkInteractive} className="wb-tool" onClick={() => whiteboardRef.current?.redo()}>
+                  <button type="button" disabled={!inkInteractive} className="wb-tool" onClick={(event) => {
+                    whiteboardRef.current?.redo();
+                    event.currentTarget.closest('details')?.removeAttribute('open');
+                  }}>
                     <Icon name="redo" /><span>إعادة</span>
                   </button>
-                  <button type="button" className="wb-tool" onClick={() => whiteboardRef.current?.exportImage()}>
+                  <button type="button" className="wb-tool" onClick={(event) => {
+                    whiteboardRef.current?.exportImage();
+                    event.currentTarget.closest('details')?.removeAttribute('open');
+                  }}>
                     <Icon name="download" /><span>حفظ صورة</span>
                   </button>
                   <button type="button" disabled={!inkInteractive} className="wb-tool" onClick={() => {
