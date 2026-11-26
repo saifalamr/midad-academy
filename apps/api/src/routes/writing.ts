@@ -191,6 +191,23 @@ export async function writingRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: string } }>('/sessions/:id', async (request) => {
     const { session, staff } = await sessionFor(prisma, request.user, request.params.id);
     const available = staff || ['LIVE', 'COMPLETED'].includes(session.status);
+    const tasks = available
+      ? await prisma.writingTask.findMany({
+          where: {
+            sessionId: session.id,
+            ...(!staff && session.status !== 'COMPLETED' ? { useAs: 'ACTIVITY' } : {}),
+          },
+          select: { id: true, title: true, word: true, mode: true, useAs: true },
+          orderBy: { createdAt: 'asc' },
+        })
+      : [];
+    const studentAttempts = request.user.role === 'STUDENT' && tasks.length
+      ? await prisma.writingAttempt.findMany({
+          where: { taskId: { in: tasks.map((task) => task.id) }, student: { userId: request.user.id } },
+          select: { taskId: true, submittedAt: true, verdict: true },
+        })
+      : [];
+    const attemptsByTask = new Map(studentAttempts.map((attempt) => [attempt.taskId, attempt]));
     return {
       data: {
         session: {
@@ -200,16 +217,15 @@ export async function writingRoutes(app: FastifyInstance) {
           courseTitle: session.course.title,
         },
         staff,
-        tasks: available
-          ? await prisma.writingTask.findMany({
-              where: {
-                sessionId: session.id,
-                ...(!staff && session.status !== 'COMPLETED' ? { useAs: 'ACTIVITY' } : {}),
-              },
-              select: { id: true, title: true, word: true, mode: true, useAs: true },
-              orderBy: { createdAt: 'asc' },
-            })
-          : [],
+        tasks: tasks.map((task) => {
+          const attempt = attemptsByTask.get(task.id);
+          return {
+            ...task,
+            ...(request.user.role === 'STUDENT'
+              ? { attempt: attempt ? { submittedAt: attempt.submittedAt, verdict: attempt.verdict } : null }
+              : {}),
+          };
+        }),
       },
     };
   });

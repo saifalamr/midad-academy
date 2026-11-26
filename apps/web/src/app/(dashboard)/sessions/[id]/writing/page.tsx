@@ -2,6 +2,7 @@
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { useAuth } from '@/components/AuthProvider';
 import { academyApi as api } from '@/lib/academy-workflow';
 import { PopupNotice, showPopup } from '@/components/FeedbackProvider';
 import WritingBoard from '@/components/WritingBoard';
@@ -16,9 +17,12 @@ import '@/components/writing.css';
 type Data = {
   session: { id: string; title: string; status: string; courseTitle: string };
   staff: boolean;
-  tasks: WritingTask[];
+  tasks: (Pick<WritingTask, 'id' | 'title' | 'word' | 'mode' | 'useAs'> & {
+    attempt?: { submittedAt: string; verdict: 'PENDING' | 'ACHIEVED' | 'PRACTICE' } | null;
+  })[];
 };
 export default function WritingSession({ params }: { params: Promise<{ id: string }> }) {
+  const { user } = useAuth();
   const { id } = use(params);
   const embedded = useSearchParams().get('embedded') === '1';
   const [data, setData] = useState<Data | null>(null),
@@ -358,6 +362,17 @@ export default function WritingSession({ params }: { params: Promise<{ id: strin
               <article className="card pad" key={t.id}>
                 <span className="tag">{t.useAs === 'HOMEWORK' ? 'واجب كتابة' : 'نشاط الحصة'}</span>
                 <h3>{t.title}</h3>
+                {user?.role === 'STUDENT' && (
+                  <p className="writing-muted" role="status">
+                    {t.attempt
+                      ? t.attempt.verdict === 'PENDING'
+                        ? 'سلّمت محاولتك · بانتظار مراجعة المعلم'
+                        : t.attempt.verdict === 'ACHIEVED'
+                          ? 'سلّمت محاولتك · أتقنت التمرين'
+                          : 'سلّمت محاولتك · راجع ملاحظة المعلم'
+                      : 'لم تسلّم محاولة بعد · يمكنك البدء الآن'}
+                  </p>
+                )}
                 <p>
                   {t.mode === 'GUIDED'
                     ? 'تتبّع بمسارات مرقمة ومساعدة تقريبية'
@@ -368,7 +383,11 @@ export default function WritingSession({ params }: { params: Promise<{ id: strin
                     className="btn btn-gold"
                     href={'/writing/' + t.id + (embedded ? '?embedded=1' : '')}
                   >
-                    {data.staff ? 'معاينة ومراجعة المحاولات' : 'فتح تمرين الكتابة'}
+                    {data.staff
+                      ? 'معاينة ومراجعة المحاولات'
+                      : user?.role === 'STUDENT'
+                        ? t.attempt ? 'عرض محاولتك والتقييم' : 'ابدأ الكتابة'
+                        : 'عرض تمرين الكتابة'}
                   </Link>
                   {data.staff && (
                     <button

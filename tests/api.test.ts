@@ -3402,12 +3402,18 @@ test('writing library, immutable assignments and private submissions form one te
   await prisma.classSession.update({where:{id:session.id},data:{status:'LIVE'}});
   assert.equal((await call('GET','/api/writing/live/'+course.id,childKey)).json().data.sessionId,session.id);
   assert.equal((await call('GET','/api/writing/live/'+course.id,keys.stranger)).statusCode,404);
+  const studentList=await call('GET',sessionPath,childKey);
+  assert.equal(studentList.statusCode,200,studentList.body);
+  assert.equal(studentList.json().data.tasks[0].attempt,null);
+  assert.equal('attempt' in (await call('GET',sessionPath,keys.parent)).json().data.tasks[0],false);
+  assert.equal((await call('GET',sessionPath,keys.stranger)).statusCode,404);
   assert.equal((await call('POST',path+'/submit',keys.parent,{strokes:guides})).statusCode,403);
   const check=await call('POST',path+'/check',childKey,{strokes:guides});
   assert.equal(check.statusCode,200,check.body);assert.equal(check.json().data.status,'ON_TRACK');
   const [a,b]=await Promise.all([call('POST',path+'/submit',childKey,{strokes:guides}),call('POST',path+'/submit',childKey,{strokes:[[...guides[0]].reverse()]})]);
   assert.equal(a.statusCode,200,a.body);assert.equal(b.statusCode,200,b.body);assert.equal(a.json().data.id,b.json().data.id);
   const attempt=a.json().data;assert.equal(attempt.verdict,'PENDING');
+  assert.equal((await call('GET',sessionPath,childKey)).json().data.tasks[0].attempt.verdict,'PENDING');
   assert.equal((await call('GET','/api/writing/parent-progress',keys.parent)).json().data.length,0);
   await prisma.classSession.update({where:{id:session.id},data:{status:'COMPLETED'}});
   const parentProgress=await call('GET','/api/writing/parent-progress',keys.parent);
@@ -3426,6 +3432,7 @@ test('writing library, immutable assignments and private submissions form one te
   assert.equal((await call('PATCH',reviewPath,'teacher',{version:1,verdict:'ACHIEVED',feedback:'محاولة جيدة'})).statusCode,404);
   const review=await call('PATCH',reviewPath,keys.teacher,{version:1,verdict:'ACHIEVED',feedback:'أحسنت؛ راجع موضع النقطة'});
   assert.equal(review.statusCode,200,review.body);
+  assert.equal((await call('GET',sessionPath,childKey)).json().data.tasks[0].attempt.verdict,'ACHIEVED');
   assert.equal((await call('GET','/api/writing/parent-progress',keys.parent)).json().data[0].verdict,'ACHIEVED');
   assert.equal((await call('PATCH',reviewPath,keys.teacher,{version:1,verdict:'PRACTICE',feedback:'تغيير قديم'})).statusCode,409);
   assert.equal((await call('DELETE',path,keys.teacher)).statusCode,409);
