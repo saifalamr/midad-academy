@@ -10,13 +10,16 @@ export default function WorkspaceShell({ children }: { children: React.ReactNode
   const { user, logout } = useAuth();
   const path = usePathname();
   const router = useRouter();
-  const [unreadNotices, setUnreadNotices] = useState(0);
+  const [noticeState, setNoticeState] = useState({ userId: '', count: 0 });
+  const unreadNotices = noticeState.userId === user?.id ? noticeState.count : 0;
   useEffect(() => {
     if (!user || !['ADMIN', 'PARENT'].includes(user.role)) return;
     let active = true;
     const refresh = () => {
       void academyApi<Notice[]>('/academy/notices')
-        .then((notices) => { if (active) setUnreadNotices(notices.filter((notice) => !notice.readAt).length); })
+        .then((notices) => {
+          if (active) setNoticeState({ userId: user.id, count: notices.filter((notice) => !notice.readAt).length });
+        })
         .catch(() => { /* Keep the last count until connectivity returns. */ });
     };
     refresh();
