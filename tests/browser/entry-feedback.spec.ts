@@ -62,16 +62,16 @@ test('login keeps the session secret in an HttpOnly cookie and blocks cross-site
 
 test('public home explains the lesson and exposes working entry links across widths', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: /مساحة يتعلّم فيها طفلك/ })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'يحضر حصة مباشرة' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'تتابع أنت الرحلة' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /العربية، عالمٌ يكتشفه طفلك/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'حصة فيها تفاعل' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'تقدّم تراه بنفسك' })).toBeVisible();
   for (const width of [280, 320, 390, 430, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await expect(
-      page.locator('.welcome-actions').getByRole('link', { name: 'استعرض الدورات' })
+      page.locator('.welcome-actions').getByRole('link', { name: 'اكتشف الدورات' })
     ).toBeVisible();
     await expect(
-      page.locator('.welcome-actions').getByRole('link', { name: 'إنشاء حساب ولي أمر' })
+      page.locator('.welcome-actions').getByRole('link', { name: 'أنشئ حساب ولي أمر' })
     ).toBeVisible();
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)
@@ -82,9 +82,18 @@ test('public home explains the lesson and exposes working entry links across wid
     expect(links.every((href) => href && href !== '#')).toBe(true);
     await page.screenshot({ path: `test-results/compact-home-${width}.png`, fullPage: true });
   }
-  await page.locator('.welcome-actions').getByRole('link', { name: 'استعرض الدورات' }).click();
+  await page.getByRole('button', { name: 'تفعيل الوضع الداكن' }).click();
+  await expect(page.locator('.public-home')).toHaveAttribute('data-home-theme', 'dark');
+  await page.screenshot({ path: 'test-results/glass-home-dark-1440.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: 'test-results/glass-home-dark-390.png', fullPage: true });
+  await page.reload();
+  await expect(page.locator('.public-home')).toHaveAttribute('data-home-theme', 'dark');
+  await page.getByRole('button', { name: 'تفعيل الوضع الفاتح' }).click();
+  await expect(page.locator('.public-home')).toHaveAttribute('data-home-theme', 'light');
+  await page.locator('.welcome-actions').getByRole('link', { name: 'اكتشف الدورات' }).click();
   await expect(page).toHaveURL(/#monthly-courses$/);
-  await page.locator('.welcome-actions').getByRole('link', { name: 'إنشاء حساب ولي أمر' }).click();
+  await page.locator('.welcome-actions').getByRole('link', { name: 'أنشئ حساب ولي أمر' }).click();
   await expect(page).toHaveURL(/\/register$/);
   await page.goto('/contact');
   await expect(page.locator('h1')).toBeVisible();
