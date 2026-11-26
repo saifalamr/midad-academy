@@ -1,13 +1,33 @@
 'use client';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import Icon, { type IconName } from './Icon';
 import { dashboardPath, useAuth } from './AuthProvider';
+import { academyApi, type Notice } from '@/lib/academy-workflow';
 export default function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const path = usePathname();
   const router = useRouter();
+  const [unreadNotices, setUnreadNotices] = useState(0);
+  useEffect(() => {
+    if (!user || !['ADMIN', 'PARENT'].includes(user.role)) return;
+    let active = true;
+    const refresh = () => {
+      void academyApi<Notice[]>('/academy/notices')
+        .then((notices) => { if (active) setUnreadNotices(notices.filter((notice) => !notice.readAt).length); })
+        .catch(() => { /* Keep the last count until connectivity returns. */ });
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 45_000);
+    window.addEventListener('midad-notices-changed', refresh);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener('midad-notices-changed', refresh);
+    };
+  }, [user?.id, user?.role, path]);
   if (!user) return <>{children}</>;
   const dashboard = dashboardPath(user.role);
   const links: { href: string; label: string; icon: IconName }[] = [
@@ -86,6 +106,12 @@ export default function WorkspaceShell({ children }: { children: React.ReactNode
           </b>
         </Link>
         <div className="workspace-account">
+          {(user.role === 'ADMIN' || user.role === 'PARENT') && (
+            <Link href="/academy?view=notices" className="workspace-notices" onClick={() => window.dispatchEvent(new Event('midad-open-notices'))} aria-label={`الإشعارات${unreadNotices ? `، ${unreadNotices} غير مقروءة` : ''}`}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4" /></svg>
+              {unreadNotices > 0 && <span className="workspace-notice-count">{unreadNotices > 99 ? '99+' : unreadNotices}</span>}
+            </Link>
+          )}
           <span className="workspace-role">
             {user.role === 'ADMIN'
               ? 'الإدارة'

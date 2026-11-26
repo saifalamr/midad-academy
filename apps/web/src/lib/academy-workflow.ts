@@ -105,6 +105,8 @@ export type Application = {
 export type ServiceRequest = {
   id: string;
   version: number;
+  createdAt: string;
+  updatedAt: string;
   kind: string;
   reason: string;
   response: string;
