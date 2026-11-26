@@ -1081,6 +1081,7 @@ function ClassroomContent({
               <button
                 type="button"
                 className="board-focus-toggle"
+                aria-label={boardFocused ? 'عرض الحصة' : 'توسيع السبورة'}
                 aria-pressed={boardFocused}
                 onClick={() => {
                   if (boardFocused) {
