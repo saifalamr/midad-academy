@@ -47,6 +47,8 @@ export default function RegisterPage() {
         return;
       }
 
+      // Finish the response before navigating, so the registration request is not aborted.
+      await res.json();
       localStorage.removeItem('token');
       sessionStorage.removeItem('token');
       localStorage.setItem('token', 'cookie');
