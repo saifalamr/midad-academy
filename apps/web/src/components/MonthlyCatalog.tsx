@@ -45,74 +45,83 @@ export default function MonthlyCatalog() {
   }, [attempt]);
   return (
     <section className="wrap sec" id="monthly-courses" dir="rtl">
-      <span className="eyebrow">الدورات الشهرية</span>
-      <h2 className="sec-h2">اختر رحلة طفلك القادمة</h2>
-      <p className="sec-sub">
-        اختر الدورة وأرسل طلبًا لطفلك داخل حسابك. تؤكد الإدارة التسجيل بعد المراجعة.
-      </p>
-      {state === 'loading' ? (
-        <p role="status">جارٍ عرض الدورات…</p>
-      ) : state === 'error' ? (
-        <PopupNotice>
-          تعذر تحميل الدورات الآن.
-          <button className="btn btn-outline" onClick={() => setAttempt((a) => a + 1)}>
-            إعادة المحاولة
-          </button>
-        </PopupNotice>
-      ) : !courses.length ? (
-        <p>سيتم الإعلان عن الدورات الشهرية هنا قريبًا.</p>
-      ) : (
-        <div className="catalog-grid">
-          {courses.map((c) => (
-            <article key={c.id} className="card pad catalog-card">
-              <span className="tag">
-                {c.month} · الأعمار {c.ageGroup} سنوات
-              </span>
-              <h3 dir="auto">{c.title}</h3>
-              <p dir="auto">{c.description}</p>
-              <p>
-                {c.teacherName} · {c.availableSeats} مقاعد متاحة
-              </p>
-              <p>
-                <b>
-                  {new Intl.NumberFormat('en', { style: 'currency', currency: c.currency }).format(
-                    c.price
+      <div className="catalog-intro">
+        <span className="eyebrow">الدورات الشهرية</span>
+        <h2 className="sec-h2">اختر بداية تناسب طفلك.</h2>
+        <p className="sec-sub">
+          تصفّح الدورات، ثم أرسل طلب تسجيل طفلك من حساب ولي الأمر. تؤكد الأكاديمية التسجيل بعد
+          المراجعة.
+        </p>
+      </div>
+      <div className="catalog-results">
+        {state === 'loading' ? (
+          <p role="status">جارٍ عرض الدورات…</p>
+        ) : state === 'error' ? (
+          <PopupNotice>
+            تعذر تحميل الدورات الآن.
+            <button className="btn btn-outline" onClick={() => setAttempt((a) => a + 1)}>
+              إعادة المحاولة
+            </button>
+          </PopupNotice>
+        ) : !courses.length ? (
+          <p>سيتم الإعلان عن الدورات الشهرية هنا قريبًا.</p>
+        ) : (
+          <div className="catalog-grid">
+            {courses.map((c) => (
+              <article key={c.id} className="card pad catalog-card">
+                <span className="tag">
+                  {c.month} · الأعمار {c.ageGroup} سنوات
+                </span>
+                <h3 dir="auto">{c.title}</h3>
+                <p dir="auto">{c.description}</p>
+                <p>
+                  {c.teacherName} · {c.availableSeats} مقاعد متاحة
+                </p>
+                <p>
+                  <b>
+                    {new Intl.NumberFormat('en', {
+                      style: 'currency',
+                      currency: c.currency,
+                    }).format(c.price)}
+                  </b>{' '}
+                  / شهر
+                </p>
+                <div className="course-times">
+                  <strong>المواعيد القادمة</strong>
+                  {c.sessions.length ? (
+                    <ul>
+                      {c.sessions.map((s) => (
+                        <li key={s.scheduledAt}>
+                          {sessionDate(s.scheduledAt, c.timeZone)} · {s.durationMinutes} دقيقة
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>تحدد الأكاديمية المواعيد قريبًا.</p>
                   )}
-                </b>{' '}
-                / شهر
-              </p>
-              <div className="course-times">
-                <strong>المواعيد القادمة</strong>
-                {c.sessions.length ? (
-                  <ul>
-                    {c.sessions.map((s) => (
-                      <li key={s.scheduledAt}>
-                        {sessionDate(s.scheduledAt, c.timeZone)} · {s.durationMinutes} دقيقة
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p>تحدد الأكاديمية المواعيد قريبًا.</p>
-                )}
-                <small>توقيت {c.timeZone}</small>
-              </div>
-              <div className="catalog-actions">
-                <Link className="btn btn-gold" href={`/academy?course=${encodeURIComponent(c.id)}`}>
-                  {c.availableSeats > 0 ? 'سجّل طفلك' : 'مكتملة — الانضمام لقائمة الانتظار'}
-                </Link>
-                <a
-                  className="catalog-question"
-                  href={courseInquiryUrl(c)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  استفسار عن الدورة
-                </a>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
+                  <small>توقيت {c.timeZone}</small>
+                </div>
+                <div className="catalog-actions">
+                  <Link
+                    className="btn btn-gold"
+                    href={`/academy?course=${encodeURIComponent(c.id)}`}
+                  >
+                    {c.availableSeats > 0 ? 'سجّل طفلك' : 'مكتملة — الانضمام لقائمة الانتظار'}
+                  </Link>
+                  <a
+                    className="catalog-question"
+                    href={courseInquiryUrl(c)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    استفسار عن الدورة
+                  </a>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   );
 }

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from './AuthProvider';
+import type { ReactNode } from 'react';
 
 type CurrentUser = { name: string; role: 'TEACHER' | 'STUDENT' | 'PARENT' | 'ADMIN' };
 
@@ -20,7 +21,7 @@ const NAV_LINKS = [
   { href: '/#monthly-courses', label: 'الدورات الشهرية' },
 ];
 
-export default function Navbar() {
+export default function Navbar({ homeThemeControl }: { homeThemeControl?: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -68,6 +69,7 @@ export default function Navbar() {
         </nav>
 
         <div className="nav-cta">
+          {homeThemeControl}
           {user ? (
             <div className="nav-user" ref={menuRef}>
               <button
