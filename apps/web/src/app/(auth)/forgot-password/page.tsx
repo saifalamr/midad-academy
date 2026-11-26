@@ -9,11 +9,11 @@ export default function ForgotPassword() {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   return (
-    <main className="midad wrap" style={{ maxWidth: 520, padding: '80px 24px' }}>
+    <main className="midad wrap" dir="rtl" style={{ maxWidth: 520, padding: '80px 24px' }}>
       <Link href="/login">
-        <Icon name="left" /> Log in
+        <Icon name="left" /> العودة إلى تسجيل الدخول
       </Link>
-      <h1 className="sec-h2">Reset your password</h1>
+      <h1 className="sec-h2">استعادة كلمة المرور</h1>
       <form
         className="card pad"
         onSubmit={async (e) => {
@@ -25,17 +25,20 @@ export default function ForgotPassword() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ email }),
             });
-            const data = await res.json();
-            setMessage(data.message ?? data.error);
+            setMessage(res.ok
+              ? 'إذا كان البريد مسجلًا، ستصلك رسالة برابط استعادة كلمة المرور.'
+              : res.status === 429
+                ? 'تكررت المحاولات. انتظر قليلًا ثم أعد المحاولة.'
+                : 'تعذر إرسال طلب الاستعادة الآن. أعد المحاولة بعد قليل.');
           } catch {
-            setMessage('Could not connect. Please try again.');
+            setMessage('تعذر الاتصال. تحقق من اتصالك ثم أعد المحاولة.');
           } finally {
             setBusy(false);
           }
         }}
       >
         <label className="field">
-          Your account email
+          البريد الإلكتروني لحسابك
           <input
             className="input"
             type="email"
@@ -45,7 +48,7 @@ export default function ForgotPassword() {
           />
         </label>
         <button className="btn btn-gold" disabled={busy}>
-          {busy ? 'Sending…' : 'Send reset link'}
+          {busy ? 'جارٍ الإرسال…' : 'إرسال رابط الاستعادة'}
         </button>
         {message && <PopupNotice title="رسالة الحساب">{message}</PopupNotice>}
       </form>

@@ -36,10 +36,14 @@ export default function RegisterPage() {
         }),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        setError(data.error || data.message || 'تعذر إنشاء الحساب');
+        setError(
+          res.status === 409
+            ? 'هذا البريد مسجل بالفعل. سجّل الدخول أو استعد كلمة المرور.'
+            : res.status === 429
+              ? 'تكررت محاولات التسجيل. انتظر قليلًا ثم أعد المحاولة.'
+              : 'تعذر إنشاء الحساب الآن. راجع البيانات ثم أعد المحاولة.'
+        );
         return;
       }
 
