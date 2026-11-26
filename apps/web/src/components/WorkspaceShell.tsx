@@ -10,15 +10,17 @@ export default function WorkspaceShell({ children }: { children: React.ReactNode
   const { user, logout } = useAuth();
   const path = usePathname();
   const router = useRouter();
+  const userId = user?.id;
+  const userRole = user?.role;
   const [noticeState, setNoticeState] = useState({ userId: '', count: 0 });
-  const unreadNotices = noticeState.userId === user?.id ? noticeState.count : 0;
+  const unreadNotices = noticeState.userId === userId ? noticeState.count : 0;
   useEffect(() => {
-    if (!user || !['ADMIN', 'PARENT'].includes(user.role)) return;
+    if (!userId || !userRole || !['ADMIN', 'PARENT'].includes(userRole)) return;
     let active = true;
     const refresh = () => {
       void academyApi<Notice[]>('/academy/notices')
         .then((notices) => {
-          if (active) setNoticeState({ userId: user.id, count: notices.filter((notice) => !notice.readAt).length });
+          if (active) setNoticeState({ userId, count: notices.filter((notice) => !notice.readAt).length });
         })
         .catch(() => { /* Keep the last count until connectivity returns. */ });
     };
@@ -30,7 +32,7 @@ export default function WorkspaceShell({ children }: { children: React.ReactNode
       window.clearInterval(timer);
       window.removeEventListener('midad-notices-changed', refresh);
     };
-  }, [user?.id, user?.role, path]);
+  }, [userId, userRole, path]);
   if (!user) return <>{children}</>;
   const dashboard = dashboardPath(user.role);
   const links: { href: string; label: string; icon: IconName }[] = [
