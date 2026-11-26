@@ -74,18 +74,20 @@ export default function MonthlyCatalog() {
                 </span>
                 <h3 dir="auto">{c.title}</h3>
                 <p dir="auto">{c.description}</p>
-                <p>
-                  {c.teacherName} · {c.availableSeats} مقاعد متاحة
-                </p>
-                <p>
-                  <b>
+                <div className="catalog-meta">
+                  <span>{c.teacherName}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>
+                    {c.availableSeats > 0 ? `${c.availableSeats} مقاعد متاحة` : 'الدورة مكتملة'}
+                  </span>
+                  <strong>
                     {new Intl.NumberFormat('en', {
                       style: 'currency',
                       currency: c.currency,
                     }).format(c.price)}
-                  </b>{' '}
-                  / شهر
-                </p>
+                    <small> / شهر</small>
+                  </strong>
+                </div>
                 <div className="course-times">
                   <strong>المواعيد القادمة</strong>
                   {c.sessions.length ? (
@@ -106,7 +108,7 @@ export default function MonthlyCatalog() {
                     className="btn btn-gold"
                     href={`/academy?course=${encodeURIComponent(c.id)}`}
                   >
-                    {c.availableSeats > 0 ? 'سجّل طفلك' : 'مكتملة — الانضمام لقائمة الانتظار'}
+                    {c.availableSeats > 0 ? 'سجّل طفلك' : 'انضم لقائمة الانتظار'}
                   </Link>
                   <a
                     className="catalog-question"

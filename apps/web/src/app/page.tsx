@@ -37,32 +37,51 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="home-lesson-scene" aria-label="تصوّر مبسّط لحصة العربية المباشرة">
+            <div className="home-lesson-scene" aria-label="تصوّر مبسّط لحصة مباشرة ونشاط الطفل">
               <div className="home-scene-top">
                 <span className="home-live">
                   <span /> حصة مباشرة
                 </span>
-                <span className="home-scene-name">مع مداد</span>
+                <span className="home-scene-name">المعلّم والطفل معًا</span>
               </div>
-              <div className="home-scene-board">
-                <span className="home-board-label">نتعلّم اليوم</span>
-                <strong>أ</strong>
-                <span className="home-board-word">أَسَدٌ</span>
-              </div>
-              <div className="home-scene-bottom">
-                <div>
-                  <HomeLineIcon name="person" size={19} />
-                  <span>المعلّم يشرح</span>
+              <div className="home-scene-layout">
+                <div className="home-call-video">
+                  <span className="home-call-audio" aria-hidden="true">
+                    <i />
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                  <div className="home-call-avatar">
+                    <HomeLineIcon name="person" size={44} />
+                  </div>
+                  <div className="home-call-caption">
+                    <HomeLineIcon name="camera" size={17} />
+                    <span>المعلّم يشرح مباشرة</span>
+                  </div>
+                  <div className="home-child-video">
+                    <HomeLineIcon name="person" size={22} />
+                    <span>طفلك</span>
+                  </div>
                 </div>
-                <span className="home-scene-separator" />
-                <div>
-                  <HomeLineIcon name="pen" size={19} />
-                  <span>طفلك يشارك</span>
+                <div className="home-exercise-preview">
+                  <span className="home-exercise-label">
+                    <HomeLineIcon name="pen" size={16} /> نشاط الطفل
+                  </span>
+                  <strong>أيّ كلمة تبدأ بحرف «أ»؟</strong>
+                  <div className="home-exercise-choice is-correct">
+                    <span>أَسَدٌ</span>
+                    <HomeLineIcon name="check" size={17} />
+                  </div>
+                  <div className="home-exercise-choice">
+                    <span>بَابٌ</span>
+                  </div>
+                  <span className="home-exercise-feedback">إجابة رائعة!</span>
                 </div>
               </div>
-              <div className="home-parent-note">
+              <div className="home-scene-footer">
                 <HomeLineIcon name="chart" size={19} />
-                <span>وتتابع أنت التقدّم</span>
+                <span>وأنت تتابع التقدّم من حساب ولي الأمر</span>
               </div>
             </div>
           </section>

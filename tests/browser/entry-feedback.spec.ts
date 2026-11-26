@@ -101,6 +101,53 @@ test('public home explains the lesson and exposes working entry links across wid
   await expect(page.locator('h1')).toBeVisible();
 });
 
+test('public home keeps a long full course compact and readable in both themes', async ({
+  page,
+}) => {
+  await page.route('**/api/courses/catalog', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        data: [
+          {
+            id: 'preview-full',
+            title: 'دورة اختبار الكتابة 4ac44a9a-89c',
+            description: 'دورة وهمية للتحقق من تقدم الكتابة لطفلين وعزل الأسر.',
+            month: '2026-11',
+            ageGroup: '6–9',
+            price: 0,
+            currency: 'USD',
+            teacherName: 'معلم اختبار الكتابة',
+            availableSeats: 0,
+            timeZone: 'Europe/Istanbul',
+            sessions: [],
+          },
+        ],
+      }),
+    })
+  );
+  await page.goto('/');
+  await expect(page.getByText('المعلّم يشرح مباشرة')).toBeVisible();
+  await expect(page.getByText('أيّ كلمة تبدأ بحرف «أ»؟')).toBeVisible();
+  const card = page.locator('.catalog-card');
+  await expect(card.getByText('الدورة مكتملة')).toBeVisible();
+  await expect(card.getByRole('link', { name: 'انضم لقائمة الانتظار' })).toHaveAttribute(
+    'href',
+    '/academy?course=preview-full'
+  );
+  for (const width of [280, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)
+    ).toBe(true);
+    expect((await card.boundingBox())?.height).toBeLessThan(width < 390 ? 560 : 400);
+  }
+  await page.getByRole('button', { name: 'تفعيل الوضع الداكن' }).click();
+  await expect(page.locator('.nav .brand')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(card.getByText('الدورة مكتملة')).toBeVisible();
+});
+
 test('validation and login failures use dismissible popups; retry remains available', async ({
   page,
 }) => {
