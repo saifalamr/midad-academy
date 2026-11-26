@@ -149,3 +149,7 @@
 .midad.classroom-v2.board-focused .board-wrap{grid-column:1;grid-row:2;padding-inline:12px;min-height:0}
 .midad.classroom-v2.board-focused .room-controls{grid-column:1;grid-row:3;position:static}
 @media (max-width:700px){.midad.classroom-v2.board-focused .board-wrap{padding-inline:8px}}
+@media (max-width:380px) and (max-height:720px) and (orientation:portrait){
+  .midad.room.classroom-v2.board-focused{height:auto;min-height:100dvh;overflow:visible;grid-template-rows:auto minmax(610px,1fr) auto}
+  .midad.classroom-v2.board-focused .room-controls{position:sticky;bottom:0}
+}
