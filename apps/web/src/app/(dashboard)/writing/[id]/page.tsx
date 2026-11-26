@@ -280,9 +280,9 @@ export default function WritingExercise({ params }: { params: Promise<{ id: stri
             </>
           ) : data.canSubmit ? (
             <>
+              <h2>١. اكتب الكلمة</h2>
               <p>
-                اكتب فوق الكلمة الخافتة. ارفع القلم بين الحركات، واضغط مرة للنقطة. يمكنك التراجع
-                وإعادة المحاولة قبل التسليم.
+                اتبع الكلمة الخافتة بإصبعك أو قلمك. ارفع القلم بين الحركات، والمس مرة للنقطة.
               </p>
               <WritingBoard
                 word={data.task.word}
@@ -318,9 +318,10 @@ export default function WritingExercise({ params }: { params: Promise<{ id: stri
                 </button>
               )}
               {result && <WritingGuidance result={result} />}
+              <h2>٢. راجع محاولتك وسلّمها</h2>
               <p>
-                التسليم يحفظ هذه المحاولة للمعلم. يمكنك التدريب والمسح قبل التسليم؛ لا تُستبدل
-                المحاولة بعده.
+                يمكنك التراجع أو إعادة الكتابة قبل التسليم. بعد التسليم يراجع المعلم محاولتك،
+                ولا يمكنك استبدالها.
               </p>
               <button
                 className="btn btn-gold"

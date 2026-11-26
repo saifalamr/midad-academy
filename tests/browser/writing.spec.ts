@@ -194,6 +194,7 @@ test('teacher creates a custom guided word, pupil draws a recoverable draft, ret
     await pupil.setViewportSize({ width: 390, height: 844 });
     await pupil.goto('/embedded-writing-check');
     const embeddedBoard = pupil.frameLocator('iframe[title="كتابة داخل الحصة"]');
+    await expect(embeddedBoard.locator('article').filter({ hasText: 'كتابة في نافذة الحصة' })).toContainText('لم تسلّم محاولة بعد');
     await embeddedBoard.locator('a[href="/writing/' + embeddedTask.id + '?embedded=1"]').click();
     try {
       await expect(
@@ -251,6 +252,10 @@ test('teacher creates a custom guided word, pupil draws a recoverable draft, ret
     await pupil.getByRole('button', { name: 'حسنًا', exact: true }).click();
     await expect(pupil.getByText('حُفظت المحاولة وسُلّمت للمعلم.', { exact: true })).toBeVisible();
     expect(await prisma.writingAttempt.count({ where: { taskId: task.id } })).toBe(1);
+    await pupil.goto('/sessions/' + session.id + '/writing');
+    const studentTask = pupil.locator('article').filter({ hasText: task.title });
+    await expect(studentTask).toContainText('سلّمت محاولتك · بانتظار مراجعة المعلم');
+    await expect(studentTask.getByRole('link', { name: 'عرض محاولتك والتقييم' })).toBeVisible();
     const activitySubmission = await request.post('http://127.0.0.1:4000/api/writing/tasks/' + embeddedTask.id + '/submit', {
       headers: { Authorization: 'Bearer ' + (await login('student@preview.midad.test')) },
       data: { strokes: [guides[0]] },
@@ -266,6 +271,8 @@ test('teacher creates a custom guided word, pupil draws a recoverable draft, ret
     await page.getByRole('button', { name: 'اعتماد تقييم الكتابة', exact: true }).click();
     await expect(page.getByRole('alertdialog')).toContainText('نُشر تقييم الكتابة');
     await page.getByRole('button', { name: 'حسنًا', exact: true }).click();
+    await pupil.reload();
+    await expect(studentTask).toContainText('سلّمت محاولتك · أتقنت التمرين');
     const familyContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
     contexts.push(familyContext);
     await familyContext.addInitScript(
