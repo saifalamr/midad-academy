@@ -422,7 +422,14 @@ test('teacher and student exchange real media, synchronized ink, permissions and
       outside: [...document.querySelectorAll<HTMLElement>('body *')]
         .filter((element) => element.getBoundingClientRect().right > innerWidth + 1)
         .slice(0, 8)
-        .map((element) => `${element.tagName.toLowerCase()}.${String(element.className).slice(0, 50)}`),
+        .map((element) => {
+          const parent = element.parentElement;
+          const grandparent = parent?.parentElement;
+          return [element, parent, grandparent]
+            .filter((node): node is HTMLElement => node instanceof HTMLElement)
+            .map((node) => `${node.tagName.toLowerCase()}.${String(node.className).slice(0, 50)}`)
+            .join(' < ');
+        }),
     }));
     expect(horizontalOverflow.page, `horizontal overflow at ${size.width}px: ${horizontalOverflow.outside.join(', ')}`).toBeLessThanOrEqual(horizontalOverflow.viewport);
     await expect(teacher.getByRole('button', { name: 'كتم الصوت', exact: true })).toBeVisible();
