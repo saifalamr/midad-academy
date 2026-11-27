@@ -428,19 +428,28 @@ export default function AdminPage() {
               <section className="card pad">
                 <span className="eyebrow">حساب جديد</span>
                 <h2>إضافة معلم</h2>
-                <p>سلّم المعلم بيانات دخوله بعد إنشاء الحساب.</p>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const form = e.currentTarget;
-                    void save('/teachers', 'POST', values(form), form);
-                  }}
-                >
-                  <Field label="اسم المعلم" name="name" />
-                  <Field label="البريد الإلكتروني" name="email" type="email" />
-                  <Field label="كلمة المرور (10 أحرف على الأقل)" name="password" type="password" />
-                  <button className="btn btn-gold">إنشاء حساب المعلم</button>
-                </form>
+                <details className="admin-create-panel" open={!data.teachers.length}>
+                  <summary>
+                    إضافة معلم جديد <Icon name="plus" />
+                  </summary>
+                  <p>سلّم المعلم بيانات دخوله بعد إنشاء الحساب.</p>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const form = e.currentTarget;
+                      void save('/teachers', 'POST', values(form), form);
+                    }}
+                  >
+                    <Field label="اسم المعلم" name="name" />
+                    <Field label="البريد الإلكتروني" name="email" type="email" />
+                    <Field
+                      label="كلمة المرور (10 أحرف على الأقل)"
+                      name="password"
+                      type="password"
+                    />
+                    <button className="btn btn-gold">إنشاء حساب المعلم</button>
+                  </form>
+                </details>
               </section>
               <section className="card pad">
                 <span className="eyebrow">دليل المعلمين</span>
@@ -462,49 +471,54 @@ export default function AdminPage() {
                 <section className="card pad">
                   <span className="eyebrow">حساب الطالب</span>
                   <h2>إضافة ابن لولي الأمر</h2>
-                  <p>ولي الأمر يسجّل بنفسه؛ هنا ننشئ حساب الطفل ونربطه بأسرته.</p>
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const form = e.currentTarget;
-                      const v = values(form);
-                      void save('/students', 'POST', { ...v, age: Number(v.age) }, form);
-                    }}
-                  >
-                    <label className="field">
-                      ولي الأمر
-                      <select
-                        aria-label="ولي الأمر"
-                        name="parentId"
-                        className="input"
-                        required
-                        defaultValue=""
-                      >
-                        <option value="" disabled>
-                          اختر ولي الأمر
-                        </option>
-                        {data.parents.map((p) => (
-                          <option value={p.id} key={p.id}>
-                            {p.user.name} — {p.user.email}
+                  <details className="admin-create-panel" open={!data.students.length}>
+                    <summary>
+                      إنشاء حساب طالب <Icon name="plus" />
+                    </summary>
+                    <p>ولي الأمر يسجّل بنفسه؛ هنا ننشئ حساب الطفل ونربطه بأسرته.</p>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const form = e.currentTarget;
+                        const v = values(form);
+                        void save('/students', 'POST', { ...v, age: Number(v.age) }, form);
+                      }}
+                    >
+                      <label className="field">
+                        ولي الأمر
+                        <select
+                          aria-label="ولي الأمر"
+                          name="parentId"
+                          className="input"
+                          required
+                          defaultValue=""
+                        >
+                          <option value="" disabled>
+                            اختر ولي الأمر
                           </option>
-                        ))}
-                      </select>
-                    </label>
-                    <Field label="اسم الطالب" name="name" />
-                    <Field label="اسم المستخدم (حروف إنجليزية وأرقام)" name="username" />
-                    <Field
-                      label="كلمة المرور (10 أحرف على الأقل)"
-                      name="password"
-                      type="password"
-                    />
-                    <Field label="العمر" name="age" type="number" min={5} max={15} />
-                    <button className="btn btn-gold" disabled={!data.parents.length}>
-                      إنشاء حساب الطالب
-                    </button>
-                  </form>
-                  {!data.parents.length && (
-                    <p>لا يوجد أولياء أمور بعد. يبدأ ولي الأمر من صفحة التسجيل.</p>
-                  )}
+                          {data.parents.map((p) => (
+                            <option value={p.id} key={p.id}>
+                              {p.user.name} — {p.user.email}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <Field label="اسم الطالب" name="name" />
+                      <Field label="اسم المستخدم (حروف إنجليزية وأرقام)" name="username" />
+                      <Field
+                        label="كلمة المرور (10 أحرف على الأقل)"
+                        name="password"
+                        type="password"
+                      />
+                      <Field label="العمر" name="age" type="number" min={5} max={15} />
+                      <button className="btn btn-gold" disabled={!data.parents.length}>
+                        إنشاء حساب الطالب
+                      </button>
+                    </form>
+                    {!data.parents.length && (
+                      <p>لا يوجد أولياء أمور بعد. يبدأ ولي الأمر من صفحة التسجيل.</p>
+                    )}
+                  </details>
                 </section>
                 <section className="card pad">
                   <span className="eyebrow">دليل الأسر</span>
@@ -571,19 +585,24 @@ export default function AdminPage() {
                 <section className="card pad">
                   <span className="eyebrow">إنشاء جديد</span>
                   <h2>إنشاء دورة شهرية</h2>
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const form = e.currentTarget;
-                      void save('/courses', 'POST', courseBody(form), form);
-                    }}
-                  >
-                    <CourseFields teachers={data.teachers} />
-                    <button className="btn btn-gold" disabled={!data.teachers.length}>
-                      إنشاء الدورة
-                    </button>
-                  </form>
-                  {!data.teachers.length && <p>أضف المعلم من قسم المعلمين أولًا.</p>}
+                  <details className="admin-create-panel" open={!data.courses.length}>
+                    <summary>
+                      إنشاء دورة جديدة <Icon name="plus" />
+                    </summary>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const form = e.currentTarget;
+                        void save('/courses', 'POST', courseBody(form), form);
+                      }}
+                    >
+                      <CourseFields teachers={data.teachers} />
+                      <button className="btn btn-gold" disabled={!data.teachers.length}>
+                        إنشاء الدورة
+                      </button>
+                    </form>
+                    {!data.teachers.length && <p>أضف المعلم من قسم المعلمين أولًا.</p>}
+                  </details>
                 </section>
                 <section className="card pad">
                   <span className="eyebrow">اختر دورة لإدارتها</span>

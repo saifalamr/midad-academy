@@ -180,7 +180,6 @@ export default function AcademyPage() {
       : []),
     { id: 'schedule', title: 'الحصص' },
     { id: 'skills', title: 'مهارات التعلّم' },
-    { id: 'notices', title: `الإشعارات (${notices.filter((n) => !n.readAt).length})` },
     { id: 'policy', title: 'سياسات الأكاديمية' },
     ...(admin ? [{ id: 'audit', title: 'سجل التعديلات' }] : []),
   ];
@@ -189,7 +188,7 @@ export default function AcademyPage() {
       applications[0])
     : undefined;
   return (
-    <main className="academy-flow wrap" dir="rtl">
+    <main className={`academy-flow wrap${admin ? ' academy-flow--admin' : ''}`} dir="rtl">
       <header className="flow-head">
         <div>
           <span className="eyebrow">مداد أكاديمي</span>
@@ -316,39 +315,45 @@ export default function AcademyPage() {
                       </Link>
                     </article>
                   ))}
-              <h2>دوراتك ومتابعة الشهر</h2>
-              <section className="flow-grid">
-                {courses.map((c) => (
-                  <article className="card pad" key={c.id}>
-                    <h3>{c.title}</h3>
-                    <p>
-                      شهر {c.month || 'غير محدد'} · نهاية الشهر: {courseEnd(c.month)}
-                    </p>
-                    {c.enrollments?.map((e) => (
-                      <p key={e.studentId}>
-                        {e.student.user.name}: {labels[e.status] || e.status}
+              <details
+                className={`flow-home-courses${admin ? '' : ' flow-home-courses--always'}`}
+                open={!admin}
+              >
+                <summary>{admin ? 'عرض الدورات ومتابعة الشهر' : 'دوراتك ومتابعة الشهر'}</summary>
+                <h2>دوراتك ومتابعة الشهر</h2>
+                <section className="flow-grid">
+                  {courses.map((c) => (
+                    <article className="card pad" key={c.id}>
+                      <h3>{c.title}</h3>
+                      <p>
+                        شهر {c.month || 'غير محدد'} · نهاية الشهر: {courseEnd(c.month)}
                       </p>
-                    ))}
-                    <div className="flow-actions">
-                      <button className="btn btn-outline" onClick={() => void openSkills(c.id)}>
-                        التقدم والمهارات
-                      </button>
-                      {parent && (
-                        <button
-                          className="btn btn-outline"
-                          onClick={() => {
-                            setSelectedCourse('');
-                            setTab('apply');
-                          }}
-                        >
-                          اختيار دورة للتجديد
+                      {c.enrollments?.map((e) => (
+                        <p key={e.studentId}>
+                          {e.student.user.name}: {labels[e.status] || e.status}
+                        </p>
+                      ))}
+                      <div className="flow-actions">
+                        <button className="btn btn-outline" onClick={() => void openSkills(c.id)}>
+                          التقدم والمهارات
                         </button>
-                      )}
-                    </div>
-                  </article>
-                ))}
-              </section>
-              {!courses.length && <p>ستظهر الدورات هنا بعد تأكيد التسجيل.</p>}
+                        {parent && (
+                          <button
+                            className="btn btn-outline"
+                            onClick={() => {
+                              setSelectedCourse('');
+                              setTab('apply');
+                            }}
+                          >
+                            اختيار دورة للتجديد
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </section>
+                {!courses.length && <p>ستظهر الدورات هنا بعد تأكيد التسجيل.</p>}
+              </details>
             </>
           )}
           {tab === 'children' && parent && (
@@ -668,7 +673,11 @@ export default function AcademyPage() {
                     {r.session ? ` — ${r.session.title}` : ''}
                   </p>
                   <b>{labels[r.status]}</b>
-                  <div className="flow-conversation" role="group" aria-label={`محادثة ${labels[r.kind]}`}>
+                  <div
+                    className="flow-conversation"
+                    role="group"
+                    aria-label={`محادثة ${labels[r.kind]}`}
+                  >
                     <div className={`flow-message ${parent ? 'is-sent' : 'is-received'}`}>
                       <small>ولي الأمر · {localTime(r.createdAt)}</small>
                       <p>{r.reason}</p>

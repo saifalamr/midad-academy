@@ -7,6 +7,7 @@ import { API_URL } from '@/lib/config';
 import { useAuth } from '@/components/AuthProvider';
 import { courseInquiryUrl, sessionDate } from '@/lib/academy-contact';
 import Icon from '@/components/Icon';
+import './courses.css';
 type Course = {
   id: string;
   title: string;
@@ -62,7 +63,11 @@ export default function CoursesPage() {
       `${c.title} ${c.description}`.toLowerCase().includes(search.toLowerCase())
   );
   return (
-    <main className="wrap" style={{ padding: '32px 24px' }}>
+    <main
+      className={`wrap${user?.role === 'ADMIN' ? ' admin-courses-page' : ''}`}
+      style={{ padding: '32px 24px' }}
+      dir="rtl"
+    >
       <span className="eyebrow">MONTHLY COURSES · الدورات الشهرية</span>
       <h1 className="sec-h2">
         {user?.role === 'STUDENT' ? 'دوراتي المسجل فيها' : 'الدورات الشهرية'}
@@ -96,13 +101,7 @@ export default function CoursesPage() {
       {loading ? (
         <p role="status">جارٍ تحميل الدورات…</p>
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,290px),1fr))',
-            gap: 20,
-          }}
-        >
+        <div className="course-browser-grid">
           {filtered.map((c, i) => (
             <article className="course card" key={c.id}>
               <div className={`co-thumb th-${(i % 6) + 1}`}>
@@ -144,8 +143,20 @@ export default function CoursesPage() {
                 )}
                 {user?.role === 'PARENT' ? (
                   <div className="flow-actions">
-                    <Link className="btn btn-gold" href={`/academy?course=${encodeURIComponent(c.id)}`}>{c.availableSeats > 0 ? 'سجّل طفلك' : 'مكتملة — الانضمام لقائمة الانتظار'}</Link>
-                    <a className="btn btn-outline" href={courseInquiryUrl(c)} target="_blank" rel="noopener noreferrer">استفسار عبر واتساب</a>
+                    <Link
+                      className="btn btn-gold"
+                      href={`/academy?course=${encodeURIComponent(c.id)}`}
+                    >
+                      {c.availableSeats > 0 ? 'سجّل طفلك' : 'مكتملة — الانضمام لقائمة الانتظار'}
+                    </Link>
+                    <a
+                      className="btn btn-outline"
+                      href={courseInquiryUrl(c)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      استفسار عبر واتساب
+                    </a>
                   </div>
                 ) : (
                   <Link

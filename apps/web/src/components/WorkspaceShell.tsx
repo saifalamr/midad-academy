@@ -5,39 +5,14 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import Icon, { type IconName } from './Icon';
 import { dashboardPath, useAuth } from './AuthProvider';
-import { academyApi, type Notice } from '@/lib/academy-workflow';
+import HomeThemeToggle from './HomeThemeToggle';
+import NotificationPopover from './NotificationPopover';
 import './admin-workspace.css';
 export default function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const path = usePathname();
   const router = useRouter();
-  const userId = user?.id;
-  const userRole = user?.role;
-  const [noticeState, setNoticeState] = useState({ userId: '', count: 0 });
   const [adminNavOpen, setAdminNavOpen] = useState(false);
-  const unreadNotices = noticeState.userId === userId ? noticeState.count : 0;
-  useEffect(() => {
-    if (!userId || !userRole || !['ADMIN', 'PARENT'].includes(userRole)) return;
-    let active = true;
-    const refresh = () => {
-      void academyApi<Notice[]>('/academy/notices')
-        .then((notices) => {
-          if (active)
-            setNoticeState({ userId, count: notices.filter((notice) => !notice.readAt).length });
-        })
-        .catch(() => {
-          /* Keep the last count until connectivity returns. */
-        });
-    };
-    refresh();
-    const timer = window.setInterval(refresh, 45_000);
-    window.addEventListener('midad-notices-changed', refresh);
-    return () => {
-      active = false;
-      window.clearInterval(timer);
-      window.removeEventListener('midad-notices-changed', refresh);
-    };
-  }, [userId, userRole, path]);
   useEffect(() => {
     setAdminNavOpen(false);
   }, [path]);
@@ -165,28 +140,9 @@ export default function WorkspaceShell({ children }: { children: React.ReactNode
           </b>
         </Link>
         <div className="workspace-account">
+          <HomeThemeToggle />
           {(user.role === 'ADMIN' || user.role === 'PARENT') && (
-            <Link
-              href="/academy?view=notices"
-              className="workspace-notices"
-              onClick={() => window.dispatchEvent(new Event('midad-open-notices'))}
-              aria-label={`الإشعارات${unreadNotices ? `، ${unreadNotices} غير مقروءة` : ''}`}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                aria-hidden="true"
-              >
-                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4" />
-              </svg>
-              {unreadNotices > 0 && (
-                <span className="workspace-notice-count">
-                  {unreadNotices > 99 ? '99+' : unreadNotices}
-                </span>
-              )}
-            </Link>
+            <NotificationPopover userId={user.id} />
           )}
           <span className="workspace-role">
             {user.role === 'ADMIN'

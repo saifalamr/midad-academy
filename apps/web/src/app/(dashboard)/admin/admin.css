@@ -149,31 +149,28 @@
   flex: none;
 }
 .admin-tabs {
-  display: flex;
-  gap: 8px;
-  padding: 7px;
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 12px;
+  padding: 0;
   margin: 0 0 19px;
-  border: 1px solid var(--admin-line);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.38);
-  width: fit-content;
-  max-width: 100%;
-  overflow-x: auto;
+  width: 100%;
 }
 .admin-tabs button {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 9px;
-  min-height: 44px;
-  padding: 9px 14px;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  background: transparent;
+  min-height: 68px;
+  padding: 13px 16px;
+  border: 1px solid rgba(255,255,255,.8);
+  border-radius: 17px;
+  background: rgba(255,255,255,.55);
   color: var(--admin-body);
   font-size: 13px;
   font-weight: 700;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: start;
   cursor: pointer;
 }
 .admin-tabs button:hover {
@@ -184,6 +181,7 @@
   background: #183762;
   color: #fff;
 }
+.admin-tabs button span { flex: 1; line-height: 1.45; }
 .admin-tabs button svg {
   width: 17px;
   height: 17px;
@@ -243,6 +241,27 @@
   font-weight: 600;
   text-align: start;
 }
+.admin-create-panel summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 50px;
+  padding: 10px 14px;
+  margin-top: 8px;
+  border: 1px solid var(--admin-line);
+  border-radius: 12px;
+  background: rgba(189,139,54,.1);
+  color: var(--admin-ink);
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+.admin-create-panel summary::-webkit-details-marker { display: none; }
+.admin-create-panel summary svg { color: #ad792d; transition: transform .18s; }
+.admin-create-panel[open] summary svg { transform: rotate(45deg); }
+.admin-create-panel > p { font-size: 13px; color: var(--admin-body); }
+.admin-create-panel form { padding-top: 15px; }
 .admin-page .input {
   width: 100%;
   min-width: 0;
@@ -530,16 +549,10 @@
     align-items: stretch;
     flex-direction: column;
   }
-  .admin-tabs {
-    width: 100%;
-  }
+  .admin-tabs { grid-template-columns: 1fr; gap: 8px; }
   .admin-tabs button {
-    flex: 1;
-    min-width: max-content;
-    padding-inline: 10px;
-  }
-  .admin-tabs button small {
-    display: none;
+    min-height: 56px;
+    padding-inline: 14px;
   }
   .admin-section-intro h2 {
     font-size: 20px;
