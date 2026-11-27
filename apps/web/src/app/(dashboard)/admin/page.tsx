@@ -252,6 +252,35 @@ export default function AdminPage() {
     };
   }
   const course = data.courses.find((c) => c.id === selected);
+  const liveSessions = data.courses.reduce(
+    (total, item) =>
+      total + item.classSessions.filter((session) => session.status === 'LIVE').length,
+    0
+  );
+  const sections = [
+    {
+      id: 'courses',
+      label: 'الدورات والمواعيد',
+      count: data.courses.length,
+      icon: 'book' as const,
+      description: 'اختر دورة لمراجعة طلابها وحصصها، أو أنشئ دورة جديدة.',
+    },
+    {
+      id: 'families',
+      label: 'الأسر والطلاب',
+      count: data.parents.length + data.students.length,
+      icon: 'family' as const,
+      description: 'راجع حسابات الأسر، وأنشئ حساب الطالب واربطه بولي أمره.',
+    },
+    {
+      id: 'teachers',
+      label: 'المعلمون',
+      count: data.teachers.length,
+      icon: 'graduate' as const,
+      description: 'أنشئ حسابات المعلمين وراجع من يمكن تعيينه للدورات.',
+    },
+  ];
+  const activeSection = sections.find((section) => section.id === tab) ?? sections[0];
 
   return (
     <main className="admin-page" dir="rtl">
@@ -279,6 +308,53 @@ export default function AdminPage() {
           <Icon name="refresh" /> تحديث
         </button>
       </header>
+      {!loading && !error && (
+        <section className="admin-overview" aria-label="أرقام الأكاديمية">
+          {[
+            {
+              label: 'الدورات',
+              count: data.courses.length,
+              icon: 'book' as const,
+              destination: 'courses',
+            },
+            {
+              label: 'حصص مباشرة',
+              count: liveSessions,
+              icon: 'video' as const,
+              destination: 'courses',
+            },
+            {
+              label: 'أولياء الأمور',
+              count: data.parents.length,
+              icon: 'family' as const,
+              destination: 'families',
+            },
+            {
+              label: 'الطلاب',
+              count: data.students.length,
+              icon: 'graduate' as const,
+              destination: 'families',
+            },
+            {
+              label: 'المعلمون',
+              count: data.teachers.length,
+              icon: 'edit' as const,
+              destination: 'teachers',
+            },
+          ].map((metric) => (
+            <button
+              type="button"
+              className="admin-metric"
+              key={metric.label}
+              onClick={() => setTab(metric.destination)}
+            >
+              <Icon name={metric.icon} />
+              <strong>{metric.count}</strong>
+              <span>{metric.label}</span>
+            </button>
+          ))}
+        </section>
+      )}
       {!loading && !error && (
         <section className="card pad admin-next" aria-label="الخطوة التالية للإدارة">
           <div>
@@ -314,21 +390,26 @@ export default function AdminPage() {
         </section>
       )}
       <nav className="admin-tabs" aria-label="أقسام الإدارة">
-        {[
-          ['courses', 'الدورات والمواعيد'],
-          ['families', 'الأسر والطلاب'],
-          ['teachers', 'المعلمون'],
-        ].map(([id, label]) => (
+        {sections.map((section) => (
           <button
-            key={id}
-            className={tab === id ? 'active' : ''}
-            onClick={() => setTab(id)}
-            aria-pressed={tab === id}
+            key={section.id}
+            className={tab === section.id ? 'active' : ''}
+            onClick={() => setTab(section.id)}
+            aria-pressed={tab === section.id}
           >
-            {label}
+            <Icon name={section.icon} />
+            <span>{section.label}</span>
+            <small aria-hidden="true">{section.count}</small>
           </button>
         ))}
       </nav>
+      <div className="admin-section-intro">
+        <div>
+          <span className="eyebrow">مساحة العمل</span>
+          <h2>{activeSection.label}</h2>
+          <p>{activeSection.description}</p>
+        </div>
+      </div>
       {error && (
         <PopupNotice className="auth-error" role="alert">
           {error}
@@ -345,6 +426,7 @@ export default function AdminPage() {
           {tab === 'teachers' && (
             <div className="admin-columns">
               <section className="card pad">
+                <span className="eyebrow">حساب جديد</span>
                 <h2>إضافة معلم</h2>
                 <p>سلّم المعلم بيانات دخوله بعد إنشاء الحساب.</p>
                 <form
@@ -361,6 +443,7 @@ export default function AdminPage() {
                 </form>
               </section>
               <section className="card pad">
+                <span className="eyebrow">دليل المعلمين</span>
                 <h2>المعلمون ({data.teachers.length})</h2>
                 {data.teachers.map((t) => (
                   <div className="admin-row" key={t.id}>
@@ -377,6 +460,7 @@ export default function AdminPage() {
             <>
               <div className="admin-columns">
                 <section className="card pad">
+                  <span className="eyebrow">حساب الطالب</span>
                   <h2>إضافة ابن لولي الأمر</h2>
                   <p>ولي الأمر يسجّل بنفسه؛ هنا ننشئ حساب الطفل ونربطه بأسرته.</p>
                   <form
@@ -423,6 +507,7 @@ export default function AdminPage() {
                   )}
                 </section>
                 <section className="card pad">
+                  <span className="eyebrow">دليل الأسر</span>
                   <h2>أولياء الأمور ({data.parents.length})</h2>
                   {data.parents.map((p) => (
                     <div className="admin-row" key={p.id}>
@@ -435,6 +520,7 @@ export default function AdminPage() {
                 </section>
               </div>
               <section className="card pad">
+                <span className="eyebrow">حسابات الطلاب</span>
                 <h2>الطلاب وربط الأسرة</h2>
                 {data.students.map((s) => (
                   <div className="admin-student" key={s.id}>
@@ -480,9 +566,10 @@ export default function AdminPage() {
             </>
           )}
           {tab === 'courses' && (
-            <>
+            <div className="admin-course-workspace">
               <div className="admin-columns admin-courses-columns">
                 <section className="card pad">
+                  <span className="eyebrow">إنشاء جديد</span>
                   <h2>إنشاء دورة شهرية</h2>
                   <form
                     onSubmit={(e) => {
@@ -499,6 +586,7 @@ export default function AdminPage() {
                   {!data.teachers.length && <p>أضف المعلم من قسم المعلمين أولًا.</p>}
                 </section>
                 <section className="card pad">
+                  <span className="eyebrow">اختر دورة لإدارتها</span>
                   <h2>الدورات ({data.courses.length})</h2>
                   <div className="admin-course-list">
                     {data.courses.map((c) => (
@@ -525,7 +613,10 @@ export default function AdminPage() {
               {course && (
                 <section className="card pad admin-detail" key={course.id}>
                   <div className="admin-heading">
-                    <h2>{course.title}</h2>
+                    <div>
+                      <span className="eyebrow">الدورة المختارة</span>
+                      <h2>{course.title}</h2>
+                    </div>
                     <Link className="btn btn-outline" href={`/courses/${course.id}/content`}>
                       <Icon name="book" /> إدارة المنهج والمواد
                     </Link>
@@ -661,7 +752,7 @@ export default function AdminPage() {
                           · {course.timeZone} · {s.durationMinutes} دقيقة
                         </span>
                       </div>
-                      <span>
+                      <span className="admin-session-status">
                         {(
                           {
                             SCHEDULED: 'مجدولة',
@@ -671,46 +762,48 @@ export default function AdminPage() {
                           } as Record<string, string>
                         )[s.status] || s.status}
                       </span>
-                      <Link
-                        className="btn btn-gold btn-sm"
-                        href={`/admin/sessions/${s.id}/details`}
-                      >
-                        تفاصيل الحصة والحضور
-                      </Link>
-                      <Link
-                        className="btn btn-outline btn-sm"
-                        href={`/admin/sessions/${s.id}/materials`}
-                      >
-                        مواد الحصة
-                      </Link>
-                      <Link
-                        className="btn btn-outline btn-sm"
-                        href={`/admin/sessions/${s.id}/homework`}
-                      >
-                        واجب الحصة
-                      </Link>
-                      {s.status === 'LIVE' && (
-                        <Link className="btn btn-gold btn-sm" href={`/classroom/${course.id}`}>
-                          مراقبة الحصة
-                        </Link>
-                      )}
-                      {s.status === 'SCHEDULED' && (
-                        <button
-                          className="btn btn-outline btn-sm"
-                          onClick={() => {
-                            if (window.confirm('إلغاء هذا الموعد؟'))
-                              void save(`/sessions/${s.id}/cancel`, 'PATCH');
-                          }}
+                      <div className="admin-session-actions">
+                        <Link
+                          className="btn btn-gold btn-sm"
+                          href={`/admin/sessions/${s.id}/details`}
                         >
-                          إلغاء الموعد
-                        </button>
-                      )}
+                          تفاصيل الحصة والحضور
+                        </Link>
+                        <Link
+                          className="btn btn-outline btn-sm"
+                          href={`/admin/sessions/${s.id}/materials`}
+                        >
+                          مواد الحصة
+                        </Link>
+                        <Link
+                          className="btn btn-outline btn-sm"
+                          href={`/admin/sessions/${s.id}/homework`}
+                        >
+                          واجب الحصة
+                        </Link>
+                        {s.status === 'LIVE' && (
+                          <Link className="btn btn-gold btn-sm" href={`/classroom/${course.id}`}>
+                            مراقبة الحصة
+                          </Link>
+                        )}
+                        {s.status === 'SCHEDULED' && (
+                          <button
+                            className="btn btn-outline btn-sm"
+                            onClick={() => {
+                              if (window.confirm('إلغاء هذا الموعد؟'))
+                                void save(`/sessions/${s.id}/cancel`, 'PATCH');
+                            }}
+                          >
+                            إلغاء الموعد
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                   {!course.classSessions.length && <p>لا توجد مواعيد لهذه الدورة بعد.</p>}
                 </section>
               )}
-            </>
+            </div>
           )}
         </fieldset>
       )}
