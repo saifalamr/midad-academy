@@ -6,6 +6,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { API_URL } from '@/lib/config';
+import HomeThemeToggle from '@/components/HomeThemeToggle';
+import '../auth-glass.css';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -55,8 +57,7 @@ export default function LoginPage() {
         const pending = sessionStorage.getItem('midad-return-to');
         sessionStorage.removeItem('midad-return-to');
         router.push(pending && /^\/academy(?:\?|$)/.test(pending) ? pending : '/parent');
-      }
-      else router.push('/student');
+      } else router.push('/student');
     } catch {
       setError('تعذر الاتصال بالخادم. حاول مرة أخرى.');
     } finally {
@@ -65,7 +66,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="midad auth" lang="ar">
+    <div className="midad auth auth-page" lang="ar" dir="rtl" data-home-theme="light">
       {/* ── Left side ───────────────────────────────────────── */}
       <aside className="auth-side geo-navy" dir="rtl">
         <Link className="brand" href="/">
@@ -80,38 +81,39 @@ export default function LoginPage() {
         <div className="auth-side-body">
           <h2 className="auth-head">أهلاً بعودتك إلى مداد</h2>
           <p className="ar auth-head-ar">نلتقي لنكتشف ونتعلّم</p>
-          <p className="auth-side-p">
-            حصصك، واجباتك وتقدّمك، كلها في مكان واحد.
-          </p>
+          <p className="auth-side-p">حصصك، واجباتك وتقدّمك، كلها في مكان واحد.</p>
           <div className="card-glass auth-quote">
             <p>كل حرف بداية، وكل درس خطوة جديدة.</p>
           </div>
         </div>
 
-        <div className="auth-side-foot">© 2026 Midad Academy</div>
+        <div className="auth-side-foot">مداد أكاديمي · تعلّم العربية بثقة</div>
       </aside>
 
       {/* ── Right side ──────────────────────────────────────── */}
       <div className="auth-main">
         <AuthBackdrop />
+        <div className="auth-topbar">
+          <Link href="/">العودة للرئيسية</Link>
+          <HomeThemeToggle />
+        </div>
         <div className="auth-card" dir="rtl">
           <AuthIdentity />
-          <div className="auth-top-link">
-            جديد في مداد؟ <Link href="/register">إنشاء حساب ولي أمر</Link>
-          </div>
-
           <h1 className="auth-title">تسجيل الدخول</h1>
-          <p className="auth-sub">
-            أدخل بياناتك لنكمل رحلة التعلّم.
+          <p className="auth-sub">أدخل بياناتك لنكمل رحلة التعلّم.</p>
+          <p className="auth-role-note">
+            <strong>حساب واحد لكل دور</strong>
+            <span>
+              ولي الأمر، الطالب، المعلّم والإدارة يدخلون من هنا. إنشاء حساب جديد متاح لولي الأمر
+              فقط.
+            </span>
           </p>
 
           {error && <PopupNotice className="auth-error">{error}</PopupNotice>}
 
           <form onSubmit={handleSubmit}>
             <div className="field">
-              <label htmlFor="email">
-                البريد الإلكتروني أو اسم المستخدم
-              </label>
+              <label htmlFor="email">البريد الإلكتروني أو اسم المستخدم</label>
               <input
                 id="email"
                 className="input"
@@ -125,9 +127,7 @@ export default function LoginPage() {
             </div>
 
             <div className="field">
-              <label htmlFor="password">
-                كلمة المرور
-              </label>
+              <label htmlFor="password">كلمة المرور</label>
               <div className="input-wrap">
                 <input
                   id="password"
@@ -142,7 +142,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   className="eye"
-                  aria-label={showPw ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+                  aria-label={showPw ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
                   onClick={() => setShowPw((v) => !v)}
                 >
                   {showPw ? (
@@ -184,26 +184,10 @@ export default function LoginPage() {
               {loading ? 'جارٍ تسجيل الدخول…' : 'تسجيل الدخول'}
             </button>
           </form>
+          <p className="auth-bottom-link">
+            جديد في مداد؟ <Link href="/register">أنشئ حساب ولي أمر</Link>
+          </p>
         </div>
-      </div>
-
-      <div
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          textAlign: 'center',
-          padding: '8px',
-          fontSize: '12px',
-          color: '#fff',
-          background: 'rgba(16,30,52,0.9)',
-          backdropFilter: 'blur(4px)',
-          zIndex: 50,
-          borderTop: '1px solid var(--line)',
-        }}
-      >
-        made by DOPIXA
       </div>
     </div>
   );

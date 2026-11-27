@@ -6,6 +6,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { API_URL } from '@/lib/config';
+import HomeThemeToggle from '@/components/HomeThemeToggle';
+import '../auth-glass.css';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -55,8 +57,9 @@ export default function RegisterPage() {
       window.dispatchEvent(new Event('midad-auth'));
       const pending = sessionStorage.getItem('midad-return-to');
       sessionStorage.removeItem('midad-return-to');
-      router.replace(pending && /^\/academy\?course=[a-zA-Z0-9_-]+$/.test(pending)
-        ? pending : '/academy?start=1');
+      router.replace(
+        pending && /^\/academy\?course=[a-zA-Z0-9_-]+$/.test(pending) ? pending : '/academy?start=1'
+      );
     } catch {
       setError('تعذر الاتصال بالخادم. حاول مرة أخرى.');
     } finally {
@@ -65,7 +68,12 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="midad auth" lang="ar">
+    <div
+      className="midad auth auth-page auth-page--register"
+      lang="ar"
+      dir="rtl"
+      data-home-theme="light"
+    >
       {/* ── Left side ───────────────────────────────────────── */}
       <aside className="auth-side geo-navy" dir="rtl">
         <Link className="brand" href="/">
@@ -88,18 +96,18 @@ export default function RegisterPage() {
           </ul>
         </div>
 
-        <div className="auth-side-foot">© 2026 Midad Academy</div>
+        <div className="auth-side-foot">مداد أكاديمي · تعلّم العربية بثقة</div>
       </aside>
 
       {/* ── Right side ──────────────────────────────────────── */}
       <div className="auth-main">
         <AuthBackdrop />
+        <div className="auth-topbar">
+          <Link href="/">العودة للرئيسية</Link>
+          <HomeThemeToggle />
+        </div>
         <div className="auth-card" dir="rtl">
           <AuthIdentity />
-          <div className="auth-top-link">
-            عندك حساب؟ <Link href="/login">تسجيل الدخول</Link>
-          </div>
-
           <h1 className="auth-title">إنشاء حساب ولي الأمر</h1>
           <p className="auth-sub">
             بعدها تختار الدورة وتضيف طفلك في طلب واحد. سنوضح لك حالة الطلب والخطوة التالية.
@@ -109,13 +117,12 @@ export default function RegisterPage() {
 
           <form onSubmit={handleSubmit}>
             <div className="field">
-              <label htmlFor="name">
-                الاسم الكامل
-              </label>
+              <label htmlFor="name">الاسم الكامل</label>
               <input
                 id="name"
                 className="input"
                 type="text"
+                autoComplete="name"
                 required
                 placeholder="مثال: سارة الأمين"
                 value={name}
@@ -124,13 +131,12 @@ export default function RegisterPage() {
             </div>
 
             <div className="field">
-              <label htmlFor="email">
-                البريد الإلكتروني
-              </label>
+              <label htmlFor="email">البريد الإلكتروني</label>
               <input
                 id="email"
                 className="input"
                 type="email"
+                autoComplete="email"
                 required
                 placeholder="you@example.com"
                 value={email}
@@ -140,13 +146,12 @@ export default function RegisterPage() {
 
             <div className="grid-2">
               <div className="field">
-                <label htmlFor="password">
-                  كلمة المرور
-                </label>
+                <label htmlFor="password">كلمة المرور</label>
                 <input
                   id="password"
                   className="input"
                   type="password"
+                  autoComplete="new-password"
                   required
                   minLength={10}
                   maxLength={128}
@@ -170,7 +175,7 @@ export default function RegisterPage() {
                   value={whatsappPhone}
                   onChange={(e) => setWhatsappPhone(e.target.value.replace(/[\s()-]/g, ''))}
                 />
-                <small>مثال: +966 ثم الرقم، بدون صفر البداية.</small>
+                <small>مثال: +966 ثم الرقم دون صفر البداية.</small>
               </div>
             </div>
 
@@ -184,7 +189,8 @@ export default function RegisterPage() {
               من إعدادات الإشعارات.
             </label>
             <label className="check check-block">
-              <input type="checkbox" required />أوافق على{' '}
+              <input type="checkbox" required />
+              أوافق على{' '}
               <Link href="/terms" className="link-gold">
                 الشروط
               </Link>{' '}
@@ -203,6 +209,9 @@ export default function RegisterPage() {
               {loading ? 'جارٍ تجهيز حسابك…' : 'إنشاء الحساب ومتابعة تسجيل الطفل'}
             </button>
           </form>
+          <p className="auth-bottom-link">
+            لديك حساب بالفعل؟ <Link href="/login">تسجيل الدخول</Link>
+          </p>
         </div>
       </div>
     </div>
