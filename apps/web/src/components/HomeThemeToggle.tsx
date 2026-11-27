@@ -23,14 +23,14 @@ export default function HomeThemeToggle() {
           ? 'dark'
           : 'light';
     setTheme(selected);
-    const home = buttonRef.current?.closest<HTMLElement>('.public-home');
+    const home = buttonRef.current?.closest<HTMLElement>('.public-home, .auth-page');
     if (home) home.dataset.homeTheme = selected;
   }, []);
 
   function toggle() {
     const next: Theme = theme === 'light' ? 'dark' : 'light';
     setTheme(next);
-    const home = buttonRef.current?.closest<HTMLElement>('.public-home');
+    const home = buttonRef.current?.closest<HTMLElement>('.public-home, .auth-page');
     if (home) home.dataset.homeTheme = next;
     try {
       localStorage.setItem('midad-home-theme', next);
