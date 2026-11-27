@@ -33,6 +33,7 @@ const paths = {
   check: 'm5 12 4 4L19 6',
   close: 'm6 6 12 12 M18 6 6 18',
   menu: 'M4 6h16 M4 12h16 M4 18h16',
+  lock: 'M5 10h14v11H5z M8 10V7a4 4 0 0 1 8 0v3 M12 15v2',
   left: 'm14 5-7 7 7 7',
   right: 'm10 5 7 7-7 7',
   undo: 'M9 4 4 9l5 5 M4 9h10a6 6 0 0 1 0 12',

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from './AuthProvider';
 import { API_URL } from '@/lib/config';
 import './homework.css';
+import './notification-settings.css';
 const statusLabels: Record<string, string> = {
   PENDING: 'بانتظار الإرسال',
   SENDING: 'جارٍ الإرسال',
@@ -54,12 +55,12 @@ export default function NotificationSettings() {
       cache: 'no-store',
     })
       .then(async (r) => {
+        if (!r.ok) throw new Error();
         const json = await r.json();
-        if (!r.ok) throw Error(json.error);
         if (!controller.signal.aborted) setData(json.data);
       })
-      .catch((e) => {
-        if (!controller.signal.aborted) setError(e.message);
+      .catch(() => {
+        if (!controller.signal.aborted) setError('تعذر تحميل التنبيهات الآن. حاول مرة أخرى.');
       });
     return () => controller.abort();
   }, [admin, user, revision]);
@@ -77,21 +78,29 @@ export default function NotificationSettings() {
         },
         body: JSON.stringify({ whatsappOptIn: !data.whatsappOptIn }),
       });
+      if (!r.ok) throw new Error();
       const json = await r.json();
-      if (!r.ok) throw Error(json.error);
       setData(json.data);
       setSaved(true);
-    } catch (e) {
-      setError((e as Error).message);
+    } catch {
+      setError('تعذر حفظ اختيارك الآن. حاول مرة أخرى.');
     } finally {
       setSaving(false);
     }
   }
   return (
-    <main className="homework-page" dir="rtl">
+    <main
+      className={`homework-page notification-settings${admin ? ' notification-settings--admin' : ''}`}
+      dir="rtl"
+    >
       <header>
-        <span className="tag">التواصل مع الأسرة</span>
-        <h1>{admin ? 'سجل رسائل واتساب' : 'رسائل واتساب'}</h1>
+        <span className="eyebrow">التواصل مع الأسرة</span>
+        <h1>{admin ? 'إعدادات التنبيهات' : 'رسائل واتساب'}</h1>
+        <p>
+          {admin
+            ? 'حالة الإرسال وسجل الرسائل، مرتّبان للمراجعة.'
+            : 'اختر إذا كنت ترغب باستقبال رسائل الأكاديمية.'}
+        </p>
       </header>
       {error && (
         <PopupNotice role="alert" className="homework-error">
@@ -102,41 +111,56 @@ export default function NotificationSettings() {
       {data &&
         (admin ? (
           <>
-            <section className="card">
+            <section className="card notification-status">
+              <span className="notification-state-dot" aria-hidden="true" />
               <h2>
                 {data.enabled && data.configured ? 'الإرسال مفعّل' : 'الإرسال التلقائي غير مفعّل'}
               </h2>
               <p>
                 رسائل تأكيد التسجيل وتقارير الحصص ودرجات الواجبات والتذكير قبل الحصة بعشر دقائق.
               </p>
-              <ul aria-label="جاهزية خدمة واتساب">
+              <ul className="notification-checks" aria-label="جاهزية خدمة واتساب">
                 {data.setupChecks?.map((check) => (
                   <li key={check.label}>
-                    {check.label}: {check.ready ? 'جاهز' : 'يحتاج إعداد'}
+                    <span>{check.label}:</span>
+                    <b className={check.ready ? 'ready' : ''}>
+                      {check.ready ? 'جاهز' : 'يحتاج إعداد'}
+                    </b>
                   </li>
                 ))}
               </ul>
-              <p>
-                {data.schedulerConfigured
-                  ? 'مفتاح تشغيل المجدول جاهز.'
-                  : 'مفتاح تشغيل المجدول الخارجي لم يُضبط.'}{' '}
-                التشغيل الدقيق أثناء سكون الخادم يحتاج مجدولًا خارجيًا يعمل باستمرار.
-              </p>
-              <p>
-                قبول المزود للرسالة لا يؤكد وصولها. حالات التأكيد غير المعروف تحتاج مراجعة المزود.
-              </p>
+              <details className="notification-details">
+                <summary>ملاحظات تشغيل الخدمة</summary>
+                <p>
+                  {data.schedulerConfigured
+                    ? 'مفتاح تشغيل المجدول جاهز.'
+                    : 'مفتاح تشغيل المجدول الخارجي لم يُضبط.'}{' '}
+                  التشغيل الدقيق أثناء سكون الخادم يحتاج مجدولًا خارجيًا يعمل باستمرار.
+                </p>
+                <p>
+                  قبول المزود للرسالة لا يؤكد وصولها. حالات التأكيد غير المعروف تحتاج مراجعة المزود.
+                </p>
+              </details>
               <button className="btn btn-outline" onClick={() => setRevision((n) => n + 1)}>
                 تحديث السجل
               </button>
             </section>
+            <h2 className="notification-list-title">آخر الرسائل</h2>
             {data.notifications?.length ? (
               data.notifications.map((item) => (
-                <article key={item.id} className="card">
+                <article key={item.id} className="card notification-log">
                   <h3>
                     {kindLabels[item.kind] || item.kind} · {item.recipient.name}
                   </h3>
-                  <p>{statusLabels[item.status] || item.status}</p>
-                  {item.lastError && <p>{item.lastError}</p>}
+                  <p className="notification-log-status">
+                    {statusLabels[item.status] || 'تحتاج مراجعة'}
+                  </p>
+                  {item.lastError && (
+                    <details className="notification-details">
+                      <summary>تفاصيل الإخفاق للإدارة</summary>
+                      <p>{item.lastError}</p>
+                    </details>
+                  )}
                   <time>{new Date(item.createdAt).toLocaleString('ar')}</time>
                 </article>
               ))

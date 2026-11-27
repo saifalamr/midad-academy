@@ -23,6 +23,7 @@ export default function HomeThemeToggle() {
           ? 'dark'
           : 'light';
     setTheme(selected);
+    document.documentElement.dataset.midadTheme = selected;
     const home = buttonRef.current?.closest<HTMLElement>('.public-home, .auth-page');
     if (home) home.dataset.homeTheme = selected;
   }, []);
@@ -30,8 +31,10 @@ export default function HomeThemeToggle() {
   function toggle() {
     const next: Theme = theme === 'light' ? 'dark' : 'light';
     setTheme(next);
+    document.documentElement.dataset.midadTheme = next;
     const home = buttonRef.current?.closest<HTMLElement>('.public-home, .auth-page');
     if (home) home.dataset.homeTheme = next;
+    window.dispatchEvent(new CustomEvent('midad-theme-changed', { detail: next }));
     try {
       localStorage.setItem('midad-home-theme', next);
     } catch {

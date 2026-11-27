@@ -11,10 +11,11 @@
 }
 .workspace-shell--admin .workspace-topbar {
   min-width: 0;
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.78);
   border-bottom: 1px solid var(--line);
   backdrop-filter: blur(24px) saturate(145%);
   -webkit-backdrop-filter: blur(24px) saturate(145%);
+  box-shadow: 0 9px 30px rgba(24, 51, 87, .04);
 }
 .workspace-shell--admin .workspace-brand img {
   width: auto;
@@ -89,6 +90,21 @@
 .workspace-shell--admin .workspace-role {
   color: #687b93;
 }
+.workspace-shell .home-theme-toggle {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgba(255,255,255,.58);
+  color: #183762;
+}
+.workspace-shell--admin .workspace-brand { margin-inline-end: auto; }
+.workspace-shell--admin .workspace-account { gap: 10px; }
+.workspace-shell--admin .workspace-profile { padding: 5px 10px 5px 5px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.48); }
+.workspace-shell--admin .workspace-brand img { height: 48px; }
 .workspace-shell--admin .admin-nav-toggle,
 .workspace-shell--admin .admin-nav-close,
 .workspace-shell--admin .admin-nav-scrim {
@@ -120,8 +136,9 @@
     height: 42px;
   }
   .workspace-shell--admin .workspace-account {
-    gap: 8px;
+    gap: 6px;
   }
+  .workspace-shell--admin .workspace-profile { padding: 3px; }
   .workspace-shell--admin .workspace-role,
   .workspace-shell--admin .workspace-profile > span:last-child {
     display: none;

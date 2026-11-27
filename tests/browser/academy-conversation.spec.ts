@@ -1,6 +1,10 @@
 import { test, expect } from '@playwright/test';
 
-test('family and administration see a distinguishable request conversation and unread updates', async ({ page, request, browser }) => {
+test('family and administration see a distinguishable request conversation and unread updates', async ({
+  page,
+  request,
+  browser,
+}) => {
   const login = async (email: string) => {
     const response = await request.post('http://127.0.0.1:4000/api/auth/login', {
       data: { email, password: 'MidadPreview2026!' },
@@ -12,7 +16,9 @@ test('family and administration see a distinguishable request conversation and u
   const adminToken = await login('admin@preview.midad.test');
   const parentHeaders = { Authorization: `Bearer ${parentToken}` };
   const adminHeaders = { Authorization: `Bearer ${adminToken}` };
-  const childrenResponse = await request.get('http://127.0.0.1:4000/api/academy/children', { headers: parentHeaders });
+  const childrenResponse = await request.get('http://127.0.0.1:4000/api/academy/children', {
+    headers: parentHeaders,
+  });
   const child = (await childrenResponse.json()).data[0];
   const reason = `أحتاج توضيحًا بشأن خطة الدرس ${Date.now()}`;
   const created = await request.post('http://127.0.0.1:4000/api/academy/requests', {
@@ -30,13 +36,15 @@ test('family and administration see a distinguishable request conversation and u
 
   await page.addInitScript((token) => localStorage.setItem('token', token), parentToken);
   await page.goto('/academy');
-  const notices = page.getByRole('link', { name: /الإشعارات، .* غير مقروءة/ });
+  const notices = page.getByRole('button', { name: /الإشعارات، .* غير مقروءة/ });
   await expect(notices).toBeVisible();
   await notices.click();
-  await expect(page.getByRole('button', { name: /الإشعارات \(/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(notices).toHaveAttribute('aria-expanded', 'true');
   await expect(page.getByRole('heading', { name: 'رد الإدارة على طلبك' }).first()).toBeVisible();
   await page.getByRole('button', { name: 'الغياب والتعويض والمساعدة' }).click();
-  const conversation = page.getByRole('group', { name: 'محادثة طلب مساعدة' }).filter({ hasText: reason });
+  const conversation = page
+    .getByRole('group', { name: 'محادثة طلب مساعدة' })
+    .filter({ hasText: reason });
   await expect(conversation.locator('.is-sent')).toContainText(reason);
   await expect(conversation.locator('.is-received')).toContainText(answer);
 
@@ -45,12 +53,16 @@ test('family and administration see a distinguishable request conversation and u
   const adminPage = await adminContext.newPage();
   await adminPage.goto('/academy');
   await adminPage.getByRole('button', { name: 'الغياب والتعويض والمساعدة' }).click();
-  const adminConversation = adminPage.getByRole('group', { name: 'محادثة طلب مساعدة' }).filter({ hasText: reason });
+  const adminConversation = adminPage
+    .getByRole('group', { name: 'محادثة طلب مساعدة' })
+    .filter({ hasText: reason });
   await expect(adminConversation.locator('.is-received')).toContainText(reason);
   await expect(adminConversation.locator('.is-sent')).toContainText(answer);
   for (const width of [320, 820, 1440]) {
     await page.setViewportSize({ width, height: 850 });
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBeTruthy();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)
+    ).toBeTruthy();
   }
   await adminContext.close();
 });

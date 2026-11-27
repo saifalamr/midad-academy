@@ -39,9 +39,7 @@ test('parents control WhatsApp consent and administration sees the honest integr
   await expect(
     adminPage.getByRole('heading', { name: 'الإرسال التلقائي غير مفعّل' })
   ).toBeVisible();
-  await expect(adminPage.getByRole('list', { name: 'جاهزية خدمة واتساب' })).toContainText(
-    'رمز وصول مزود واتساب: يحتاج إعداد'
-  );
+  await expect(adminPage.getByRole('list', { name: 'جاهزية خدمة واتساب' }).getByRole('listitem').filter({ hasText: 'رمز وصول مزود واتساب' })).toContainText(/رمز وصول مزود واتساب:\s*يحتاج إعداد/);
   await expect(adminPage.getByText('رسائل تأكيد التسجيل', { exact: false })).toBeVisible();
   for (const width of [320, 820, 1440]) {
     await adminPage.setViewportSize({ width, height: 900 });

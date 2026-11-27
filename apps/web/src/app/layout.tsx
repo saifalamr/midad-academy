@@ -10,6 +10,7 @@ import '@fontsource/ibm-plex-sans-arabic/500.css';
 import '@fontsource/ibm-plex-sans-arabic/600.css';
 import '@fontsource/ibm-plex-sans-arabic/700.css';
 import './globals.css';
+import './theme.css';
 import { FeedbackProvider } from '@/components/FeedbackProvider';
 import { AuthProvider } from '@/components/AuthProvider';
 
@@ -31,7 +32,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem('midad-home-theme');document.documentElement.dataset.midadTheme=t==='light'||t==='dark'?t:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(e){document.documentElement.dataset.midadTheme='light'}`,
+          }}
+        />
+      </head>
       <body className="antialiased">
         <FeedbackProvider>
           <AuthProvider>{children}</AuthProvider>
